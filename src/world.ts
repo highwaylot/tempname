@@ -46,9 +46,9 @@ function makeDrifter(seed: number, speed: number) {
 
 export class World {
   state: WorldState;
-  private entropyDrift = makeDrifter(1.234, 0.05);
-  private depthDrift = makeDrifter(5.678, 0.03);
-  private warmthDrift = makeDrifter(9.101, 0.02);
+  private entropyDrift = makeDrifter(1.234, 0.02);
+  private depthDrift = makeDrifter(5.678, 0.012);
+  private warmthDrift = makeDrifter(9.101, 0.008);
   private listeners: Listener[] = [];
   private nextRippleId = 0;
 
