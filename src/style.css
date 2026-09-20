@@ -1,0 +1,86 @@
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #05070a;
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+  color: #eee;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  cursor: pointer;
+}
+
+#ui-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10;
+}
+
+.panel {
+  background: rgba(10, 12, 16, 0.75);
+  backdrop-filter: blur(6px);
+  padding: 16px 18px;
+  border-radius: 0 0 12px 0;
+  max-width: 280px;
+  font-size: 13px;
+}
+
+.panel h1 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.panel h2 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ab;
+}
+
+.hint {
+  color: #789;
+  font-size: 11px;
+}
+
+.group {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+input[type="range"] {
+  flex: 1;
+}
+
+select, button, input[type="number"] {
+  background: #1a1f28;
+  color: #eee;
+  border: 1px solid #2a3140;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+button {
+  cursor: pointer;
+}
+
+.hidden {
+  display: none;
+}
