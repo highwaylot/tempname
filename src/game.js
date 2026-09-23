@@ -2,11 +2,12 @@
 // locals at the top of each function that uses them.
 import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
-import { startBeds, driveAudio, blip, thump, crashSound, arp } from './audio.js';
+import { startBeds, driveAudio, blip, thump, crashSound, arp, duck } from './audio.js';
 import { view } from './render.js';
-import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, showDeath, syncOneHand } from './ui.js';
+import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, setOverlay, showDeath, showGate, showPause, hidePause, syncOneHand } from './ui.js';
 import { sidePointer } from './input.js';
-import { haptic } from './native.js';
+import { haptic, ent } from './native.js';
+import { resetClock } from './loop.js';
 
 // ===================== game state =====================
 export var PHASE_READY = 0, PHASE_RUN = 1, PHASE_DEAD = 2;
@@ -41,6 +42,11 @@ export var game = {
   rampT: 0,
   grace: 0,
   paused: false,
+  // Who paused ("user" for the pause menu, "" for tab/panel/rotate), when
+  // (performance.now(), for the 300 ms resume lockout) and the 3-2-1 hold.
+  pausedBy: "",
+  pausedAt: 0,
+  countdown: 0,
   litTime: 0,
   slowmo: 0,
   // Loop-owned values that were closure vars: grid scroll phase, the
@@ -60,13 +66,22 @@ export var CHARGE_DECAY = 0.32;
 export var BOOST_DRAIN = 0.4;
 export var BOOST_SPEED = 1.85;
 export var MAGNET_R = 120;
+// One thumb registers half the strokes and never earns the 1.8x bilateral
+// bonus; 3.0 lands ignition ~1.6 s at a casual 2.9 strokes/s (two-thumb
+// 1.4 s); 3.6 = exact two-thumb parity, 1.8 = the bilateral bonus alone.
+// First guess pending play reports.
+export var ONE_HAND_PUMP = 3.0;
+// The rare coin, rolled per row: blue 1 in 30 (a few per run), purple 1 in
+// 250 (once every few runs). No pity counter: uncertainty about how much,
+// never whether.
+export var BLUE_ODDS = 1/30, PURPLE_ODDS = 1/250;
 
 // On touch the thumb covers the avatar, so it rides above the contact point.
 export var TOUCH_OFFSET = 62;
 function makeCursor(){
   return { x:0, y:0, tx:0, ty:0, rawX:0, rawY:0, offset:0, active:false, trail:[],
            prevTy:0, strokeDir:0, strokeStart:0, lastStrokeAt:-9,
-           px:0, py:0, vx:0, vy:0 };
+           px:0, py:0, vx:0, vy:0, dy:0 };
 }
 export var cursors = [ makeCursor(), makeCursor() ];
 export function lanes(){ return state.oneHand ? 1 : 2; }
@@ -92,6 +107,12 @@ export var HIT_R = 12;
 export var DRAW_R = 17;
 
 export function startRun(){
+  // Every start path (title, the three restart paths, pause restart) goes
+  // through here, so this is the whole gate.
+  if(!ent.canRun()){ showGate(); return; }
+  // Counted on start, so a run killed mid-way still counts.
+  state.life.runs++;
+  saveState();
   game.phase = PHASE_RUN;
   game.dist = 0;
   game.coins = 0;
@@ -112,17 +133,21 @@ export function startRun(){
   game.runTime = 0;
   game.hinted = false;
   game.wreck = 0;
+  game.bestCombo = 0;
   game.debris.length = 0;
   game.flash = 0;
   game.dying = 0;
   game.rampT = 0;
   game.grace = 0;
+  game.pausedBy = "";
+  game.pausedAt = 0;
+  game.countdown = 0;
   game.litTime = 0;
   game.slowmo = 0;
   cursors.forEach(function(c){ c.strokeDir = 0; c.lastStrokeAt = -9; c.prevTy = c.ty; c.strokeStart = c.ty; c.trail.length = 0; });
   resetComboStat();
-  overlayReady.classList.add("gone");
-  overlayDead.classList.add("gone");
+  setOverlay(overlayReady, false);
+  setOverlay(overlayDead, false);
   startBeds();
 }
 // The hit itself: burst, sound, shake, and half a second of slow motion so
@@ -151,9 +176,19 @@ export function finishDeath(){
   game.phase = PHASE_DEAD;
   game.deadAt = world.time;
   var score = Math.floor(game.dist);
+  // The first run ever is not a record: there was nothing to beat.
+  var isRecord = score > state.best && state.best > 0;
   if(score > state.best){ state.best = score; }
   saveState();
-  showDeath(score);
+  if(isRecord){
+    game.flash = 0.8; game.flashColor = "242,193,78";
+    if(state.soundOn){ arp([523,659,784,1047], 70, "triangle", 0.16); thump(200, 0.2, 0.4); }
+    haptic("record");
+  }
+  // Here and not in startRun: the restart gate reads lanes() before startRun
+  // runs, and startRun must not teleport the live orb.
+  if(pendingOneHand != null){ var p = pendingOneHand; pendingOneHand = null; setOneHand(p); }
+  showDeath(score, isRecord);
 }
 
 // Barrier rects break into chunks with real velocity away from the impact,
@@ -211,7 +246,7 @@ function shatter(o, c){
   if(crunch) haptic("crunch"); else haptic("smash", power);
   comboNum.textContent = game.combo;
   comboMult.textContent = "×" + (1 + Math.floor(game.combo/5));
-  comboBadge.classList.remove("pop"); void comboBadge.offsetWidth; comboBadge.classList.add("pop");
+  restartAnim(comboBadge, "pop");
   if(game.wreck >= game.wreckTarget) wreckStorm();
 }
 
@@ -247,6 +282,8 @@ function wreckStorm(){
 function collectSpecial(p, gain){
   var purple = p.tier === 2;
   var hex = purple ? "#b04bff" : "#3d7bff";
+  // Lifetime tally; finishDeath saves.
+  if(purple) state.life.purples++; else state.life.blues++;
   world.perturb(p.x, p.y, purple ? 1.6 : 1.1, 1.6);
   game.shake = Math.max(game.shake, purple ? 0.7 : 0.35);
   game.flash = purple ? 0.9 : 0.5;
@@ -330,9 +367,7 @@ function threaded(o, c){
   if(surge) haptic("surge");
   comboNum.textContent = game.combo;
   comboMult.textContent = "×" + mult;
-  comboBadge.classList.remove("pop");
-  void comboBadge.offsetWidth;
-  comboBadge.classList.add("pop");
+  restartAnim(comboBadge, "pop");
 }
 
 var lastTickAt = -9;
@@ -346,10 +381,10 @@ export function registerStroke(side, amp){
   // ±30% jitter so the exact stroke that tips the meter is never certain.
   // Sustained uncertainty about when the payoff lands is what keeps the
   // ramp toward it alive.
-  var add = STROKE_CHARGE * (0.7 + Math.random()*0.6) * (rhythm ? 1.4 : 0.8) * (bilateral ? 1.8 : 1);
+  var add = STROKE_CHARGE * (0.7 + Math.random()*0.6) * (rhythm ? 1.4 : 0.8) * (bilateral ? 1.8 : 1) * (state.oneHand ? ONE_HAND_PUMP : 1);
   game.charge = Math.min(1, game.charge + add);
   if(!state.taughtPump){ state.taughtPump = true; saveState(); }
-  gauge.classList.remove("tick"); void gauge.offsetWidth; gauge.classList.add("tick");
+  restartAnim(gauge, "tick");
   // Frantic pumping can hit 20 strokes/s; cap the tick so it does not spawn
   // a fresh audio graph on every one.
   if(state.soundOn && now - lastTickAt > 0.08){
@@ -395,9 +430,9 @@ function spawnRow(){
   // more common the longer you stay continuously lit, so infinite boost
   // demands threading at speed instead of replacing it.
   var pHard = 0.06 + (game.boost > 0 ? Math.min(0.5, 0.14 + game.litTime*0.05) : 0);
-  // The rare coin, rolled per row. Blue ~1 in 50, purple ~1 in 400.
+  // The rare coin, rolled per row (BLUE_ODDS / PURPLE_ODDS).
   var sr = Math.random();
-  var specialTier = sr < 1/400 ? 2 : (sr < 1/50 ? 1 : 0);
+  var specialTier = sr < PURPLE_ODDS ? 2 : (sr < BLUE_ODDS ? 1 : 0);
   var specialSide = lanes() === 1 ? 0 : (Math.random() < 0.5 ? 0 : 1);
   var h = 22 + Math.random()*26;
 
@@ -467,7 +502,7 @@ export function update(dt){
       c.vx = Math.max(-1400, Math.min(1400, (c.x - c.px)/dt));
       c.vy = Math.max(-1400, Math.min(1400, (c.y - c.py)/dt));
     }
-    c.px = c.x; c.py = c.y;
+    c.dy = c.y - c.py; c.px = c.x; c.py = c.y;
     // Paused thumbs resync strokeDir/strokeStart on resume instead of
     // counting the pre-pause half stroke.
     if(game.phase === PHASE_RUN && c.active && !game.paused){
@@ -507,6 +542,7 @@ export function update(dt){
     if(game.dying <= 0){ game.dying = 0; finishDeath(); }
   }
   if(game.grace > 0) game.grace -= dt;
+  if(game.countdown > 0) game.countdown -= dt;
   if(game.slowmo > 0) game.slowmo -= dt;
 
   if(game.phase === PHASE_RUN){
@@ -519,9 +555,11 @@ export function update(dt){
     var ramp = Math.min(1, game.rampT/1.2); ramp = ramp*ramp*(3 - 2*ramp);
     var d = difficulty();
     game.runTime += wdt;
-    if(!state.taughtPump && !game.hinted && game.runTime > 3){
+    // Ramp is fully finished at 1.2 s; the first barrier reaches the orb at
+    // ~3.3 s, so the hint is up before it and fades from 3.86 s.
+    if(!state.taughtPump && !game.hinted && game.runTime > 1.2){
       game.hinted = true;
-      game.texts.push({ x:W/2, y:H*0.8, text:"pump ↕ to charge", life:2.6, color:"#7dd3c0", size:12 });
+      game.texts.push({ x:W/2, y:H*0.8, text:"pump ↕ to charge", life:4.0, color:"#7dd3c0", size:12 });
       while(game.texts.length > 4) game.texts.shift();
     }
     // Boost is a spendable tank: ignites at full, drains while lit, and
@@ -551,7 +589,7 @@ export function update(dt){
       // A storm fired from shatter() can empty this array mid-loop.
       if(i >= game.obstacles.length) continue;
       var o = game.obstacles[i];
-      o.y += game.speed*wdt;
+      var mv = game.speed*wdt; o.y += mv;
       o.flash = Math.max(0, o.flash - dt*3.2);
       if(o.y > H + 60){ game.obstacles.splice(i,1); continue; }
       if(o.side >= lanes()) continue;
@@ -564,10 +602,15 @@ export function update(dt){
       if(game.dying > 0) continue;
       var c = cursors[o.side];
       var hit = false;
-      var inBand = o.y < c.y + HIT_R && o.y + o.h > c.y - HIT_R;
+      var rel = mv - c.dy; /* barrier down + avatar up, this frame */
+      /* > 0 only when the relative travel exceeds the band, i.e. a tunnel was
+         possible; 0 on every ordinary frame so the test is bit-identical to
+         the unswept one. */
+      var ext = Math.max(0, rel - o.h - HIT_R);
+      var inBand = o.y - ext < c.y + HIT_R && o.y + o.h > c.y - HIT_R;
       for(var r=0;r<o.rects.length;r++){
         var rc = o.rects[r];
-        if(circleRectHit(c.x, c.y, HIT_R, rc.x, o.y, rc.w, o.h)){
+        if(circleRectHit(c.x, c.y, HIT_R, rc.x, o.y - ext, rc.w, o.h + ext)){
           // Boost breaks slate, not steel.
           if(game.boost > 0 && !o.hard) shatter(o, c);
           else die(c.x, c.y, (o.hard && game.boost > 0) ? "steel" : "");
@@ -682,11 +725,61 @@ export function update(dt){
   driveAudio();
 }
 
+// A switch asked for mid-run waits for the run to end. Applied live it
+// re-laned the field under the orb: the idle second orb died to lane-1 rows
+// (one -> two) or rows spawned for a lane that no longer existed (two -> one).
+var pendingOneHand = null;
+export function getPendingOneHand(){ return pendingOneHand; }
 export function setOneHand(on){
+  if(game.phase === PHASE_RUN){
+    pendingOneHand = (!!on === state.oneHand) ? null : !!on;
+    syncOneHand();
+    return;
+  }
   state.oneHand = !!on;
   saveState();
   sidePointer[1] = null;
   cursors[1].active = false;
-  if(game.phase !== PHASE_RUN) resetCursors();
+  resetCursors();
   syncOneHand();
+}
+
+// ===================== pause menu =====================
+// A user pause is distinct from the tab/panel/rotate pauses (pausedBy ""):
+// only the thumbs lift it, never a tab return or a closing sheet, and the
+// world holds for a 1.2 s 3-2-1 count after it so the orbs can be re-placed.
+export function pauseRun(){
+  if(game.phase !== PHASE_RUN || game.paused || game.dying > 0) return;
+  game.paused = true; game.pausedBy = "user"; game.pausedAt = performance.now();
+  showPause(Math.floor(game.dist), game.coins, game.combo);
+  duck(true);
+}
+export function resumeRun(){
+  if(game.pausedBy !== "user") return;
+  hidePause();
+  game.paused = false; game.pausedBy = "";
+  game.grace = 1.2; game.countdown = 1.2;
+  resetClock();
+  duck(false);
+}
+// Called from every press on the field. True means the press was the pause
+// menu's to consume: the 300 ms lockout swallows the tap that reached the
+// button, then the run resumes once every lane's thumb is down.
+export function tryResume(){
+  if(game.pausedBy !== "user") return false;
+  if(performance.now() - game.pausedAt < 300) return true;
+  if(lanes() === 1 ? cursors[0].active : (cursors[0].active && cursors[1].active)) resumeRun();
+  return true;
+}
+export function quitToTitle(){
+  hidePause();
+  game.paused = false; game.pausedBy = "";
+  game.phase = PHASE_READY;
+  game.boost = 0; game.charge = 0; game.wreck = 0; game.slowmo = 0; game.dying = 0;
+  game.obstacles.length = 0; game.pickups.length = 0; game.debris.length = 0;
+  game.texts.length = 0; game.sparks.length = 0; game.rings.length = 0;
+  resetComboStat();
+  resetCursors();
+  setOverlay(overlayReady, true);
+  duck(false);
 }

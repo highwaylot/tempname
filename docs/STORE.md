@@ -40,7 +40,7 @@ subtitle: Thread it, or wreck it
 promo: One lane per thumb. Thread the gaps, or pump the tank and smash through. Plays one-handed too. No ads, no accounts, nothing leaves your phone.
 ```
 
-### 1.4 Description (4000 max) — 2810 chars
+### 1.4 Description (4000 max) — 2799 chars
 
 ```
 description-begin
@@ -66,7 +66,7 @@ Settings you can change: sound and volume, the impact level of hits, trail lengt
 
 No ads. No accounts. No tracking. The game makes no network requests while you play, contains no analytics and no third-party code, and does not ask who you are.
 
-The download is free and includes the game. A single one-time purchase of $4.99 unlocks it fully. There is nothing else to buy, no currency, no consumables, no timers, and no way to spend more.
+The first 15 runs are free and complete. One purchase of $4.99 unlocks unlimited runs. There is nothing else to buy, no currency, no consumables, no timers, and no way to spend more.
 
 The name is from Bell's theorem: two separated systems whose outcomes are correlated beyond what either side produces alone. The two thumbs are the pair. The seam between the lanes is the channel.
 description-end
@@ -198,7 +198,7 @@ play-title: Bell Theory
 play-short: A two-thumb endless runner. Thread the gap or wreck it. No ads, no accounts.
 ```
 
-### 2.3 Full description (4000 max) — 2801 chars after substitution
+### 2.3 Full description (4000 max) — 2799 chars after substitution
 
 Use the App Store description (1.4) verbatim, with one substitution: replace
 the paragraph beginning "The download is free" with the version below, because
@@ -207,7 +207,7 @@ be localised by Play's pricing template.
 
 ```
 play-full-substitute-begin
-The download is free and includes the game. A single one-time purchase unlocks it fully. There is nothing else to buy, no currency, no consumables, no timers, and no way to spend more.
+The first 15 runs are free and complete. One purchase unlocks unlimited runs. There is nothing else to buy, no currency, no consumables, no timers, and no way to spend more.
 play-full-substitute-end
 ```
 
@@ -301,7 +301,10 @@ list and the privacy policy all change. See the open questions.
    `.woff2` files inside the bundle with `@font-face` (both fonts are OFL) or
    fall back to system fonts, and remove the three `<link>` tags. Then run the
    harness with network disabled to prove it.
-2. **Photo picker usage string.** The orb picture chooser is
+2. **Photo picker usage string.** *Done in part (W27): `NSPhotoLibraryUsageDescription`
+   is in `ios/App/App/Info.plist` and the input carries `accept="image/*"`;
+   the camera string is not added — check on a device whether the sheet still
+   offers "Take Photo" and add `NSCameraUsageDescription` if it does.* The orb picture chooser is
    `<input type="file">`, which on iOS opens the system photo picker from the
    WebView. Add `NSPhotoLibraryUsageDescription` (and
    `NSCameraUsageDescription`, since the sheet offers "Take Photo") to
@@ -309,7 +312,8 @@ list and the privacy policy all change. See the open questions.
    It stays on this phone." Without the strings the picker can crash the app
    at review. Alternatively remove the camera option by restricting the
    accept attribute; the library string is still needed.
-3. **Persistence swap.** `localStorage` → Capacitor Preferences, per
+3. **Persistence swap.** *Done (W30): `@capacitor/preferences` holds the durable
+   copy, localStorage is the synchronous cache.* `localStorage` → Capacitor Preferences, per
    DECISIONS.md, so that the WebView's storage is not purged by the OS under
    pressure and the best score survives. The privacy answers already assume
    Preferences.

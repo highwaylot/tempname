@@ -2,11 +2,11 @@
 // at import time, and the only one that imports the stylesheet, so nothing
 // else may import it.
 import './styles.css';
-import { loadPersisted } from './native.js';
-import { state, hydrateState } from './state.js';
+import { loadPersisted, initNative, ent, wireBackButton, wireLifecycle } from './native.js';
+import { state, hydrateState, saveState } from './state.js';
 import { audio, initAudio, ensureAudio } from './audio.js';
 import { view, initRender, draw } from './render.js';
-import { initUI, syncHud, isPanelOpen, isRotateShown } from './ui.js';
+import { initUI, syncHud, syncGate, isPanelOpen, isRotateShown, openPanel, closePanel } from './ui.js';
 import { initInput } from './input.js';
 import { game, PHASE_RUN, resetCursors, update } from './game.js';
 import { loop, resetClock } from './loop.js';
@@ -25,6 +25,7 @@ function initProf(){
   window.BellTheory.prof = prof;
 }
 function frame(ts){
+  loop.frameNo++;
   var dt = loop.lastTs ? Math.min(0.05, (ts-loop.lastTs)/1000) : 0;
   loop.lastTs = ts;
   var t0 = prof ? performance.now() : 0, t1 = t0, t2 = t0;
@@ -59,27 +60,59 @@ function onVisibilityChange(){
       var s = audio.ctx.suspend(); if(s && s.catch) s.catch(function(){});
     }
   } else {
-    if(game.paused && !isPanelOpen() && !isRotateShown()){ game.paused = false; game.grace = 0.8; }
+    if(game.paused && game.pausedBy !== "user" && !isPanelOpen() && !isRotateShown()){ game.paused = false; game.grace = 0.8; }
     resetClock();
     if(state.soundOn) ensureAudio();
   }
 }
 
+// The wrapper's surface: the store plugin sets the entitlement and price
+// and takes the unlock/restore taps; the Android back handler (native.js
+// wireBackButton) reads the panel, phase and rotate state. Extended, not
+// replaced: initProf may already own window.BellTheory.prof.
+function initBridge(){
+  window.BellTheory = Object.assign(window.BellTheory || {}, {
+    isPanelOpen: isPanelOpen,
+    openPanel: openPanel,
+    closePanel: closePanel,
+    phase: function(){ return game.phase; },
+    rotateShown: isRotateShown,
+    PHASE_RUN: PHASE_RUN,
+    setUnlocked: function(on){ ent.unlocked = !!on; syncGate(); },
+    setPrice: function(str){ ent.price = str ? String(str) : null; syncGate(); },
+    onUnlockRequested: function(cb){ ent.onUnlock = typeof cb === "function" ? cb : null; },
+    onRestoreRequested: function(cb){ ent.onRestore = typeof cb === "function" ? cb : null; }
+  });
+}
+
 // Persisted settings first (raced against a short timeout so a stalled
 // bridge never blocks the game), then each module's init in dependency
-// order, then the loop.
+// order, then the loop. A load that loses the race (json undefined, as
+// against null for "nothing stored") still lands: its best is recovered
+// when it arrives, so a slow bridge never costs the high score.
 function boot(){
-  var timeout = new Promise(function(resolve){ setTimeout(function(){ resolve(null); }, 1000); });
-  return Promise.race([loadPersisted(), timeout]).then(function(json){
-    hydrateState(json);
+  var load = loadPersisted();
+  var timeout = new Promise(function(resolve){ setTimeout(function(){ resolve(undefined); }, 1000); });
+  return Promise.race([load, timeout]).then(function(json){
+    hydrateState(json == null ? null : json);
+    initNative();
     initRender();
     initAudio();
     initUI();
     initInput();
     resetCursors();
     initProf();
+    initBridge();
+    wireLifecycle();
+    wireBackButton();
     document.addEventListener("visibilitychange", onVisibilityChange);
     requestAnimationFrame(frame);
+    if(json === undefined) load.then(function(late){
+      try{
+        var p = late && JSON.parse(late);
+        if(p && typeof p.best === "number" && p.best > state.best){ state.best = p.best; saveState(); }
+      }catch(e){}
+    });
   });
 }
 boot();

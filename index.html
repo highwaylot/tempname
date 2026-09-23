@@ -29,6 +29,11 @@
         <span class="stat" id="comboStat"><i>Combo</i><b><span id="comboNum">0</span><em id="comboMult">×1</em></b></span>
       </div>
       <div class="tools">
+        <button class="icon-btn pause-btn" id="pauseBtn" aria-label="Pause" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5v14M15 5v14"/>
+          </svg>
+        </button>
         <button class="icon-btn sound-btn" id="soundBtn" aria-label="Toggle sound">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 5 6 9H3v6h3l5 4z"/>
@@ -58,9 +63,14 @@
       <div class="title-block">
         <div class="title">BELL THEORY</div>
         <div class="tagline">thread it · or wreck it</div>
+        <div class="tagline free-note" id="freeNote" hidden>15 runs free, then one purchase</div>
       </div>
       <div class="cta-block">
         <div class="cta" id="readyCta">both thumbs down</div>
+        <div class="mode-seg gate-row" id="readyGate" role="group" aria-label="Unlock">
+          <button type="button" class="unlock">unlock</button>
+          <button type="button" class="restore">restore</button>
+        </div>
         <div class="mode-seg" id="modeSeg" role="group" aria-label="Play mode">
           <button type="button" data-mode="two">two thumbs</button>
           <button type="button" data-mode="one">one thumb</button>
@@ -68,13 +78,32 @@
       </div>
     </div>
 
-    <div class="overlay gone" id="overlayDead">
+    <div class="overlay gone" id="overlayDead" inert>
       <div class="dead-block">
-        <div class="dead-label">crashed</div>
+        <div class="dead-label" id="deadLabel">crashed</div>
         <div class="big" id="deadDist">0</div>
         <div class="row"><span>coins <b id="deadCoins">0</b></span><span>best <span id="deadBest">0</span></span></div>
         <p class="loop" id="deadLoop"></p>
+        <p class="loop life" id="deadLife" hidden>run <span id="deadLifeRun">0</span> · blue <span class="life-blue" id="deadLifeBlue">0</span> · purple <span class="life-purple" id="deadLifePurple">0</span></p>
         <div class="cta" id="deadCta">both thumbs to run again</div>
+        <div class="mode-seg gate-row" id="deadGate" role="group" aria-label="Unlock">
+          <button type="button" class="unlock">unlock</button>
+          <button type="button" class="restore">restore</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay gone" id="overlayPause" inert>
+      <div class="dead-block">
+        <div class="dead-label" style="color:var(--accent)">paused</div>
+        <div class="big" id="pauseDist">0</div>
+        <div class="row"><span>coins <b id="pauseCoins"></b></span><span>combo <span id="pauseCombo"></span></span></div>
+        <div class="pause-actions">
+          <button type="button" id="pauseSettings">settings</button>
+          <button type="button" id="pauseRestart">restart</button>
+          <button type="button" id="pauseQuit">title</button>
+        </div>
+        <div class="cta" id="pauseCta">both thumbs down to resume</div>
       </div>
     </div>
   </div>
@@ -89,7 +118,7 @@
     <details class="panel-section howto">
       <summary>How to play</summary>
       <p>Left thumb drives the left lane, right thumb the right. Thread the gaps, take the coins. Lift a thumb and that side stops moving — it does not stop being hit.</p>
-      <p><b>Pump</b> both thumbs up and down to fill the tank. At 100 it ignites and drains as you ride it. Faster, coins pull to you, and barriers break on you instead of the other way round. Every smash refills the tank, so you can stay lit and wreck as long as you keep hitting things.</p>
+      <p><b>Pump</b> up and down to fill the tank (both thumbs together fill it fastest). At 100 it ignites and drains as you ride it. Faster, coins pull to you, and barriers break on you instead of the other way round. Every smash refills the tank, so you can stay lit and wreck as long as you keep hitting things.</p>
     </details>
 
     <div class="panel-section">
@@ -101,6 +130,7 @@
           <span class="track"></span><span class="knob"></span>
         </label>
       </div>
+      <p class="note" id="modeNote" hidden>applies to your next run</p>
       <div id="slotList"></div>
     </div>
 
@@ -120,9 +150,11 @@
       <div class="field">
         <div class="field-label"><span>Impact</span><span class="val" id="impactVal"></span></div>
         <input type="range" id="impactRange" min="0" max="200" step="5">
+        <p class="note">sound only; native haptics use system strength</p>
       </div>
       <p class="note">Engine: <b id="audioStatus">not started</b> <span id="errStatus"></span></p>
-      <p class="note">Silent on iPhone with the engine running? Flip the ring/silent switch — web audio obeys it.</p>
+      <p class="note" data-web-only>Silent on iPhone with the engine running? Flip the ring/silent switch — web audio obeys it.</p>
+      <button class="reset-btn" id="restoreBtn">restore purchase</button>
     </div>
 
     <div class="panel-section">
@@ -138,6 +170,13 @@
       <div class="field">
         <div class="field-label"><span>Follow speed</span><span class="val" id="followVal"></span></div>
         <input type="range" id="followRange" min="8" max="60" step="1">
+      </div>
+      <div class="toggle-line">
+        <span>Auto pause</span>
+        <label class="switch">
+          <input type="checkbox" id="autoPauseToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
       </div>
     </div>
 

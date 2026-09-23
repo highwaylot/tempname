@@ -207,6 +207,14 @@ export function crashSound(){
   src.start(t);
 }
 
+// Pause menu: the bed drops to a quarter behind the card and comes back on
+// resume. A muted engine stays at the floor either way.
+export function duck(on){
+  if(!audio.master || !audio.ctx) return;
+  var v = state.soundOn ? state.volume : 0.0001;
+  audio.master.gain.setTargetAtTime(on ? (state.soundOn ? state.volume*0.25 : 0.0001) : v, audio.ctx.currentTime, 0.1);
+}
+
 // Staggered notes. A chord reads as a hit; an arpeggio reads as a reward.
 export function arp(freqs, gapMs, type, vol){
   freqs.forEach(function(f, i){

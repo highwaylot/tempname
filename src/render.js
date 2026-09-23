@@ -394,6 +394,19 @@ export function draw(){
   ctx2d.globalAlpha = 1;
   ctx2d.textAlign = "left";
 
+  // Resume countdown, drawn directly: game.texts caps at 5 entries and would
+  // evict a frozen 3-2-1 label under a burst of pass labels.
+  if(game.countdown > 0){
+    var n = Math.min(3, Math.ceil(game.countdown/0.4));
+    ctx2d.globalAlpha = 0.9;
+    ctx2d.fillStyle = "#7dd3c0";
+    ctx2d.font = "600 34px 'IBM Plex Mono', monospace";
+    ctx2d.textAlign = "center";
+    ctx2d.fillText(String(n), W/2, H*0.45);
+    ctx2d.globalAlpha = 1;
+    ctx2d.textAlign = "left";
+  }
+
   if(game.flash > 0 && !reduceMotion){
     ctx2d.fillStyle = "rgba(" + game.flashColor + "," + (game.flash*0.3).toFixed(3) + ")";
     ctx2d.fillRect(-40, -40, W + 80, H + 80);
