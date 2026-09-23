@@ -613,8 +613,13 @@ export function update(dt){
       var c = cursors[o.side];
       var hit = false;
       var rel = mv - c.dy; /* barrier down + avatar up, this frame */
-      /* > 0 only when the relative travel exceeds the band, i.e. a tunnel was
-         possible; 0 on every ordinary frame so the test is bit-identical to
+      /* Extends the wall's top edge upward by the relative travel beyond
+         the band. > 0 once rel > h + HIT_R, which is HIT_R before a tunnel
+         is actually possible (old circle fully below the band needs
+         rel > h + 2*HIT_R), so in that HIT_R-wide range a diagonal corner
+         slide can also register. One-directional: barrier down + avatar up
+         only; an avatar diving down through a wall it already passed is not
+         swept. 0 on every ordinary frame so the test is bit-identical to
          the unswept one. */
       var ext = Math.max(0, rel - o.h - HIT_R);
       var inBand = o.y - ext < c.y + HIT_R && o.y + o.h > c.y - HIT_R;
