@@ -170,6 +170,9 @@ export function finishDeath(){
     if(state.soundOn){ arp([523,659,784,1047], 70, "triangle", 0.16); thump(200, 0.2, 0.4); }
     haptic("record");
   }
+  // Here and not in startRun: the restart gate reads lanes() before startRun
+  // runs, and startRun must not teleport the live orb.
+  if(pendingOneHand != null){ var p = pendingOneHand; pendingOneHand = null; setOneHand(p); }
   showDeath(score, isRecord);
 }
 
@@ -706,11 +709,21 @@ export function update(dt){
   driveAudio();
 }
 
+// A switch asked for mid-run waits for the run to end. Applied live it
+// re-laned the field under the orb: the idle second orb died to lane-1 rows
+// (one -> two) or rows spawned for a lane that no longer existed (two -> one).
+var pendingOneHand = null;
+export function getPendingOneHand(){ return pendingOneHand; }
 export function setOneHand(on){
+  if(game.phase === PHASE_RUN){
+    pendingOneHand = (!!on === state.oneHand) ? null : !!on;
+    syncOneHand();
+    return;
+  }
   state.oneHand = !!on;
   saveState();
   sidePointer[1] = null;
   cursors[1].active = false;
-  if(game.phase !== PHASE_RUN) resetCursors();
+  resetCursors();
   syncOneHand();
 }

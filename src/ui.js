@@ -3,7 +3,7 @@
 // filled in initUI(); nothing here runs at import time.
 import { state, saveState, resetSettings, isMouseDevice } from './state.js';
 import { audio, unlockMediaSession, startBeds, blip, thump, isAudioLive, audioStateName } from './audio.js';
-import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand } from './game.js';
+import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand, getPendingOneHand } from './game.js';
 import { imgCache, ensureImage, clearImageCache } from './render.js';
 import { loop, resetClock } from './loop.js';
 
@@ -254,13 +254,19 @@ function disarmReset(){
 
 var modeSeg = null;
 var oneHandToggle = null;
+var modeNote = null;
 var readyCta = null;
 var deadCta = null;
 export function syncOneHand(){
+  // The picker shows the choice, live or queued for the next run; the CTAs
+  // describe the mode the next start is actually gated on.
+  var pending = getPendingOneHand();
+  var chosen = pending != null ? pending : state.oneHand;
   modeSeg.querySelectorAll("button").forEach(function(b){
-    b.classList.toggle("active", (b.dataset.mode === "one") === state.oneHand);
+    b.classList.toggle("active", (b.dataset.mode === "one") === chosen);
   });
-  oneHandToggle.checked = state.oneHand;
+  oneHandToggle.checked = chosen;
+  modeNote.hidden = pending == null;
   readyCta.textContent = state.oneHand
     ? (isMouseDevice ? "click to start" : "thumb down")
     : "both thumbs down";
@@ -397,6 +403,7 @@ export function initUI(){
 
   modeSeg = document.getElementById("modeSeg");
   oneHandToggle = document.getElementById("oneHandToggle");
+  modeNote = document.getElementById("modeNote");
   readyCta = document.getElementById("readyCta");
   deadCta = document.getElementById("deadCta");
   modeSeg.querySelectorAll("button").forEach(function(b){
