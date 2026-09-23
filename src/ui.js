@@ -6,6 +6,7 @@ import { audio, unlockMediaSession, startBeds, blip, thump, isAudioLive, audioSt
 import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand, getPendingOneHand, startRun, pauseRun, quitToTitle } from './game.js';
 import { imgCache, ensureImage, clearImageCache } from './render.js';
 import { loop, resetClock } from './loop.js';
+import { ent } from './native.js';
 
 // ===================== hud =====================
 export var overlayReady = null;
@@ -110,6 +111,10 @@ export function showDeath(score, isRecord){
   // A record is carried by the label above, not repeated here.
   deadLoop.textContent = (gap > 0 ? gap + " short of your best · " : "")
     + (state.taughtPump ? toNext + " more clean to ×" + nextMult : "pump ↕ to charge");
+  // The last free runs say so, neutrally, and only at the end.
+  var left = ent.runsLeft();
+  if(left <= 3 && left > 0) deadLoop.textContent += " · " + left + " free run" + (left === 1 ? "" : "s") + " left";
+  syncGate();
   // Lifetime line, only once a rare coin has ever been taken.
   var life = state.life;
   deadLife.hidden = life.blues + life.purples === 0;
@@ -117,6 +122,26 @@ export function showDeath(score, isRecord){
   deadLifeBlue.textContent = life.blues;
   deadLifePurple.textContent = life.purples;
   setOverlay(overlayDead, true);
+}
+// ===================== unlock gate =====================
+// .gated on an overlay swaps its CTA for the unlock/restore row; the score
+// and best stay. The unlock label carries the wrapper's price when known.
+var freeNote = null;
+var unlockBtns = null;
+var gateLabel = "";
+export function syncGate(){
+  var gated = !ent.canRun();
+  overlayReady.classList.toggle("gated", gated);
+  overlayDead.classList.toggle("gated", gated);
+  var label = "unlock" + (ent.price ? " · " + ent.price : "");
+  if(label !== gateLabel){ gateLabel = label; unlockBtns.forEach(function(b){ b.textContent = label; }); }
+  freeNote.hidden = ent.unlocked || state.life.runs > 0;
+}
+// startRun refused: show the gate on whichever card is up. From the pause
+// card's restart the run is still live, so it goes back to the title first.
+export function showGate(){
+  if(game.phase === PHASE_RUN) quitToTitle();
+  syncGate();
 }
 // The DOM half of pauseRun() / resumeRun().
 export function showPause(dist, coins, combo){
@@ -500,7 +525,15 @@ export function initUI(){
   });
   oneHandToggle.addEventListener("change", function(){ setOneHand(oneHandToggle.checked); });
 
+  freeNote = document.getElementById("freeNote");
+  freeNote.textContent = ent.FREE_RUNS + " runs free, then one purchase";
+  unlockBtns = Array.prototype.slice.call(document.querySelectorAll(".gate-row .unlock"));
+  Array.prototype.forEach.call(document.querySelectorAll(".gate-row .unlock"), function(b){ b.addEventListener("click", function(){ ent.purchase(); }); });
+  Array.prototype.forEach.call(document.querySelectorAll(".gate-row .restore"), function(b){ b.addEventListener("click", function(){ ent.restore(); }); });
+  document.getElementById("restoreBtn").addEventListener("click", function(){ ent.restore(); });
+
   renderSides();
   syncControls();
   syncOneHand();
+  syncGate();
 }

@@ -2,11 +2,11 @@
 // at import time, and the only one that imports the stylesheet, so nothing
 // else may import it.
 import './styles.css';
-import { loadPersisted } from './native.js';
+import { loadPersisted, initNative, ent } from './native.js';
 import { state, hydrateState } from './state.js';
 import { audio, initAudio, ensureAudio } from './audio.js';
 import { view, initRender, draw } from './render.js';
-import { initUI, syncHud, isPanelOpen, isRotateShown } from './ui.js';
+import { initUI, syncHud, syncGate, isPanelOpen, isRotateShown } from './ui.js';
 import { initInput } from './input.js';
 import { game, PHASE_RUN, resetCursors, update } from './game.js';
 import { loop, resetClock } from './loop.js';
@@ -66,6 +66,18 @@ function onVisibilityChange(){
   }
 }
 
+// The wrapper's surface: the store plugin sets the entitlement and price
+// and takes the unlock/restore taps. Extended, not replaced: initProf may
+// already own window.BellTheory.prof.
+function initBridge(){
+  window.BellTheory = Object.assign(window.BellTheory || {}, {
+    setUnlocked: function(on){ ent.unlocked = !!on; syncGate(); },
+    setPrice: function(str){ ent.price = str ? String(str) : null; syncGate(); },
+    onUnlockRequested: function(cb){ ent.onUnlock = typeof cb === "function" ? cb : null; },
+    onRestoreRequested: function(cb){ ent.onRestore = typeof cb === "function" ? cb : null; }
+  });
+}
+
 // Persisted settings first (raced against a short timeout so a stalled
 // bridge never blocks the game), then each module's init in dependency
 // order, then the loop.
@@ -73,12 +85,14 @@ function boot(){
   var timeout = new Promise(function(resolve){ setTimeout(function(){ resolve(null); }, 1000); });
   return Promise.race([loadPersisted(), timeout]).then(function(json){
     hydrateState(json);
+    initNative();
     initRender();
     initAudio();
     initUI();
     initInput();
     resetCursors();
     initProf();
+    initBridge();
     document.addEventListener("visibilitychange", onVisibilityChange);
     requestAnimationFrame(frame);
   });

@@ -4,9 +4,9 @@ import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
 import { startBeds, driveAudio, blip, thump, crashSound, arp, duck } from './audio.js';
 import { view } from './render.js';
-import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, setOverlay, showDeath, showPause, hidePause, syncOneHand } from './ui.js';
+import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, setOverlay, showDeath, showGate, showPause, hidePause, syncOneHand } from './ui.js';
 import { sidePointer } from './input.js';
-import { haptic } from './native.js';
+import { haptic, ent } from './native.js';
 import { resetClock } from './loop.js';
 
 // ===================== game state =====================
@@ -107,6 +107,9 @@ export var HIT_R = 12;
 export var DRAW_R = 17;
 
 export function startRun(){
+  // Every start path (title, the three restart paths, pause restart) goes
+  // through here, so this is the whole gate.
+  if(!ent.canRun()){ showGate(); return; }
   // Counted on start, so a run killed mid-way still counts.
   state.life.runs++;
   saveState();

@@ -40,7 +40,7 @@ subtitle: Thread it, or wreck it
 promo: One lane per thumb. Thread the gaps, or pump the tank and smash through. Plays one-handed too. No ads, no accounts, nothing leaves your phone.
 ```
 
-### 1.4 Description (4000 max) — 2810 chars
+### 1.4 Description (4000 max) — 2799 chars
 
 ```
 description-begin
@@ -66,7 +66,7 @@ Settings you can change: sound and volume, the impact level of hits, trail lengt
 
 No ads. No accounts. No tracking. The game makes no network requests while you play, contains no analytics and no third-party code, and does not ask who you are.
 
-The download is free and includes the game. A single one-time purchase of $4.99 unlocks it fully. There is nothing else to buy, no currency, no consumables, no timers, and no way to spend more.
+The first 15 runs are free and complete. One purchase of $4.99 unlocks unlimited runs. There is nothing else to buy, no currency, no consumables, no timers, and no way to spend more.
 
 The name is from Bell's theorem: two separated systems whose outcomes are correlated beyond what either side produces alone. The two thumbs are the pair. The seam between the lanes is the channel.
 description-end
@@ -198,7 +198,7 @@ play-title: Bell Theory
 play-short: A two-thumb endless runner. Thread the gap or wreck it. No ads, no accounts.
 ```
 
-### 2.3 Full description (4000 max) — 2801 chars after substitution
+### 2.3 Full description (4000 max) — 2799 chars after substitution
 
 Use the App Store description (1.4) verbatim, with one substitution: replace
 the paragraph beginning "The download is free" with the version below, because
@@ -207,7 +207,7 @@ be localised by Play's pricing template.
 
 ```
 play-full-substitute-begin
-The download is free and includes the game. A single one-time purchase unlocks it fully. There is nothing else to buy, no currency, no consumables, no timers, and no way to spend more.
+The first 15 runs are free and complete. One purchase unlocks unlimited runs. There is nothing else to buy, no currency, no consumables, no timers, and no way to spend more.
 play-full-substitute-end
 ```
 

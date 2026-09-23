@@ -1,6 +1,6 @@
 # Bell Theory — launch decision spec (Jev-shaped)
 
-One state, fourteen atomic questions, one pass. Adapt the shapes to the TypeSafe
+One state, fifteen atomic questions, one pass. Adapt the shapes to the TypeSafe
 API; the wording is meant to be pasted as-is. The "mine" column is Claude's
 calibrated estimate on 2026-09-23, labeled so it is never mistaken for a Jev
 result. Replace it with real probabilities when you run it.
@@ -65,6 +65,12 @@ result. Replace it with real probabilities when you run it.
 | 12 | Launch difficulty, discovery / marketing (1 – 5) | 4 |
 | 13 | Differentiation vs 2 Cars clones (1 none – 5 total) | 4 |
 | 14 | Differentiation vs Duet (1 – 5) | 3 |
+
+### Count — a number
+
+| # | Question | Mine |
+|---|---|---|
+| 15 | How many free runs before the single unlock? (the gate is live in `src/native.js` as `ent.FREE_RUNS`) | 15 (estimate: enough to reach the first pump and a first rare coin, few enough that a keeper hits the gate in one sitting; not a Jev result) |
 
 ## Combination logic (yours to edit)
 

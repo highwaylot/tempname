@@ -246,6 +246,12 @@ body{
 }
 .mode-seg button.active{ color:var(--accent-ink); background:var(--accent); }
 .mode-seg button:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+/* The unlock gate: .gated swaps the CTA for the unlock/restore row. */
+.gate-row{ display:none; }
+.overlay.gated .gate-row{ display:inline-flex; }
+.overlay.gated .cta{ display:none; }
+.gate-row .unlock{ color:var(--accent-ink); background:var(--accent); }
+.free-note{ margin-top:10px; }
 
 .panel-toggle{
   width:44px; height:44px;

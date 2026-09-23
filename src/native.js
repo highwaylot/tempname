@@ -14,6 +14,30 @@ export function loadPersisted(){
   return Promise.resolve(raw);
 }
 
+// ===================== entitlement =====================
+// The unlock gate: the complete game for the first FREE_RUNS runs, then one
+// purchase. Inert until the StoreKit 2 plugin lands: web and native both
+// default to unlocked, the plugin will set it from Transaction
+// .currentEntitlements, and "unlocked" is never persisted in the settings
+// blob. window.__BT_UNLOCKED === false (read in initNative) forces the gate
+// so the harness and scratch tests can exercise it. price is the wrapper's
+// localised string; the label is never a hardcoded amount.
+export var ent = {
+  FREE_RUNS: 15,
+  unlocked: true,
+  price: null,
+  onUnlock: null,
+  onRestore: null,
+  runsLeft: function(){ return this.unlocked ? Infinity : Math.max(0, this.FREE_RUNS - state.life.runs); },
+  canRun: function(){ return this.runsLeft() > 0; },
+  purchase: function(){ /* web stub: no-op; StoreKit plugin next round */ if(this.onUnlock) this.onUnlock(); },
+  restore: function(){ if(this.onRestore) this.onRestore(); }
+};
+// Called from boot after hydrateState, before initUI renders the gate.
+export function initNative(){
+  if(window.__BT_UNLOCKED === false) ent.unlocked = false;
+}
+
 // ===================== haptics =====================
 // One call per game moment, by kind. On the web each kind is a Vibration
 // API pattern (ms on/off; a number is one pulse); the native

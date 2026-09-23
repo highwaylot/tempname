@@ -63,9 +63,14 @@
       <div class="title-block">
         <div class="title">BELL THEORY</div>
         <div class="tagline">thread it · or wreck it</div>
+        <div class="tagline free-note" id="freeNote" hidden>15 runs free, then one purchase</div>
       </div>
       <div class="cta-block">
         <div class="cta" id="readyCta">both thumbs down</div>
+        <div class="mode-seg gate-row" id="readyGate" role="group" aria-label="Unlock">
+          <button type="button" class="unlock">unlock</button>
+          <button type="button" class="restore">restore</button>
+        </div>
         <div class="mode-seg" id="modeSeg" role="group" aria-label="Play mode">
           <button type="button" data-mode="two">two thumbs</button>
           <button type="button" data-mode="one">one thumb</button>
@@ -81,6 +86,10 @@
         <p class="loop" id="deadLoop"></p>
         <p class="loop life" id="deadLife" hidden>run <span id="deadLifeRun">0</span> · blue <span class="life-blue" id="deadLifeBlue">0</span> · purple <span class="life-purple" id="deadLifePurple">0</span></p>
         <div class="cta" id="deadCta">both thumbs to run again</div>
+        <div class="mode-seg gate-row" id="deadGate" role="group" aria-label="Unlock">
+          <button type="button" class="unlock">unlock</button>
+          <button type="button" class="restore">restore</button>
+        </div>
       </div>
     </div>
 
@@ -144,6 +153,7 @@
       </div>
       <p class="note">Engine: <b id="audioStatus">not started</b> <span id="errStatus"></span></p>
       <p class="note">Silent on iPhone with the engine running? Flip the ring/silent switch — web audio obeys it.</p>
+      <button class="reset-btn" id="restoreBtn">restore purchase</button>
     </div>
 
     <div class="panel-section">
