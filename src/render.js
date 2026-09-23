@@ -17,6 +17,11 @@ export function ensureImage(slot){
 export function clearImageCache(){ imgCache = {}; }
 
 // ===================== canvas =====================
+// The backing store is capped at DPR 2 (W06): a 3x phone rasterises 2.25x
+// the pixels of a 2x one for lines and text that read the same at arm's
+// length. realDpr keeps the true ratio so blur radii set in CSS units can be
+// scaled back to the same on-screen size (shadowBlur is in store pixels).
+var DPR_CAP = 2;
 export var view = { canvas:null, ctx2d:null, wrap:null, W:0, H:0, dpr:1, realDpr:1 };
 // The centre seam lives in the DOM (#seamEl, under the canvas); its opacity
 // is written only when it moves by more than a rounding step.
@@ -27,8 +32,8 @@ var camXf = "";
 export function resize(){
   var rect = view.wrap.getBoundingClientRect();
   view.W = rect.width; view.H = rect.height;
-  view.realDpr = window.devicePixelRatio || 1;
-  view.dpr = Math.max(1, window.devicePixelRatio || 1);
+  view.realDpr = Math.max(1, window.devicePixelRatio || 1);
+  view.dpr = Math.min(DPR_CAP, view.realDpr);
   view.canvas.width = Math.round(view.W*view.dpr);
   view.canvas.height = Math.round(view.H*view.dpr);
   view.ctx2d.setTransform(view.dpr,0,0,view.dpr,0,0);
@@ -378,7 +383,9 @@ export function draw(){
 
     ctx2d.save();
     var glow = Math.min(34, state.glow + (game.parallelOn ? 16 : 0) + (game.boost > 0 ? 22 : game.charge*10));
-    if(glow > 0){ ctx2d.shadowColor = slot.color; ctx2d.shadowBlur = glow; }
+    // shadowBlur is applied in backing-store pixels, so under the DPR cap the
+    // CSS-unit glow is scaled by dpr/realDpr to keep its on-screen size.
+    if(glow > 0){ ctx2d.shadowColor = slot.color; ctx2d.shadowBlur = glow * view.dpr / view.realDpr; }
     ctx2d.globalAlpha = c.active ? 1 : 0.45;
     if(slot.mode === "image") drawImageBlob(c.x, c.y, DRAW_R, ensureImage(slot));
     else drawShape(slot.shape, c.x, c.y, DRAW_R, slot.color);
