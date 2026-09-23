@@ -15,7 +15,8 @@
     "smoke:dist": "node test/harness.mjs --url file://$PWD/dist/index.html",
     "smoke:preview": "node test/harness.mjs --serve dist",
     "icons": "node test/render-icons.mjs",
-    "lint": "eslint src test/harness.mjs"
+    "lint": "eslint src test/harness.mjs",
+    "fonts:check": "node test/fonts-check.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
