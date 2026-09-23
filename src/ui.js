@@ -286,7 +286,7 @@ export function renderSides(){
         if(!fi.files || !fi.files[0]) return;
         fileToDataUrl(fi.files[0], function(url){
           slot.image = url; imgCache[slot.id] = null; ensureImage(slot);
-          clearHaloCache(); saveState(); renderSides();
+          clearHaloCache(); prewarmHalos(); saveState(); renderSides();
         });
       });
       fw.appendChild(fl); fw.appendChild(fi);
