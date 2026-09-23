@@ -4,7 +4,7 @@ import { world } from './world.js';
 import { unlockMediaSession, startBeds } from './audio.js';
 import { haptic } from './native.js';
 import { view } from './render.js';
-import { game, cursors, lanes, startRun, PHASE_READY, PHASE_RUN, PHASE_DEAD, TOUCH_OFFSET } from './game.js';
+import { game, cursors, lanes, startRun, pauseRun, tryResume, PHASE_READY, PHASE_RUN, PHASE_DEAD, TOUCH_OFFSET } from './game.js';
 
 // ===================== input =====================
 export var sidePointer = [null, null];
@@ -17,6 +17,7 @@ function onPointerDown(e){
   if(sidePointer[side] !== null){
     // Already bound — a sticky mouse, or a second finger on a held side. The
     // only thing a fresh press can mean here is "run again".
+    if(tryResume()) return;
     if(game.phase === PHASE_DEAD && world.time - game.deadAt > 0.6){
       var readyNow = lanes() === 1 ? cursors[0].active : (cursors[0].active && cursors[1].active);
       if(readyNow) startRun();
@@ -37,6 +38,7 @@ function onPointerDown(e){
   haptic("tap");
   unlockMediaSession();
   startBeds();
+  if(tryResume()) return;
   var ready = lanes() === 1 ? cursors[0].active : (cursors[0].active && cursors[1].active);
   if(ready){
     if(game.phase === PHASE_READY) startRun();
@@ -69,11 +71,20 @@ function onPointerMove(e){
   }
 }
 
+// Two-thumb touch only: both thumbs off the glass for a second is a pause.
+// A sticky mouse lifts on every click and one thumb lifts to reach a button.
+var liftTimer = 0;
 export function release(e){
   var side = sidePointer[0] === e.pointerId ? 0 : (sidePointer[1] === e.pointerId ? 1 : -1);
   if(side < 0) return;
   sidePointer[side] = null;
   cursors[side].active = false;
+  if(state.autoPause && e.pointerType !== "mouse" && lanes() === 2 && game.phase === PHASE_RUN && !cursors[0].active && !cursors[1].active){
+    clearTimeout(liftTimer);
+    liftTimer = setTimeout(function(){
+      if(game.phase === PHASE_RUN && !game.paused && !cursors[0].active && !cursors[1].active) pauseRun();
+    }, 1000);
+  }
 }
 // A mouse is sticky: one click starts, then the orb follows the pointer with
 // no button held. Only leaving the field lets go.

@@ -244,7 +244,7 @@ body{
 .mode-seg button:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
 
 .panel-toggle{
-  width:36px; height:36px;
+  width:44px; height:44px;
   border-radius:10px;
   border:1px solid var(--panel-border);
   background:rgba(26,30,38,.8);
@@ -491,7 +491,7 @@ button.reset-btn:hover{ color:var(--danger); border-color:rgba(255,111,111,.3); 
 @media (prefers-reduced-motion: reduce){ .stat.pop b, .stat.pop2 b, .dead-label.record{ animation:none; } }
 
 .icon-btn{
-  width:36px; height:36px;
+  width:44px; height:44px;
   border-radius:10px;
   border:1px solid var(--panel-border);
   background:rgba(26,30,38,.7);
@@ -506,5 +506,16 @@ button.reset-btn:hover{ color:var(--danger); border-color:rgba(255,111,111,.3); 
 .icon-btn{ flex:none; }
 .sound-btn.muted{ color:var(--ink-faint); }
 .sound-btn.live{ color:var(--accent); border-color:rgba(125,211,192,.35); }
+/* Pause menu: a dimmed backdrop so the card reads over barriers, and three
+   44 px actions (v17 target rule) inside an overlay that is otherwise
+   pointer-events:none. */
+#overlayPause{ background:rgba(11,13,18,.55); }
+.pause-actions{ pointer-events:auto; display:flex; gap:8px; margin-top:6px; }
+.pause-actions button{
+  font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-dim); background:rgba(26,30,38,.72); border:1px solid var(--panel-border); border-radius:99px;
+  padding:0 16px; min-height:44px; cursor:pointer;
+}
+.pause-actions button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
 [hidden]{ display:none !important; }

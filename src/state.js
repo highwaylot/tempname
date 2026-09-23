@@ -23,7 +23,8 @@ export function defaultState(){
     best: 0,
     taughtPump: false,
     impact: 1.2,
-    oneHand: false
+    oneHand: false,
+    autoPause: true
   };
 }
 function loadState(raw){
@@ -33,7 +34,7 @@ function loadState(raw){
     if(!parsed || !Array.isArray(parsed.slots) || parsed.slots.length !== 2) return defaultState();
     var merged = defaultState();
     merged.slots = parsed.slots;
-    ["soundOn","volume","trailLength","glow","follow","grid","fft","haptics","best","taughtPump","impact","oneHand"].forEach(function(k){
+    ["soundOn","volume","trailLength","glow","follow","grid","fft","haptics","best","taughtPump","impact","oneHand","autoPause"].forEach(function(k){
       if(typeof parsed[k] !== "undefined") merged[k] = parsed[k];
     });
     return merged;

@@ -2,8 +2,8 @@
 // button, slot editor, controls, reset and mode picker. Element refs are
 // filled in initUI(); nothing here runs at import time.
 import { state, saveState, resetSettings, isMouseDevice } from './state.js';
-import { audio, unlockMediaSession, startBeds, blip, thump, isAudioLive, audioStateName } from './audio.js';
-import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand, getPendingOneHand } from './game.js';
+import { audio, unlockMediaSession, startBeds, blip, thump, isAudioLive, audioStateName, duck } from './audio.js';
+import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand, getPendingOneHand, startRun, pauseRun, quitToTitle } from './game.js';
 import { imgCache, ensureImage, clearImageCache } from './render.js';
 import { loop, resetClock } from './loop.js';
 
@@ -26,7 +26,7 @@ export var GAUGE_C = 2 * Math.PI * 27;
 // Last value written to each HUD field: the DOM is touched only on change,
 // so a steady frame costs comparisons, not style invalidations. frame() and
 // syncSoundBtn() are the only writers, so nothing ever resets these.
-var hud = { off:null, num:null, hot:null, ready:null, mult:null, gh:null, sh:null, playing:null, label:null, dist:null, coins:null, sOn:null, live:null, aname:null, err:null };
+var hud = { off:null, num:null, hot:null, ready:null, mult:null, gh:null, sh:null, playing:null, label:null, dist:null, coins:null, sOn:null, live:null, aname:null, err:null, pb:null };
 // CSS animation restarts without the remove / void offsetWidth / add reflow:
 // alternate between two identical keyframe sets (cls and cls + "2").
 // Idempotent per frame, so two same-frame strokes or threads still restart
@@ -45,6 +45,11 @@ var deadDist = null;
 var deadCoins = null;
 var deadBest = null;
 var deadLoop = null;
+var overlayPause = null;
+var pauseBtn = null;
+var pauseDist = null;
+var pauseCoins = null;
+var pauseCombo = null;
 var lastHud = 0;
 
 // Runs once per frame after update/draw.
@@ -66,6 +71,8 @@ export function syncHud(ts){
   if(sh !== hud.sh){ hud.sh = sh; statsEl.hidden = sh; }
   var pl = game.phase === PHASE_RUN;
   if(pl !== hud.playing){ hud.playing = pl; appEl.classList.toggle("playing", pl); }
+  var showPauseBtn = game.phase === PHASE_RUN && !game.paused && game.dying === 0;
+  if(showPauseBtn !== hud.pb){ hud.pb = showPauseBtn; pauseBtn.hidden = !showPauseBtn; }
   var lb = hot ? "LIT" : (game.charge < 0.03 ? "PUMP ↕" : "BOOST");
   if(lb !== hud.label){ hud.label = lb; gaugeLabel.textContent = lb; }
   if(ts - lastHud > 90){
@@ -101,6 +108,14 @@ export function showDeath(score, isRecord){
     + (state.taughtPump ? toNext + " more clean to ×" + nextMult : "pump ↕ to charge");
   setOverlay(overlayDead, true);
 }
+// The DOM half of pauseRun() / resumeRun().
+export function showPause(dist, coins, combo){
+  pauseDist.textContent = dist;
+  pauseCoins.textContent = coins;
+  pauseCombo.textContent = combo;
+  setOverlay(overlayPause, true);
+}
+export function hidePause(){ setOverlay(overlayPause, false); }
 
 // ===================== panel =====================
 var panel = null;
@@ -118,7 +133,8 @@ export function closePanel(){
   panelOpen = false;
   panel.hidden = true; scrim.hidden = true;
   panelToggle.setAttribute("aria-expanded","false");
-  if(game.paused && !document.hidden){ game.paused = false; game.grace = 0.8; resetClock(); }
+  // A user pause stays: closing the sheet returns to the pause card.
+  if(game.paused && game.pausedBy !== "user" && !document.hidden){ game.paused = false; game.grace = 0.8; resetClock(); }
 }
 export function isPanelOpen(){ return panelOpen; }
 
@@ -130,7 +146,7 @@ function checkOrientation(){
   var bad = landscapeMq.matches && ("ontouchstart" in window);
   rotateOverlay.hidden = !bad;
   if(bad && game.phase === PHASE_RUN) game.paused = true;
-  else if(!bad && game.paused && !panelOpen && !document.hidden){ game.paused = false; game.grace = 0.8; resetClock(); }
+  else if(!bad && game.paused && game.pausedBy !== "user" && !panelOpen && !document.hidden){ game.paused = false; game.grace = 0.8; resetClock(); }
 }
 export function isRotateShown(){ return !rotateOverlay.hidden; }
 
@@ -264,6 +280,7 @@ var followVal = null;
 var gridToggle = null;
 var fftToggle = null;
 var hapticToggle = null;
+var autoPauseToggle = null;
 
 export function syncControls(){
   soundToggle.checked = state.soundOn;
@@ -277,6 +294,7 @@ export function syncControls(){
   gridToggle.checked = state.grid;
   fftToggle.checked = state.fft;
   hapticToggle.checked = state.haptics;
+  autoPauseToggle.checked = state.autoPause;
   syncSoundBtn();
 }
 
@@ -294,6 +312,7 @@ var oneHandToggle = null;
 var modeNote = null;
 var readyCta = null;
 var deadCta = null;
+var pauseCta = null;
 export function syncOneHand(){
   // The picker shows the choice, live or queued for the next run; the CTAs
   // describe the mode the next start is actually gated on.
@@ -310,6 +329,9 @@ export function syncOneHand(){
   deadCta.textContent = state.oneHand
     ? (isMouseDevice ? "click to run again" : "thumb down to run again")
     : "both thumbs to run again";
+  pauseCta.textContent = state.oneHand
+    ? (isMouseDevice ? "click to resume" : "thumb down to resume")
+    : "both thumbs down to resume";
   var twoBtn = modeSeg.querySelector('[data-mode="two"]');
   if(twoBtn) twoBtn.title = isMouseDevice ? "needs a touchscreen" : "";
   renderSides();
@@ -335,6 +357,19 @@ export function initUI(){
   deadCoins = document.getElementById("deadCoins");
   deadBest = document.getElementById("deadBest");
   deadLoop = document.getElementById("deadLoop");
+  overlayPause = document.getElementById("overlayPause");
+  pauseBtn = document.getElementById("pauseBtn");
+  pauseDist = document.getElementById("pauseDist");
+  pauseCoins = document.getElementById("pauseCoins");
+  pauseCombo = document.getElementById("pauseCombo");
+  pauseBtn.addEventListener("click", pauseRun);
+  document.getElementById("pauseRestart").addEventListener("click", function(){
+    hidePause(); game.paused = false; resetClock(); duck(false);
+    startRun();
+  });
+  document.getElementById("pauseQuit").addEventListener("click", quitToTitle);
+  // closePanel leaves a user pause alone, so this returns to the pause card.
+  document.getElementById("pauseSettings").addEventListener("click", function(){ openPanel(); });
 
   panel = document.getElementById("panel");
   panelToggle = document.getElementById("panelToggle");
@@ -385,6 +420,7 @@ export function initUI(){
   gridToggle = document.getElementById("gridToggle");
   fftToggle = document.getElementById("fftToggle");
   hapticToggle = document.getElementById("hapticToggle");
+  autoPauseToggle = document.getElementById("autoPauseToggle");
   soundToggle.addEventListener("change", function(){
     state.soundOn = soundToggle.checked;
     if(state.soundOn) startBeds();
@@ -423,6 +459,7 @@ export function initUI(){
   gridToggle.addEventListener("change", function(){ state.grid = gridToggle.checked; saveState(); });
   fftToggle.addEventListener("change", function(){ state.fft = fftToggle.checked; saveState(); });
   hapticToggle.addEventListener("change", function(){ state.haptics = hapticToggle.checked; saveState(); });
+  autoPauseToggle.addEventListener("change", function(){ state.autoPause = autoPauseToggle.checked; saveState(); });
 
   resetBtn = document.getElementById("resetBtn");
   resetBtn.addEventListener("click", function(){
@@ -443,6 +480,7 @@ export function initUI(){
   modeNote = document.getElementById("modeNote");
   readyCta = document.getElementById("readyCta");
   deadCta = document.getElementById("deadCta");
+  pauseCta = document.getElementById("pauseCta");
   modeSeg.querySelectorAll("button").forEach(function(b){
     b.addEventListener("click", function(){ setOneHand(b.dataset.mode === "one"); });
   });

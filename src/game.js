@@ -2,11 +2,12 @@
 // locals at the top of each function that uses them.
 import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
-import { startBeds, driveAudio, blip, thump, crashSound, arp } from './audio.js';
+import { startBeds, driveAudio, blip, thump, crashSound, arp, duck } from './audio.js';
 import { view } from './render.js';
-import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, setOverlay, showDeath, syncOneHand } from './ui.js';
+import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, setOverlay, showDeath, showPause, hidePause, syncOneHand } from './ui.js';
 import { sidePointer } from './input.js';
 import { haptic } from './native.js';
+import { resetClock } from './loop.js';
 
 // ===================== game state =====================
 export var PHASE_READY = 0, PHASE_RUN = 1, PHASE_DEAD = 2;
@@ -41,6 +42,11 @@ export var game = {
   rampT: 0,
   grace: 0,
   paused: false,
+  // Who paused ("user" for the pause menu, "" for tab/panel/rotate), when
+  // (performance.now(), for the 300 ms resume lockout) and the 3-2-1 hold.
+  pausedBy: "",
+  pausedAt: 0,
+  countdown: 0,
   litTime: 0,
   slowmo: 0,
   // Loop-owned values that were closure vars: grid scroll phase, the
@@ -127,6 +133,9 @@ export function startRun(){
   game.dying = 0;
   game.rampT = 0;
   game.grace = 0;
+  game.pausedBy = "";
+  game.pausedAt = 0;
+  game.countdown = 0;
   game.litTime = 0;
   game.slowmo = 0;
   cursors.forEach(function(c){ c.strokeDir = 0; c.lastStrokeAt = -9; c.prevTy = c.ty; c.strokeStart = c.ty; c.trail.length = 0; });
@@ -525,6 +534,7 @@ export function update(dt){
     if(game.dying <= 0){ game.dying = 0; finishDeath(); }
   }
   if(game.grace > 0) game.grace -= dt;
+  if(game.countdown > 0) game.countdown -= dt;
   if(game.slowmo > 0) game.slowmo -= dt;
 
   if(game.phase === PHASE_RUN){
@@ -724,4 +734,44 @@ export function setOneHand(on){
   cursors[1].active = false;
   resetCursors();
   syncOneHand();
+}
+
+// ===================== pause menu =====================
+// A user pause is distinct from the tab/panel/rotate pauses (pausedBy ""):
+// only the thumbs lift it, never a tab return or a closing sheet, and the
+// world holds for a 1.2 s 3-2-1 count after it so the orbs can be re-placed.
+export function pauseRun(){
+  if(game.phase !== PHASE_RUN || game.paused || game.dying > 0) return;
+  game.paused = true; game.pausedBy = "user"; game.pausedAt = performance.now();
+  showPause(Math.floor(game.dist), game.coins, game.combo);
+  duck(true);
+}
+export function resumeRun(){
+  if(game.pausedBy !== "user") return;
+  hidePause();
+  game.paused = false; game.pausedBy = "";
+  game.grace = 1.2; game.countdown = 1.2;
+  resetClock();
+  duck(false);
+}
+// Called from every press on the field. True means the press was the pause
+// menu's to consume: the 300 ms lockout swallows the tap that reached the
+// button, then the run resumes once every lane's thumb is down.
+export function tryResume(){
+  if(game.pausedBy !== "user") return false;
+  if(performance.now() - game.pausedAt < 300) return true;
+  if(lanes() === 1 ? cursors[0].active : (cursors[0].active && cursors[1].active)) resumeRun();
+  return true;
+}
+export function quitToTitle(){
+  hidePause();
+  game.paused = false; game.pausedBy = "";
+  game.phase = PHASE_READY;
+  game.boost = 0; game.charge = 0; game.wreck = 0; game.slowmo = 0; game.dying = 0;
+  game.obstacles.length = 0; game.pickups.length = 0; game.debris.length = 0;
+  game.texts.length = 0; game.sparks.length = 0; game.rings.length = 0;
+  resetComboStat();
+  resetCursors();
+  setOverlay(overlayReady, true);
+  duck(false);
 }

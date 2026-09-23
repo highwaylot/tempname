@@ -60,7 +60,7 @@ function onVisibilityChange(){
       var s = audio.ctx.suspend(); if(s && s.catch) s.catch(function(){});
     }
   } else {
-    if(game.paused && !isPanelOpen() && !isRotateShown()){ game.paused = false; game.grace = 0.8; }
+    if(game.paused && game.pausedBy !== "user" && !isPanelOpen() && !isRotateShown()){ game.paused = false; game.grace = 0.8; }
     resetClock();
     if(state.soundOn) ensureAudio();
   }

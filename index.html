@@ -29,6 +29,11 @@
         <span class="stat" id="comboStat"><i>Combo</i><b><span id="comboNum">0</span><em id="comboMult">×1</em></b></span>
       </div>
       <div class="tools">
+        <button class="icon-btn pause-btn" id="pauseBtn" aria-label="Pause" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5v14M15 5v14"/>
+          </svg>
+        </button>
         <button class="icon-btn sound-btn" id="soundBtn" aria-label="Toggle sound">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 5 6 9H3v6h3l5 4z"/>
@@ -75,6 +80,20 @@
         <div class="row"><span>coins <b id="deadCoins">0</b></span><span>best <span id="deadBest">0</span></span></div>
         <p class="loop" id="deadLoop"></p>
         <div class="cta" id="deadCta">both thumbs to run again</div>
+      </div>
+    </div>
+
+    <div class="overlay gone" id="overlayPause" inert>
+      <div class="dead-block">
+        <div class="dead-label" style="color:var(--accent)">paused</div>
+        <div class="big" id="pauseDist">0</div>
+        <div class="row"><span>coins <b id="pauseCoins"></b></span><span>combo <span id="pauseCombo"></span></span></div>
+        <div class="pause-actions">
+          <button type="button" id="pauseSettings">settings</button>
+          <button type="button" id="pauseRestart">restart</button>
+          <button type="button" id="pauseQuit">title</button>
+        </div>
+        <div class="cta" id="pauseCta">both thumbs down to resume</div>
       </div>
     </div>
   </div>
@@ -139,6 +158,13 @@
       <div class="field">
         <div class="field-label"><span>Follow speed</span><span class="val" id="followVal"></span></div>
         <input type="range" id="followRange" min="8" max="60" step="1">
+      </div>
+      <div class="toggle-line">
+        <span>Auto pause</span>
+        <label class="switch">
+          <input type="checkbox" id="autoPauseToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
       </div>
     </div>
 
