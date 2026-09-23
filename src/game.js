@@ -66,7 +66,7 @@ export var TOUCH_OFFSET = 62;
 function makeCursor(){
   return { x:0, y:0, tx:0, ty:0, rawX:0, rawY:0, offset:0, active:false, trail:[],
            prevTy:0, strokeDir:0, strokeStart:0, lastStrokeAt:-9,
-           px:0, py:0, vx:0, vy:0 };
+           px:0, py:0, vx:0, vy:0, dy:0 };
 }
 export var cursors = [ makeCursor(), makeCursor() ];
 export function lanes(){ return state.oneHand ? 1 : 2; }
@@ -467,7 +467,7 @@ export function update(dt){
       c.vx = Math.max(-1400, Math.min(1400, (c.x - c.px)/dt));
       c.vy = Math.max(-1400, Math.min(1400, (c.y - c.py)/dt));
     }
-    c.px = c.x; c.py = c.y;
+    c.dy = c.y - c.py; c.px = c.x; c.py = c.y;
     // Paused thumbs resync strokeDir/strokeStart on resume instead of
     // counting the pre-pause half stroke.
     if(game.phase === PHASE_RUN && c.active && !game.paused){
@@ -551,7 +551,7 @@ export function update(dt){
       // A storm fired from shatter() can empty this array mid-loop.
       if(i >= game.obstacles.length) continue;
       var o = game.obstacles[i];
-      o.y += game.speed*wdt;
+      var mv = game.speed*wdt; o.y += mv;
       o.flash = Math.max(0, o.flash - dt*3.2);
       if(o.y > H + 60){ game.obstacles.splice(i,1); continue; }
       if(o.side >= lanes()) continue;
@@ -564,10 +564,15 @@ export function update(dt){
       if(game.dying > 0) continue;
       var c = cursors[o.side];
       var hit = false;
-      var inBand = o.y < c.y + HIT_R && o.y + o.h > c.y - HIT_R;
+      var rel = mv - c.dy; /* barrier down + avatar up, this frame */
+      /* > 0 only when the relative travel exceeds the band, i.e. a tunnel was
+         possible; 0 on every ordinary frame so the test is bit-identical to
+         the unswept one. */
+      var ext = Math.max(0, rel - o.h - HIT_R);
+      var inBand = o.y - ext < c.y + HIT_R && o.y + o.h > c.y - HIT_R;
       for(var r=0;r<o.rects.length;r++){
         var rc = o.rects[r];
-        if(circleRectHit(c.x, c.y, HIT_R, rc.x, o.y, rc.w, o.h)){
+        if(circleRectHit(c.x, c.y, HIT_R, rc.x, o.y - ext, rc.w, o.h + ext)){
           // Boost breaks slate, not steel.
           if(game.boost > 0 && !o.hard) shatter(o, c);
           else die(c.x, c.y, (o.hard && game.boost > 0) ? "steel" : "");

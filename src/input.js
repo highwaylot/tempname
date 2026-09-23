@@ -33,7 +33,7 @@ function onPointerDown(e){
   c.offset = e.pointerType === "touch" ? TOUCH_OFFSET : 0;
   c.rawX = x; c.rawY = y;
   c.tx = x; c.ty = y - c.offset;
-  if(game.phase !== PHASE_RUN){ c.x = x; c.y = c.ty; c.px = c.x; c.py = c.y; c.trail.length = 0; }
+  if(game.phase !== PHASE_RUN){ c.x = x; c.y = c.ty; c.px = c.x; c.py = c.y; c.dy = 0; c.trail.length = 0; }
   haptic("tap");
   unlockMediaSession();
   startBeds();
