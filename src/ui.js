@@ -4,7 +4,7 @@
 import { state, saveState, resetSettings, isMouseDevice } from './state.js';
 import { audio, unlockMediaSession, startBeds, blip, thump, isAudioLive, audioStateName } from './audio.js';
 import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand } from './game.js';
-import { imgCache, ensureImage, clearImageCache } from './render.js';
+import { imgCache, ensureImage, clearImageCache, clearHaloCache, prewarmHalos } from './render.js';
 import { loop, resetClock } from './loop.js';
 
 // ===================== hud =====================
@@ -156,7 +156,7 @@ export function renderSides(){
       b.type = "button";
       b.textContent = mode === "color" ? "Color" : "Image";
       if(slot.mode === mode) b.classList.add("active");
-      b.addEventListener("click", function(){ slot.mode = mode; saveState(); renderSides(); });
+      b.addEventListener("click", function(){ slot.mode = mode; clearHaloCache(); prewarmHalos(); saveState(); renderSides(); });
       seg.appendChild(b);
     });
     row.appendChild(seg);
@@ -169,6 +169,7 @@ export function renderSides(){
         slot.color = ci.value;
         dot.style.setProperty("--dot-color", slot.color);
         dot.style.background = slot.color;
+        clearHaloCache();
         saveState();
       });
       var ss = document.createElement("select");
@@ -178,7 +179,7 @@ export function renderSides(){
         if(slot.shape === o[0]) opt.selected = true;
         ss.appendChild(opt);
       });
-      ss.addEventListener("change", function(){ slot.shape = ss.value; saveState(); });
+      ss.addEventListener("change", function(){ slot.shape = ss.value; clearHaloCache(); prewarmHalos(); saveState(); });
       line.appendChild(ci); line.appendChild(ss);
     } else {
       var fw = document.createElement("div"); fw.className = "file-btn";
@@ -192,7 +193,7 @@ export function renderSides(){
         if(!fi.files || !fi.files[0]) return;
         fileToDataUrl(fi.files[0], function(url){
           slot.image = url; imgCache[slot.id] = null; ensureImage(slot);
-          saveState(); renderSides();
+          clearHaloCache(); saveState(); renderSides();
         });
       });
       fw.appendChild(fl); fw.appendChild(fi);
@@ -386,6 +387,7 @@ export function initUI(){
     disarmReset();
     resetSettings();
     clearImageCache();
+    clearHaloCache(); prewarmHalos();
     renderSides(); syncControls(); syncOneHand();
   });
 

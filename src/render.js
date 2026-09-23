@@ -37,6 +37,7 @@ export function resize(){
   view.canvas.width = Math.round(view.W*view.dpr);
   view.canvas.height = Math.round(view.H*view.dpr);
   view.ctx2d.setTransform(view.dpr,0,0,view.dpr,0,0);
+  clearHaloCache();
 }
 export function initRender(){
   view.canvas = document.getElementById("stage");
@@ -46,11 +47,12 @@ export function initRender(){
   resize();
   window.addEventListener("resize", resize);
   state.slots.forEach(ensureImage);
+  prewarmHalos();
 }
 
 // ===================== drawing helpers =====================
-function drawShape(shape, x, y, r, color){
-  var ctx2d = view.ctx2d;
+function drawShape(shape, x, y, r, color, g){
+  var ctx2d = g || view.ctx2d;
   if(shape === "ring"){
     ctx2d.beginPath(); ctx2d.arc(x,y,r,0,Math.PI*2);
     ctx2d.lineWidth = Math.max(4, r*0.32); ctx2d.strokeStyle = color; ctx2d.stroke();
@@ -85,6 +87,71 @@ function drawImageBlob(x,y,r,img){
   ctx2d.restore();
   ctx2d.beginPath(); ctx2d.arc(x,y,r,0,Math.PI*2);
   ctx2d.lineWidth = 2; ctx2d.strokeStyle = "rgba(255,255,255,.42)"; ctx2d.stroke();
+}
+
+// Orb halo as a cached sprite (W15). A live shadowBlur re-blurs the orb
+// every frame; the blur only changes with shape, colour, radius and the
+// rounded glow, so it is rendered once per key into a small canvas and
+// drawn back with drawImage. The sprite holds the shadow alone: the shape
+// is drawn off-canvas and shadowOffsetX brings the blur back, so what lands
+// under the live body is exactly what the live path composited there (a
+// destination-out punch measured 60/255 off inside an inactive orb, where
+// globalAlpha 0.45 stacks shadow then body). Keyed on both dpr values
+// because shadowBlur is in store pixels; cleared on resize and whenever a
+// slot's look changes (ui.js).
+var haloCache = {};
+export function clearHaloCache(){ haloCache = {}; }
+function haloSprite(shape, color, r, blur){
+  var key = shape + "|" + color + "|" + r + "|" + blur + "|" + view.dpr + "|" + view.realDpr;
+  var s = haloCache[key];
+  if(s) return s;
+  var pad = Math.ceil(blur*2 + 4), size = Math.ceil((r + pad)*2), off = size*2;
+  var c = document.createElement("canvas");
+  c.width = Math.ceil(size*view.dpr); c.height = c.width;
+  var g = c.getContext("2d");
+  g.setTransform(view.dpr,0,0,view.dpr,0,0);
+  g.shadowColor = color;
+  g.shadowBlur = blur * view.dpr / view.realDpr;
+  // Offsets ignore the CTM (store pixels), the shape position does not.
+  g.shadowOffsetX = off * view.dpr;
+  drawShape(shape, size/2 - off, size/2, r, color, g);
+  s = { c:c, size:size, store:c.width };
+  haloCache[key] = s;
+  return s;
+}
+// Pre-warm the sprites a run can reach (charge adds up to 10 to the glow,
+// boost and parallel play cap it at 34) in idle slices, so a build never
+// lands on a run frame. Most likely keys first: the resting glow, the boost
+// cap, then the charge steps, both slots at each step. The idle timeout is
+// short because a loop that never goes idle would otherwise starve the queue.
+var warmQueue = [], warmPending = false;
+export function prewarmHalos(){
+  var lo = Math.max(1, Math.round(state.glow)), hi = Math.min(34, Math.round(state.glow) + 10);
+  var blurs = [lo, 34];
+  for(var b = lo + 1; b <= hi; b++) blurs.push(b);
+  warmQueue.length = 0;
+  blurs.forEach(function(blur){
+    state.slots.forEach(function(slot){
+      if(slot.mode !== "image") warmQueue.push([slot.shape, slot.color, blur]);
+    });
+  });
+  scheduleWarm();
+}
+function scheduleWarm(){
+  if(warmPending || !warmQueue.length) return;
+  warmPending = true;
+  if(window.requestIdleCallback) window.requestIdleCallback(warmStep, { timeout: 50 });
+  else setTimeout(warmStep, 40);
+}
+function warmStep(deadline){
+  warmPending = false;
+  var built = 0;
+  do {
+    var it = warmQueue.shift();
+    haloSprite(it[0], it[1], DRAW_R, it[2]);
+    built++;
+  } while(warmQueue.length && deadline && ((deadline.timeRemaining && deadline.timeRemaining() > 4) || (deadline.didTimeout && built < 3)));
+  scheduleWarm();
 }
 
 export function draw(){
@@ -383,12 +450,24 @@ export function draw(){
 
     ctx2d.save();
     var glow = Math.min(34, state.glow + (game.parallelOn ? 16 : 0) + (game.boost > 0 ? 22 : game.charge*10));
-    // shadowBlur is applied in backing-store pixels, so under the DPR cap the
-    // CSS-unit glow is scaled by dpr/realDpr to keep its on-screen size.
-    if(glow > 0){ ctx2d.shadowColor = slot.color; ctx2d.shadowBlur = glow * view.dpr / view.realDpr; }
     ctx2d.globalAlpha = c.active ? 1 : 0.45;
-    if(slot.mode === "image") drawImageBlob(c.x, c.y, DRAW_R, ensureImage(slot));
-    else drawShape(slot.shape, c.x, c.y, DRAW_R, slot.color);
+    if(slot.mode === "image"){
+      // shadowBlur is applied in backing-store pixels, so under the DPR cap
+      // the CSS-unit glow is scaled by dpr/realDpr to keep its on-screen size.
+      if(glow > 0){ ctx2d.shadowColor = slot.color; ctx2d.shadowBlur = glow * view.dpr / view.realDpr; }
+      drawImageBlob(c.x, c.y, DRAW_R, ensureImage(slot));
+    } else {
+      if(glow > 0){
+        var hs = haloSprite(slot.shape, slot.color, DRAW_R, Math.round(glow));
+        // Snapped to whole store pixels and drawn at its bitmap size: a
+        // fractional device offset turns the blit into a bilinear resample
+        // of the whole sprite (measured 8x the cost, slower than the blur).
+        var hx = Math.round((c.x - hs.size/2) * view.dpr) / view.dpr;
+        var hy = Math.round((c.y - hs.size/2) * view.dpr) / view.dpr;
+        ctx2d.drawImage(hs.c, hx, hy, hs.store / view.dpr, hs.store / view.dpr);
+      }
+      drawShape(slot.shape, c.x, c.y, DRAW_R, slot.color);
+    }
     ctx2d.restore();
     ctx2d.globalAlpha = 1;
   });
