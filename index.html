@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<style>
+  /* Mirrors the artifact host's skeleton so the standalone page matches the
+     published one: safe-area padding on the root, zero body margin. */
+  :root{ color-scheme:light; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  html,body{ margin:0; }
+  body{ font:14px system-ui, sans-serif; }
+  img{ max-width:100%; }
+  [hidden]{ display:none !important; }
+</style>
+<title>Bell Theory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app">
+  <div class="stage-wrap">
+    <canvas id="stage"></canvas>
+
+    <div class="topbar">
+      <div class="stats">
+        <span class="stat"><i>Dist</i><b id="distVal">0</b></span>
+        <span class="stat"><i>Coins</i><b><span class="gold" id="coinVal">0</span><em id="coinMult" class="ent" hidden>×2</em></b></span>
+        <span class="stat" id="comboStat"><i>Combo</i><b><span id="comboNum">0</span><em id="comboMult">×1</em></b></span>
+      </div>
+      <div class="tools">
+        <button class="icon-btn sound-btn" id="soundBtn" aria-label="Toggle sound">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 5 6 9H3v6h3l5 4z"/>
+            <path id="waveOn" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>
+            <path id="waveOff" d="M17 9.5l4 5M21 9.5l-4 5"/>
+          </svg>
+        </button>
+        <button class="panel-toggle" id="panelToggle" aria-label="Open customization panel" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.63 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.63a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.37 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.04z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="gauge" id="gauge" hidden>
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <circle class="g-track" cx="32" cy="32" r="27"/>
+        <circle class="g-fill" id="gaugeFill" cx="32" cy="32" r="27"/>
+      </svg>
+      <div class="g-num" id="gaugeNum">0</div>
+      <div class="g-label" id="gaugeLabel">PUMP ↕</div>
+    </div>
+
+    <div class="overlay" id="overlayReady">
+      <div class="title-block">
+        <div class="title">BELL THEORY</div>
+        <div class="tagline">thread it · or wreck it</div>
+      </div>
+      <div class="cta-block">
+        <div class="cta" id="readyCta">both thumbs down</div>
+        <div class="mode-seg" id="modeSeg" role="group" aria-label="Play mode">
+          <button type="button" data-mode="two">two thumbs</button>
+          <button type="button" data-mode="one">one thumb</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay gone" id="overlayDead">
+      <div class="dead-block">
+        <div class="dead-label">crashed</div>
+        <div class="big" id="deadDist">0</div>
+        <div class="row"><span>coins <b id="deadCoins">0</b></span><span>best <span id="deadBest">0</span></span></div>
+        <p class="loop" id="deadLoop"></p>
+        <div class="cta" id="deadCta">both thumbs to run again</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="panel" id="panel" hidden>
+    <div class="panel-head">
+      <h1>Customize</h1>
+      <button class="panel-close" id="panelClose">close ✕</button>
+    </div>
+
+    <details class="panel-section howto">
+      <summary>How to play</summary>
+      <p>Left thumb drives the left lane, right thumb the right. Thread the gaps, take the coins. Lift a thumb and that side stops moving — it does not stop being hit.</p>
+      <p><b>Pump</b> both thumbs up and down to fill the tank. At 100 it ignites and drains as you ride it. Faster, coins pull to you, and barriers break on you instead of the other way round. Every smash refills the tank, so you can stay lit and wreck as long as you keep hitting things.</p>
+    </details>
+
+    <div class="panel-section">
+      <h2>Thumbs</h2>
+      <div class="toggle-line">
+        <span>One-handed</span>
+        <label class="switch">
+          <input type="checkbox" id="oneHandToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+      <div id="slotList"></div>
+    </div>
+
+    <div class="panel-section">
+      <h2>World</h2>
+      <div class="toggle-line">
+        <span>Sound</span>
+        <label class="switch">
+          <input type="checkbox" id="soundToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Volume</span><span class="val" id="volumeVal"></span></div>
+        <input type="range" id="volumeRange" min="0" max="100" step="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Impact</span><span class="val" id="impactVal"></span></div>
+        <input type="range" id="impactRange" min="0" max="200" step="5">
+      </div>
+      <p class="note">Engine: <b id="audioStatus">not started</b> <span id="errStatus"></span></p>
+      <p class="note">Silent on iPhone with the engine running? Flip the ring/silent switch — web audio obeys it.</p>
+    </div>
+
+    <div class="panel-section">
+      <h2>Feel</h2>
+      <div class="field">
+        <div class="field-label"><span>Trail length</span><span class="val" id="trailVal"></span></div>
+        <input type="range" id="trailRange" min="0" max="40" step="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Glow</span><span class="val" id="glowVal"></span></div>
+        <input type="range" id="glowRange" min="0" max="40" step="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Follow speed</span><span class="val" id="followVal"></span></div>
+        <input type="range" id="followRange" min="8" max="60" step="1">
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Scene</h2>
+      <div class="toggle-line">
+        <span>Lane grid</span>
+        <label class="switch">
+          <input type="checkbox" id="gridToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+      <div class="toggle-line">
+        <span>Spectrum bars</span>
+        <label class="switch">
+          <input type="checkbox" id="fftToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+      <div class="toggle-line">
+        <span>Haptic buzz</span>
+        <label class="switch">
+          <input type="checkbox" id="hapticToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section" style="border-bottom:none;">
+      <button class="reset-btn" id="resetBtn">reset settings</button>
+    </div>
+  </aside>
+  <div class="rotate" id="rotateOverlay" hidden>turn your phone upright</div>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -7,11 +7,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:single": "vite build --mode single",
     "preview": "vite preview",
     "smoke": "node test/harness.mjs",
     "smoke:one": "node test/harness.mjs --mode one",
     "smoke:proto": "node test/harness.mjs --url file://$PWD/prototype/index.html",
-    "icons": "node test/render-icons.mjs"
+    "smoke:dist": "node test/harness.mjs --url file://$PWD/dist/index.html",
+    "smoke:preview": "node test/harness.mjs --serve dist",
+    "icons": "node test/render-icons.mjs",
+    "lint": "eslint src test/harness.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
@@ -22,6 +26,8 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
     "playwright": "1.56.1",
     "vite": "^7.1.0",
     "vite-plugin-singlefile": "^2.3.3"

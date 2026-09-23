@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Harness floor</title>
+<style>
+  html,body{ margin:0; height:100%; overflow:hidden; background:#0b0d12; }
+  canvas{ display:block; width:100vw; height:100vh; touch-action:none; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script>
+// The harness floor: the cheapest frame this Chromium can produce under the
+// same viewport, dpr and CPU throttle as the game - a full-screen canvas at
+// the device pixel ratio, cleared once per rAF, with the harness's synthetic
+// thumbs dispatched at it and ignored. The game's p50/p95 are read against
+// this page's p50/p95 (see docs/AUDIT.md, perf target).
+(function(){
+  var canvas = document.getElementById("stage");
+  var ctx = canvas.getContext("2d");
+  function resize(){
+    var dpr = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width = Math.round(window.innerWidth*dpr);
+    canvas.height = Math.round(window.innerHeight*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  resize();
+  window.addEventListener("resize", resize);
+  function frame(){
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
