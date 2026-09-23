@@ -87,7 +87,10 @@ export function ensureAudio(){
     audio.noiseFilter.connect(audio.noiseGain);
     audio.noiseGain.connect(audio.master);
   }
-  if(audio.ctx.state !== "running"){
+  // A hidden page must stay suspended: visibilitychange suspends the context,
+  // and a resume() from a queued sound would otherwise bring it back while
+  // the tab is in the background.
+  if(audio.ctx.state !== "running" && !document.hidden){
     var r = audio.ctx.resume();
     if(r && r.catch) r.catch(function(){});
   }
@@ -149,7 +152,13 @@ export function driveAudio(dt){
 export function blip(freq, dur, type, vol){
   var ctx = ensureAudio();
   if(!ctx) return;
-  var t = ctx.currentTime;
+  blipAt(ctx.currentTime, freq, dur, type, vol);
+}
+// blip with an explicit start time on the audio clock, so a sequence of
+// notes keeps its spacing whatever the main thread is doing.
+export function blipAt(t, freq, dur, type, vol){
+  var ctx = ensureAudio();
+  if(!ctx) return;
   var osc = ctx.createOscillator();
   var g = ctx.createGain();
   osc.type = type || "triangle";
@@ -226,8 +235,12 @@ export function crashSound(){
 }
 
 // Staggered notes. A chord reads as a hit; an arpeggio reads as a reward.
+// Every note is scheduled on the audio clock up front: a setTimeout per note
+// jittered with the frame loop (0-150 ms gaps at 6x) and could resume a
+// context the hidden page had just suspended.
 export function arp(freqs, gapMs, type, vol){
-  freqs.forEach(function(f, i){
-    setTimeout(function(){ if(state.soundOn) blip(f, 0.18, type, vol); }, i*gapMs);
-  });
+  var ctx = ensureAudio();
+  if(!ctx) return;
+  var t0 = ctx.currentTime;
+  for(var i=0;i<freqs.length;i++) blipAt(t0 + i*gapMs/1000, freqs[i], 0.18, type, vol);
 }
