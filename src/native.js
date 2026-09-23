@@ -6,6 +6,7 @@ import { Preferences } from '@capacitor/preferences';
 import { App } from '@capacitor/app';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { STORE_KEY, OLD_KEY, state } from './state.js';
+import * as game from './game.js';
 
 export var isNative = Capacitor.isNativePlatform();
 export var platform = Capacitor.getPlatform();
@@ -73,6 +74,20 @@ export function initNative(){
     document.addEventListener("visibilitychange", function(){ if(document.hidden) flush(); });
     App.addListener("pause", flush);
   }
+}
+
+// ===================== lifecycle =====================
+// One App appStateChange listener drives the same suspend/resume pair the
+// web's visibilitychange handler uses (game.js suspendRun/resumeAfterHidden,
+// W31); both are idempotent, so a double delivery with visibilitychange is
+// harmless. Read through the namespace and typeof-guarded so the module
+// builds before the pair lands.
+export function wireLifecycle(){
+  if(!isNative) return;
+  App.addListener('appStateChange', function(s){
+    var fn = s.isActive ? game.resumeAfterHidden : game.suspendRun;
+    if(typeof fn === "function") fn();
+  });
 }
 
 // ===================== android back =====================

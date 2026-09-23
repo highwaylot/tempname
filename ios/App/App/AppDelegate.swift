@@ -1,4 +1,5 @@
 import UIKit
+import AVFoundation
 import Capacitor
 
 @UIApplicationMain
@@ -6,8 +7,35 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
+    // Web Audio inside WKWebView runs under the ambient category, which the
+    // ring/silent switch mutes; .playback ignores the switch, and
+    // .mixWithOthers keeps the player's own music going under the bed (no
+    // Now Playing entry, no UIBackgroundModes). Re-applied on every
+    // did-become-active and after an interruption ends: the template uses
+    // the scene lifecycle, so applicationDidBecomeActive on this delegate
+    // is never called.
+    private func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true, options: [])
+        } catch {
+            NSLog("AVAudioSession configure failed: \(error)")
+        }
+    }
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        configureAudioSession()
+        let center = NotificationCenter.default
+        center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.configureAudioSession()
+        }
+        center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+            guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: raw),
+                  type == .ended else { return }
+            self?.configureAudioSession()
+        }
         return true
     }
 

@@ -2,7 +2,7 @@
 // at import time, and the only one that imports the stylesheet, so nothing
 // else may import it.
 import './styles.css';
-import { loadPersisted, initNative, ent, wireBackButton } from './native.js';
+import { loadPersisted, initNative, ent, wireBackButton, wireLifecycle } from './native.js';
 import { state, hydrateState, saveState } from './state.js';
 import { audio, initAudio, ensureAudio } from './audio.js';
 import { view, initRender, draw } from './render.js';
@@ -103,6 +103,7 @@ function boot(){
     resetCursors();
     initProf();
     initBridge();
+    wireLifecycle();
     wireBackButton();
     document.addEventListener("visibilitychange", onVisibilityChange);
     requestAnimationFrame(frame);

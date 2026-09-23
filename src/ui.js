@@ -6,7 +6,7 @@ import { audio, unlockMediaSession, startBeds, blip, thump, isAudioLive, audioSt
 import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand, getPendingOneHand, startRun, pauseRun, quitToTitle } from './game.js';
 import { imgCache, ensureImage, clearImageCache } from './render.js';
 import { loop, resetClock } from './loop.js';
-import { ent } from './native.js';
+import { ent, isNative } from './native.js';
 
 // ===================== hud =====================
 export var overlayReady = null;
@@ -373,6 +373,9 @@ export function syncOneHand(){
 }
 
 export function initUI(){
+  // Copy that only makes sense on the web (the ring-switch note: the shell's
+  // AVAudioSession category ignores the switch).
+  if(isNative){ var webOnly = document.querySelectorAll("[data-web-only]"); for(var wi = 0; wi < webOnly.length; wi++) webOnly[wi].hidden = true; }
   overlayReady = document.getElementById("overlayReady");
   overlayDead = document.getElementById("overlayDead");
   comboBadge = document.getElementById("comboStat");
