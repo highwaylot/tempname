@@ -596,6 +596,9 @@ export function update(dt){
       }
     }
 
+    // Plain coins taken in the same frame play as one voice scaled by the
+    // count (identical samples to one voice per coin, 2 nodes instead of 2n).
+    var coinHits = 0;
     for(var j=game.pickups.length-1;j>=0;j--){
       var p = game.pickups[j];
       p.y += game.speed*wdt;
@@ -632,10 +635,7 @@ export function update(dt){
           else {
             world.perturb(p.x, p.y, 0.5, 1.1);
             game.shake = Math.max(game.shake, 0.1);
-            if(state.soundOn){
-              blip(game.parallelOn ? 880 : 660, 0.16, "triangle", 0.12);
-              thump(220, 0.11, 0.32);
-            }
+            coinHits++;
             for(var k=0;k<7;k++){
               var a = Math.random()*Math.PI*2, sp = 40 + Math.random()*140;
               game.sparks.push({ x:p.x, y:p.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:1, color:"#f2c14e" });
@@ -645,6 +645,10 @@ export function update(dt){
           break;
         }
       }
+    }
+    if(coinHits > 0 && state.soundOn){
+      blip(game.parallelOn ? 880 : 660, 0.16, "triangle", 0.12, coinHits);
+      thump(220, 0.11, 0.32, coinHits);
     }
   }
 

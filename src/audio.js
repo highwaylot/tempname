@@ -6,7 +6,7 @@ import { syncSoundBtn } from './ui.js';
 export var audio = {
   ctx:null, master:null, comp:null, click:null, analyser:null, freqData:null, binIndex:null,
   droneGain:null, noiseGain:null, noiseFilter:null, started:false, soundOffAt:0,
-  drone:null, noisePCM:null, noiseBuf:null
+  drone:null, noisePCM:null, noiseBuf:null, clickBp:null, crashLp:null
 };
 // The graph is built at load in idle time so the first touch only resumes
 // the context and starts the sources: the context + static graph, the four
@@ -130,6 +130,16 @@ export function ensureAudio(){
     audio.noiseGain.gain.value = 0.0;
     audio.noiseFilter.connect(audio.noiseGain);
     audio.noiseGain.connect(audio.master);
+    // Shared filters for the impact click and the crash noise: both stages
+    // are linear and time-invariant, so one filter after the per-voice gain
+    // renders the same samples as one per voice, without two extra nodes per
+    // hit.
+    audio.clickBp = ctx.createBiquadFilter();
+    audio.clickBp.type = "bandpass"; audio.clickBp.frequency.value = 900; audio.clickBp.Q.value = 1.2;
+    audio.clickBp.connect(audio.master);
+    audio.crashLp = ctx.createBiquadFilter();
+    audio.crashLp.type = "lowpass"; audio.crashLp.frequency.value = 900;
+    audio.crashLp.connect(audio.master);
   }
   // A hidden page must stay suspended: visibilitychange suspends the context,
   // and a resume() from a queued sound would otherwise bring it back while
@@ -182,24 +192,28 @@ export function driveAudio(dt){
   if(Math.abs(ng - lastNG) > 0.0003){ lastNG = ng; audio.noiseGain.gain.setTargetAtTime(ng, t, 0.4); }
   if(Math.abs(dg - lastDG) > 0.0003){ lastDG = dg; audio.droneGain.gain.setTargetAtTime(dg, t, 0.6); }
 }
-export function blip(freq, dur, type, vol){
+// n (default 1) plays the note as n phase-coherent voices in one: every
+// envelope anchor is scaled by n, which renders the same samples as n
+// identical voices started in the same frame.
+export function blip(freq, dur, type, vol, n){
   var ctx = ensureAudio();
   if(!ctx) return;
-  blipAt(ctx.currentTime, freq, dur, type, vol);
+  blipAt(ctx.currentTime, freq, dur, type, vol, n);
 }
 // blip with an explicit start time on the audio clock, so a sequence of
 // notes keeps its spacing whatever the main thread is doing.
-export function blipAt(t, freq, dur, type, vol){
+export function blipAt(t, freq, dur, type, vol, n){
   var ctx = ensureAudio();
   if(!ctx) return;
+  n = n || 1;
   var osc = ctx.createOscillator();
   var g = ctx.createGain();
   osc.type = type || "triangle";
   osc.frequency.setValueAtTime(freq, t);
   osc.frequency.exponentialRampToValueAtTime(freq*1.6, t + dur*0.8);
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol || 0.16, t + 0.012);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.gain.setValueAtTime(0.0001*n, t);
+  g.gain.exponentialRampToValueAtTime((vol || 0.16)*n, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001*n, t + dur);
   osc.connect(g); g.connect(audio.master);
   osc.start(t); osc.stop(t + dur + 0.02);
 }
@@ -207,9 +221,13 @@ export function blipAt(t, freq, dur, type, vol){
 // gives a strong fundamental plus odd harmonics in the band a phone driver
 // can actually push, and at high volume that buzzes the frame. Pitch stays
 // in that band instead of sweeping below it. Scaled by the Impact setting.
-export function thump(freq, dur, vol){
+// n (default 1) folds n same-frame hits into one voice (anchors scaled by
+// n, see blip). The oscillator keeps its own lowpass: the 4 ms exponential
+// attack does not commute with a shared filter (19% error on the onset).
+export function thump(freq, dur, vol, n){
   var ctx = ensureAudio();
   if(!ctx) return;
+  n = n || 1;
   var t = ctx.currentTime;
   var v = vol * (state.impact || 1);
   var osc = ctx.createOscillator();
@@ -219,9 +237,9 @@ export function thump(freq, dur, vol){
   osc.frequency.setValueAtTime(freq, t);
   osc.frequency.exponentialRampToValueAtTime(Math.max(120, freq*0.7), t + dur);
   lp.type = "lowpass"; lp.frequency.value = 1400; lp.Q.value = 0.7;
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(v, t + 0.004);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.gain.setValueAtTime(0.0001*n, t);
+  g.gain.exponentialRampToValueAtTime(v*n, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001*n, t + dur);
   osc.connect(lp); lp.connect(g); g.connect(audio.master);
   osc.start(t); osc.stop(t + dur + 0.02);
 
@@ -233,10 +251,8 @@ export function thump(freq, dur, vol){
   }
   var src = ctx.createBufferSource();
   src.buffer = audio.click;
-  var bp = ctx.createBiquadFilter();
-  bp.type = "bandpass"; bp.frequency.value = 900; bp.Q.value = 1.2;
-  var ng = ctx.createGain(); ng.gain.value = v*0.6;
-  src.connect(bp); bp.connect(ng); ng.connect(audio.master);
+  var ng = ctx.createGain(); ng.gain.value = v*0.6*n;
+  src.connect(ng); ng.connect(audio.clickBp);
   src.start(t);
 }
 export function crashSound(){
@@ -254,17 +270,31 @@ export function crashSound(){
   osc.connect(g); g.connect(audio.master);
   osc.start(t); osc.stop(t + 0.65);
 
-  var size = Math.floor(ctx.sampleRate * 0.35);
-  var buf = ctx.createBuffer(1, size, ctx.sampleRate);
-  var d = buf.getChannelData(0);
-  for(var i=0;i<size;i++) d[i] = (Math.random()*2-1) * (1 - i/size);
+  // The noise burst is a 0.35 s slice of the 2 s bed buffer at a random
+  // offset, with the decay as a gain ramp (sample-accurate, so the same
+  // samples as a baked one): no 15k-sample buffer filled per death. The
+  // per-death buffer stays as the fallback for a crash before startBeds.
   var src = ctx.createBufferSource();
-  src.buffer = buf;
-  var lp = ctx.createBiquadFilter();
-  lp.type = "lowpass"; lp.frequency.value = 900;
-  var ng = ctx.createGain(); ng.gain.value = 0.32;
-  src.connect(lp); lp.connect(ng); ng.connect(audio.master);
-  src.start(t);
+  var ng = ctx.createGain();
+  if(audio.noiseBuf){
+    // Whole samples, like the baked buffer was: 0.35*sr is not an integer
+    // and a ramp one sample longer than the slice is a -84 dB difference.
+    var nd = Math.floor(ctx.sampleRate * 0.35) / ctx.sampleRate;
+    src.buffer = audio.noiseBuf;
+    ng.gain.setValueAtTime(0.32, t);
+    ng.gain.linearRampToValueAtTime(0, t + nd);
+    src.connect(ng); ng.connect(audio.crashLp);
+    src.start(t, Math.random() * (audio.noiseBuf.duration - nd), nd);
+  } else {
+    var size = Math.floor(ctx.sampleRate * 0.35);
+    var buf = ctx.createBuffer(1, size, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for(var i=0;i<size;i++) d[i] = (Math.random()*2-1) * (1 - i/size);
+    src.buffer = buf;
+    ng.gain.value = 0.32;
+    src.connect(ng); ng.connect(audio.crashLp);
+    src.start(t);
+  }
 }
 
 // Staggered notes. A chord reads as a hit; an arpeggio reads as a reward.
