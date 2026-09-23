@@ -17,28 +17,97 @@ export function ensureImage(slot){
 export function clearImageCache(){ imgCache = {}; }
 
 // ===================== canvas =====================
+// The backing store is capped at DPR 2 (W06): a 3x phone rasterises 2.25x
+// the pixels of a 2x one for lines and text that read the same at arm's
+// length. realDpr keeps the true ratio so blur radii set in CSS units can be
+// scaled back to the same on-screen size (shadowBlur is in store pixels).
+var DPR_CAP = 2;
 export var view = { canvas:null, ctx2d:null, wrap:null, W:0, H:0, dpr:1, realDpr:1 };
+// The centre seam lives in the DOM (#seamEl, under the canvas); its opacity
+// is written only when it moves by more than a rounding step.
+var seamEl = null, seamLastA = -1;
+// The camera (shake + sway) is a CSS transform on the canvas and the seam,
+// written only when the string changes.
+var camXf = "";
 export function resize(){
   var rect = view.wrap.getBoundingClientRect();
   view.W = rect.width; view.H = rect.height;
-  view.realDpr = window.devicePixelRatio || 1;
-  view.dpr = Math.max(1, window.devicePixelRatio || 1);
+  view.realDpr = Math.max(1, window.devicePixelRatio || 1);
+  view.dpr = Math.min(DPR_CAP, view.realDpr);
   view.canvas.width = Math.round(view.W*view.dpr);
   view.canvas.height = Math.round(view.H*view.dpr);
   view.ctx2d.setTransform(view.dpr,0,0,view.dpr,0,0);
+  clearHaloCache();
 }
 export function initRender(){
   view.canvas = document.getElementById("stage");
   view.ctx2d = view.canvas.getContext("2d");
   view.wrap = view.canvas.parentElement;
+  seamEl = document.getElementById("seamEl");
   resize();
   window.addEventListener("resize", resize);
   state.slots.forEach(ensureImage);
+  prewarmHalos();
+  initFx();
+}
+
+// ===================== adaptive quality =====================
+// Straight grid rows and no spectrum bars, only on a device that is already
+// dropping frames (W19). A 120-entry ring of rAF intervals is filled while a
+// run is on; every 60 frames, once the run is 3 s old, a ring p95 over 33 ms
+// drops the tier to "low". The step back to "full" happens only at the next
+// startRun, when the previous run's last 120 frames held p95 under 20 ms, so
+// the change is never seen as a pop. ?fx=full / ?fx=low pin the tier (the
+// gate is measured pinned full); the Auto quality switch (state.autoFx) off
+// holds full. The saved grid/fft toggles are untouched either way.
+export var fx = { level:"full", auto:true };
+var FX_N = 120;
+var fxRing = new Float32Array(FX_N), fxSorted = new Float32Array(FX_N);
+var fxHead = 0, fxCount = 0, fxFrames = 0, fxRunMs = 0, fxPinned = false;
+function fxReset(){ fxHead = 0; fxCount = 0; fxFrames = 0; fxRunMs = 0; }
+// p95 of the ring (the harness's percentile: sorted[floor(n*0.95)]); null
+// until the ring is full.
+function fxP95(){
+  if(fxCount < FX_N) return null;
+  fxSorted.set(fxRing);
+  fxSorted.sort();
+  return fxSorted[Math.floor(FX_N*0.95)];
+}
+// Once per frame from main.js with the raw rAF interval in ms.
+export function fxFrame(ms){
+  if(!fx.auto || game.phase !== PHASE_RUN || !(ms > 0)) return;
+  fxRing[fxHead] = ms; fxHead = (fxHead + 1) % FX_N;
+  if(fxCount < FX_N) fxCount++;
+  fxRunMs += ms;
+  if(++fxFrames % 60) return;
+  if(fx.level === "low" || fxRunMs < 3000) return;
+  var p95 = fxP95();
+  if(p95 !== null && p95 > 33) fx.level = "low";
+}
+// startRun: the one place the tier may step back up.
+export function fxRunStart(){
+  if(fx.auto && fx.level === "low"){
+    var p95 = fxP95();
+    if(p95 !== null && p95 < 20) fx.level = "full";
+  }
+  fxReset();
+}
+// The Auto quality switch; a URL pin wins over it.
+export function setFxAuto(on){
+  if(fxPinned) return;
+  fx.auto = !!on;
+  if(!fx.auto) fx.level = "full";
+  fxReset();
+}
+function initFx(){
+  var m = /(^|[?&])fx=(full|low)(&|$)/.exec(location.search);
+  if(m){ fxPinned = true; fx.auto = false; fx.level = m[2]; return; }
+  setFxAuto(state.autoFx);
 }
 
 // ===================== drawing helpers =====================
-function drawShape(shape, x, y, r, color){
-  var ctx2d = view.ctx2d;
+function drawShape(shape, x, y, r, color, g){
+  var ctx2d = g || view.ctx2d;
   if(shape === "ring"){
     ctx2d.beginPath(); ctx2d.arc(x,y,r,0,Math.PI*2);
     ctx2d.lineWidth = Math.max(4, r*0.32); ctx2d.strokeStyle = color; ctx2d.stroke();
@@ -75,22 +144,98 @@ function drawImageBlob(x,y,r,img){
   ctx2d.lineWidth = 2; ctx2d.strokeStyle = "rgba(255,255,255,.42)"; ctx2d.stroke();
 }
 
+// Orb halo as a cached sprite (W15). A live shadowBlur re-blurs the orb
+// every frame; the blur only changes with shape, colour, radius and the
+// rounded glow, so it is rendered once per key into a small canvas and
+// drawn back with drawImage. The sprite holds the shadow alone: the shape
+// is drawn off-canvas and shadowOffsetX brings the blur back, so what lands
+// under the live body is exactly what the live path composited there (a
+// destination-out punch measured 60/255 off inside an inactive orb, where
+// globalAlpha 0.45 stacks shadow then body). Keyed on both dpr values
+// because shadowBlur is in store pixels; cleared on resize and whenever a
+// slot's look changes (ui.js).
+var haloCache = {};
+export function clearHaloCache(){ haloCache = {}; }
+function haloSprite(shape, color, r, blur){
+  var key = shape + "|" + color + "|" + r + "|" + blur + "|" + view.dpr + "|" + view.realDpr;
+  var s = haloCache[key];
+  if(s) return s;
+  var pad = Math.ceil(blur*2 + 4), size = Math.ceil((r + pad)*2), off = size*2;
+  var c = document.createElement("canvas");
+  c.width = Math.ceil(size*view.dpr); c.height = c.width;
+  var g = c.getContext("2d");
+  g.setTransform(view.dpr,0,0,view.dpr,0,0);
+  g.shadowColor = color;
+  g.shadowBlur = blur * view.dpr / view.realDpr;
+  // Offsets ignore the CTM (store pixels), the shape position does not.
+  g.shadowOffsetX = off * view.dpr;
+  drawShape(shape, size/2 - off, size/2, r, color, g);
+  s = { c:c, size:size, store:c.width };
+  haloCache[key] = s;
+  return s;
+}
+// Pre-warm the sprites a run can reach (charge adds up to 10 to the glow,
+// boost and parallel play cap it at 34) in idle slices, so a build never
+// lands on a run frame. Most likely keys first: the resting glow, the boost
+// cap, then the charge steps, both slots at each step. The idle timeout is
+// short because a loop that never goes idle would otherwise starve the queue.
+var warmQueue = [], warmPending = false;
+export function prewarmHalos(){
+  var lo = Math.max(1, Math.round(state.glow)), hi = Math.min(34, Math.round(state.glow) + 10);
+  var blurs = [lo, 34];
+  for(var b = lo + 1; b <= hi; b++) blurs.push(b);
+  warmQueue.length = 0;
+  blurs.forEach(function(blur){
+    state.slots.forEach(function(slot){
+      if(slot.mode !== "image") warmQueue.push([slot.shape, slot.color, blur]);
+    });
+  });
+  scheduleWarm();
+}
+function scheduleWarm(){
+  if(warmPending || !warmQueue.length) return;
+  warmPending = true;
+  if(window.requestIdleCallback) window.requestIdleCallback(warmStep, { timeout: 50 });
+  else setTimeout(warmStep, 40);
+}
+function warmStep(deadline){
+  warmPending = false;
+  var built = 0;
+  do {
+    var it = warmQueue.shift();
+    haloSprite(it[0], it[1], DRAW_R, it[2]);
+    built++;
+  } while(warmQueue.length && deadline && ((deadline.timeRemaining && deadline.timeRemaining() > 4) || (deadline.didTimeout && built < 3)));
+  scheduleWarm();
+}
+
 export function draw(){
-  var ctx2d = view.ctx2d, W = view.W, H = view.H;
+  var ctx2d = view.ctx2d, W = view.W, H = view.H, low = fx.level === "low";
   ctx2d.clearRect(0,0,W,H);
   ctx2d.save();
+  // Shake and camera sway move the whole canvas element (a compositor
+  // transform) instead of re-rasterising every frame through a ctx2d
+  // rotate. Sway grows with level: slow lateral drift plus a hint of lean,
+  // so the track starts to feel like it is curving under you. Draw-space
+  // only — collision and input run in unswayed coordinates. The CSS
+  // transform-origin is the element centre (W/2,H/2), so this composition
+  // equals the old translate(shake) translate(c) rotate(r) translate(-c+sway)
+  // exactly; Math.random is still called twice per shaking frame so the
+  // spawn RNG order is unchanged.
+  var sx = 0, sy = 0, swx = 0, rot = 0;
   if(game.shake > 0 && !reduceMotion){
-    ctx2d.translate((Math.random()-0.5)*game.shake*14, (Math.random()-0.5)*game.shake*14);
+    sx = (Math.random()-0.5)*game.shake*14; sy = (Math.random()-0.5)*game.shake*14;
   }
-  // Camera sway grows with level: slow lateral drift plus a hint of lean, so
-  // the track starts to feel like it is curving under you. Draw-space only —
-  // collision runs in unswayed coordinates.
   if(game.phase === PHASE_RUN && !reduceMotion){
     var swayAmp = difficulty()*9 + (game.boost > 0 ? 4 : 0);
-    var swayX = Math.sin(world.time*0.85)*swayAmp;
-    ctx2d.translate(W/2, H/2);
-    ctx2d.rotate(swayX*0.0009);
-    ctx2d.translate(-W/2 + swayX, -H/2);
+    swx = Math.sin(world.time*0.85)*swayAmp;
+    rot = swx*0.0009;
+  }
+  var xf = (sx || sy || swx) ? "translate(" + sx.toFixed(2) + "px," + sy.toFixed(2) + "px) rotate(" + rot.toFixed(5) + "rad) translate(" + swx.toFixed(2) + "px,0)" : "";
+  if(xf !== camXf){
+    camXf = xf;
+    view.canvas.style.transform = xf;
+    if(seamEl) seamEl.style.transform = xf;
   }
 
   // lane grid, scrolling
@@ -101,14 +246,25 @@ export function draw(){
     // Horizontal only — the scrolling lines read as speed. Each line is a
     // polyline so it can bow around a moving orb like a wake: vertical motion
     // drags it, fast lateral motion bulges it outward.
-    var gstep = 22, R = 110, R2 = R*R;
+    var gstep = 22, R = 110, R2 = R*R, nl = lanes();
     for(var y = -42 + game.scrollOffset; y < H; y += 42){
       var y0 = Math.round(y)+.5;
       ctx2d.moveTo(0, y0);
+      // A row more than R from every orb gets dy === 0 at every vertex, so
+      // one straight segment draws the same pixels as the 19-vertex polyline.
+      // The low tier draws every row that way.
+      var near = false;
+      if(!reduceMotion && !low){
+        for(var ci=0; ci<nl; ci++){
+          var ddy0 = y0 - cursors[ci].y;
+          if(ddy0 < R && ddy0 > -R){ near = true; break; }
+        }
+      }
+      if(!near){ ctx2d.lineTo(W, y0); continue; }
       for(var gx = gstep; gx <= W + gstep; gx += gstep){
         var dy = 0;
         if(!reduceMotion){
-          for(var ci=0; ci<lanes(); ci++){
+          for(var ci=0; ci<nl; ci++){
             var cc = cursors[ci];
             var ddx = gx - cc.x, ddy = y0 - cc.y;
             var d2 = ddx*ddx + ddy*ddy;
@@ -125,29 +281,32 @@ export function draw(){
     ctx2d.stroke();
   }
 
-  // spectrum bars along the bottom — audio driving visuals
-  if(state.fft && audio.analyser && audio.freqData){
+  // spectrum bars along the bottom — audio driving visuals. Read only while
+  // sound is on (or for 300 ms after muting, so the bars fall instead of
+  // vanishing): the analyser smooths per call, so it is read every frame.
+  if(state.fft && !low && audio.started && audio.analyser && audio.freqData && (state.soundOn || performance.now() - audio.soundOffAt < 300)){
     audio.analyser.getByteFrequencyData(audio.freqData);
     var bars = 40;
     var bw = W / bars;
     ctx2d.fillStyle = "rgba(125,211,192,0.085)";
     for(var bi=0; bi<bars; bi++){
-      // Non-linear bin mapping: the drone lives in the first few bins, so a
-      // straight 1:1 map piled all the energy into the far-left corner.
-      var bin = 1 + Math.floor(Math.pow(bi/bars, 1.8) * 70);
+      // Non-linear bin mapping (audio.binIndex): the drone lives in the
+      // first few bins, so a straight 1:1 map piled all the energy into the
+      // far-left corner.
+      var bin = audio.binIndex[bi];
       var bh = (audio.freqData[bin] / 255) * H * 0.1;
       ctx2d.fillRect(bi*bw, H - bh, bw - 1.5, bh);
     }
   }
 
-  // centre seam, brightened by world warmth (parallel play)
-  var seamA = 0.08 + world.warmth*0.5;
-  var grad = ctx2d.createLinearGradient(W/2-40,0,W/2+40,0);
-  grad.addColorStop(0,"rgba(255,255,255,0)");
-  grad.addColorStop(0.5,"rgba(255,255,255,"+seamA.toFixed(3)+")");
-  grad.addColorStop(1,"rgba(255,255,255,0)");
-  ctx2d.fillStyle = grad;
-  ctx2d.fillRect(W/2-40, 0, 80, H);
+  // centre seam, brightened by world warmth (parallel play). It is the DOM
+  // band under the canvas: no seam in one-thumb mode (one lane, nothing to
+  // divide) and none on the death screen, where it washed out the CTA.
+  var seamA = (lanes() === 2 && game.phase !== PHASE_DEAD) ? 0.08 + world.warmth*0.5 : 0;
+  if(seamEl && Math.abs(seamA - seamLastA) > 0.003){
+    seamLastA = seamA;
+    seamEl.style.opacity = seamA.toFixed(3);
+  }
 
   // The seam is the tank's fill column: charge rises up the centre line
   // from the gauge, so filling is visible in peripheral vision instead of
@@ -360,10 +519,24 @@ export function draw(){
 
     ctx2d.save();
     var glow = Math.min(34, state.glow + (game.parallelOn ? 16 : 0) + (game.boost > 0 ? 22 : game.charge*10));
-    if(glow > 0){ ctx2d.shadowColor = slot.color; ctx2d.shadowBlur = glow; }
     ctx2d.globalAlpha = c.active ? 1 : 0.45;
-    if(slot.mode === "image") drawImageBlob(c.x, c.y, DRAW_R, ensureImage(slot));
-    else drawShape(slot.shape, c.x, c.y, DRAW_R, slot.color);
+    if(slot.mode === "image"){
+      // shadowBlur is applied in backing-store pixels, so under the DPR cap
+      // the CSS-unit glow is scaled by dpr/realDpr to keep its on-screen size.
+      if(glow > 0){ ctx2d.shadowColor = slot.color; ctx2d.shadowBlur = glow * view.dpr / view.realDpr; }
+      drawImageBlob(c.x, c.y, DRAW_R, ensureImage(slot));
+    } else {
+      if(glow > 0){
+        var hs = haloSprite(slot.shape, slot.color, DRAW_R, Math.round(glow));
+        // Snapped to whole store pixels and drawn at its bitmap size: a
+        // fractional device offset turns the blit into a bilinear resample
+        // of the whole sprite (measured 8x the cost, slower than the blur).
+        var hx = Math.round((c.x - hs.size/2) * view.dpr) / view.dpr;
+        var hy = Math.round((c.y - hs.size/2) * view.dpr) / view.dpr;
+        ctx2d.drawImage(hs.c, hx, hy, hs.store / view.dpr, hs.store / view.dpr);
+      }
+      drawShape(slot.shape, c.x, c.y, DRAW_R, slot.color);
+    }
     ctx2d.restore();
     ctx2d.globalAlpha = 1;
   });

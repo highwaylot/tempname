@@ -1,7 +1,7 @@
 // Pointer handling on the canvas. initInput() attaches everything.
 import { state } from './state.js';
 import { world } from './world.js';
-import { unlockMediaSession, startBeds } from './audio.js';
+import { audio, ensureAudio, unlockMediaSession, startBeds } from './audio.js';
 import { haptic } from './native.js';
 import { view } from './render.js';
 import { game, cursors, lanes, startRun, pauseRun, tryResume, PHASE_READY, PHASE_RUN, PHASE_DEAD, TOUCH_OFFSET } from './game.js';
@@ -9,9 +9,12 @@ import { game, cursors, lanes, startRun, pauseRun, tryResume, PHASE_READY, PHASE
 // ===================== input =====================
 export var sidePointer = [null, null];
 
+// Pointer positions are read against the wrap, not the canvas: the camera
+// shake/sway is a CSS transform on the canvas (W05), and a thumb must map to
+// the unswayed field it is actually over.
 function onPointerDown(e){
   var canvas = view.canvas;
-  var rect = canvas.getBoundingClientRect();
+  var rect = view.wrap.getBoundingClientRect();
   var x = e.clientX - rect.left, y = e.clientY - rect.top;
   var side = lanes() === 1 ? 0 : (x < view.W/2 ? 0 : 1);
   if(sidePointer[side] !== null){
@@ -47,7 +50,6 @@ function onPointerDown(e){
 }
 
 function onPointerMove(e){
-  var canvas = view.canvas;
   var side = sidePointer[0] === e.pointerId ? 0 : (sidePointer[1] === e.pointerId ? 1 : -1);
   if(side < 0){
     // A mouse re-entering the field mid-run picks the orb back up, no click.
@@ -56,7 +58,7 @@ function onPointerMove(e){
       cursors[0].active = true; cursors[0].offset = 0;
     } else return;
   }
-  var rect = canvas.getBoundingClientRect();
+  var rect = view.wrap.getBoundingClientRect();
   var c = cursors[side];
   var nx = e.clientX - rect.left, ny = e.clientY - rect.top;
   var moved = Math.abs(nx - c.rawX) + Math.abs(ny - c.rawY);
@@ -89,15 +91,29 @@ export function release(e){
 // A mouse is sticky: one click starts, then the orb follows the pointer with
 // no button held. Only leaving the field lets go.
 function releaseUnlessMouse(e){ if(e.pointerType !== "mouse") release(e); }
-function onPointerOut(e){
-  if(e.pointerType === "mouse") release(e);
+// A lifted thumb is also the gesture that re-arms a context the platform
+// suspended behind our back (an interruption, a route change).
+function onPointerUp(e){
+  releaseUnlessMouse(e);
+  if(state.soundOn && audio.ctx && audio.ctx.state !== "running") ensureAudio();
 }
+// A mouse crossing from the canvas onto the strip the camera slid it away
+// from is still in the field; only leaving the wrap lets go.
+function onPointerOut(e){
+  if(e.pointerType === "mouse" && !(e.relatedTarget && view.wrap.contains(e.relatedTarget))) release(e);
+}
+// The same handlers on the wrap, for a press or move in the <=20 px strip
+// the canvas slid away from; canvas events bubble here too, hence the guard.
+function onWrapPointerDown(e){ if(e.target === view.wrap) onPointerDown(e); }
+function onWrapPointerMove(e){ if(e.target === view.wrap) onPointerMove(e); }
 
 export function initInput(){
-  var canvas = view.canvas;
+  var canvas = view.canvas, wrap = view.wrap;
   canvas.addEventListener("pointerdown", onPointerDown, { passive:true });
   canvas.addEventListener("pointermove", onPointerMove, { passive:true });
-  canvas.addEventListener("pointerup", releaseUnlessMouse, { passive:true });
+  canvas.addEventListener("pointerup", onPointerUp, { passive:true });
   canvas.addEventListener("pointercancel", releaseUnlessMouse, { passive:true });
   canvas.addEventListener("pointerout", onPointerOut, { passive:true });
+  wrap.addEventListener("pointerdown", onWrapPointerDown, { passive:true });
+  wrap.addEventListener("pointermove", onWrapPointerMove, { passive:true });
 }

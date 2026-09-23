@@ -4,22 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <style>
-  /* Mirrors the artifact host's skeleton so the standalone page matches the
-     published one: safe-area padding on the root, zero body margin. */
-  :root{ color-scheme:light; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  /* Mirrors the artifact host's skeleton (zero body margin) without its
+     safe-area padding on the root: the stylesheet applies the insets once
+     (W28), and a host that pads the root is detected in main.js. */
+  :root{ color-scheme:dark; background:#0b0d11; }
   html,body{ margin:0; }
   body{ font:14px system-ui, sans-serif; }
   img{ max-width:100%; }
   [hidden]{ display:none !important; }
 </style>
 <title>Bell Theory</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="app">
   <div class="stage-wrap">
+    <div id="seamClip" aria-hidden="true"><div id="seamEl"></div></div>
     <canvas id="stage"></canvas>
 
     <div class="topbar">
@@ -175,6 +174,13 @@
         <span>Auto pause</span>
         <label class="switch">
           <input type="checkbox" id="autoPauseToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+      <div class="toggle-line">
+        <span>Auto quality</span>
+        <label class="switch">
+          <input type="checkbox" id="autoFxToggle">
           <span class="track"></span><span class="knob"></span>
         </label>
       </div>

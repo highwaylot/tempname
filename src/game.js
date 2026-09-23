@@ -2,9 +2,9 @@
 // locals at the top of each function that uses them.
 import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
-import { startBeds, driveAudio, blip, thump, crashSound, arp, duck } from './audio.js';
-import { view } from './render.js';
-import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, setOverlay, showDeath, showGate, showPause, hidePause, syncOneHand } from './ui.js';
+import { audio, ensureAudio, unlockMediaSession, releaseMediaSession, startBeds, driveAudio, blip, thump, crashSound, arp, duck } from './audio.js';
+import { view, fxRunStart } from './render.js';
+import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, setOverlay, showDeath, showGate, showPause, hidePause, syncOneHand, isPanelOpen, isRotateShown } from './ui.js';
 import { sidePointer } from './input.js';
 import { haptic, ent } from './native.js';
 import { resetClock } from './loop.js';
@@ -113,6 +113,7 @@ export function startRun(){
   // Counted on start, so a run killed mid-way still counts.
   state.life.runs++;
   saveState();
+  fxRunStart();
   game.phase = PHASE_RUN;
   game.dist = 0;
   game.coins = 0;
@@ -289,8 +290,8 @@ function collectSpecial(p, gain){
   game.flash = purple ? 0.9 : 0.5;
   game.flashColor = purple ? "176,75,255" : "61,123,255";
   if(purple) game.slowmo = 0.35;
-  game.rings.push({ x:p.x, y:p.y, r:p.r, max: purple ? 90 : 60, life:1, special:hex });
-  if(purple) game.rings.push({ x:p.x, y:p.y, r:p.r, max:130, life:1.2, special:"#eef0f4" });
+  game.rings.push(makeRing(p.x, p.y, p.r, purple ? 90 : 60, 1, false, false, false, hex));
+  if(purple) game.rings.push(makeRing(p.x, p.y, p.r, 130, 1.2, false, false, false, "#eef0f4"));
   var n = purple ? 30 : 18;
   for(var k=0;k<n;k++){
     var a = Math.random()*Math.PI*2, sp = 80 + Math.random()*(purple ? 300 : 200);
@@ -336,8 +337,8 @@ function threaded(o, c){
   }
 
   world.perturb(c.x, c.y, surge ? 1.0 : (clean ? 0.7 : 0.4), 1.2);
-  game.rings.push({ x:c.x, y:c.y, r:HIT_R, max: surge ? 56 : (clean ? 44 : 30), life:1, clean:clean, surge:surge });
-  if(graze) game.rings.push({ x:c.x, y:c.y, r:HIT_R, max:36, life:1, graze:true });
+  game.rings.push(makeRing(c.x, c.y, HIT_R, surge ? 56 : (clean ? 44 : 30), 1, clean, surge, false, null));
+  if(graze) game.rings.push(makeRing(c.x, c.y, HIT_R, 36, 1, false, false, true, null));
   var label = (graze ? (steel ? "STEEL GRAZE " : "GRAZE ") : "") + (surge ? "SURGE +" + pts : (clean ? "CLEAN +" + pts : (near ? "CLOSE +" + pts : "+" + pts)));
   game.texts.push({
     x:c.x, y:c.y - 30, text:label, life: (surge || graze) ? 1.4 : 1,
@@ -457,16 +458,16 @@ function spawnRow(){
     if(gs - b.x0 > 3) rects.push({ x:b.x0, w:gs - b.x0 });
     if(b.x1 - ge > 3) rects.push({ x:ge, w:b.x1 - ge });
     var hard = Math.random() < pHard;
-    game.obstacles.push({ y:-h, h:h, rects:rects, side:side, kind:kind, gapC:gapC, gapW:gapW, passed:false, flash:0, minGraze:99, hard:hard, warned:false });
+    game.obstacles.push({ y:-h, h:h, rects:rects, side:side, kind:kind, gapC:gapC, gapW:gapW, passed:false, flash:0, minGraze:Infinity, hard:hard, warned:false });
     if(Math.random() < 0.62){
-      game.pickups.push({ x:gapC + (Math.random()-0.5)*gapW*0.5, y:-h - 40 - Math.random()*70, r:9, taken:false, tier:0, val:1 });
+      game.pickups.push(makePickup(gapC + (Math.random()-0.5)*gapW*0.5, -h - 40 - Math.random()*70, 9, 0, 1));
     }
     if(specialTier && side === specialSide){
       // Off the safe line on purpose: you have to leave the gap to take it
       // and get back before the barrier arrives.
       var dir = Math.random() < 0.5 ? -1 : 1;
       var srel = Math.max(0.1, Math.min(0.9, rel + dir*(0.28 + Math.random()*0.14)));
-      game.pickups.push({ x:b.x0 + srel*laneW, y:-h - 90, r:11, taken:false, tier:specialTier, val: specialTier === 2 ? 100 : 25 });
+      game.pickups.push(makePickup(b.x0 + srel*laneW, -h - 90, 11, specialTier, specialTier === 2 ? 100 : 25));
     }
   });
   // occasional coin arc that sits off the safe line — greed costs you
@@ -475,9 +476,18 @@ function spawnRow(){
     var b = laneBounds(side);
     var cx = b.x0 + laneW*(0.2 + Math.random()*0.6);
     for(var i=0;i<4;i++){
-      game.pickups.push({ x:cx + Math.sin(i*0.9)*26, y:-140 - i*30, r:9, taken:false, tier:0, val:1 });
+      game.pickups.push(makePickup(cx + Math.sin(i*0.9)*26, -140 - i*30, 9, 0, 1));
     }
   }
+}
+
+// Every pickup and ring is born with the same property set in the same
+// order, so V8 keeps one hidden class per kind through the update loops.
+function makePickup(x, y, r, tier, val){
+  return { x:x, y:y, r:r, taken:false, tier:tier, val:val, cued:false, glint:0 };
+}
+function makeRing(x, y, r, max, life, clean, surge, graze, special){
+  return { x:x, y:y, r:r, max:max, life:life, clean:clean, surge:surge, graze:graze, special:special };
 }
 
 function circleRectHit(cx, cy, cr, rx, ry, rw, rh){
@@ -630,6 +640,9 @@ export function update(dt){
       }
     }
 
+    // Plain coins taken in the same frame play as one voice scaled by the
+    // count (identical samples to one voice per coin, 2 nodes instead of 2n).
+    var coinHits = 0;
     for(var j=game.pickups.length-1;j>=0;j--){
       var p = game.pickups[j];
       p.y += game.speed*wdt;
@@ -657,7 +670,8 @@ export function update(dt){
       }
       for(var s=0;s<lanes();s++){
         var cc = cursors[s];
-        if(Math.hypot(cc.x-p.x, cc.y-p.y) < HIT_R + p.r + 3){
+        var pdx = cc.x - p.x, pdy = cc.y - p.y, pr = HIT_R + p.r + 3;
+        if(pdx*pdx + pdy*pdy < pr*pr){
           var gain = (p.val || 1) * (game.parallelOn ? 2 : 1);
           game.coins += gain;
           game.dist += gain * 2;
@@ -665,10 +679,7 @@ export function update(dt){
           else {
             world.perturb(p.x, p.y, 0.5, 1.1);
             game.shake = Math.max(game.shake, 0.1);
-            if(state.soundOn){
-              blip(game.parallelOn ? 880 : 660, 0.16, "triangle", 0.12);
-              thump(220, 0.11, 0.32);
-            }
+            coinHits++;
             for(var k=0;k<7;k++){
               var a = Math.random()*Math.PI*2, sp = 40 + Math.random()*140;
               game.sparks.push({ x:p.x, y:p.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:1, color:"#f2c14e" });
@@ -678,6 +689,10 @@ export function update(dt){
           break;
         }
       }
+    }
+    if(coinHits > 0 && state.soundOn){
+      blip(game.parallelOn ? 880 : 660, 0.16, "triangle", 0.12, coinHits);
+      thump(220, 0.11, 0.32, coinHits);
     }
   }
 
@@ -722,7 +737,32 @@ export function update(dt){
     : (game.parallelOn ? 0.92 : (game.phase === PHASE_RUN ? 0.4 + game.charge*0.35 + tier*0.2 : 0.2));
   targetWarmth = Math.min(1, targetWarmth);
   world.tick(dt, targetEntropy, targetWarmth);
-  driveAudio();
+  driveAudio(dt);
+}
+
+// ===================== lifecycle =====================
+// Background tab, or the native app going inactive: freeze the run and
+// quiet the audio. On return, the world holds still for a beat so you can
+// reposition before it moves again. Both are idempotent, so visibilitychange
+// and a native appStateChange delivering the same edge twice is harmless.
+export function suspendRun(){
+  if(game.phase === PHASE_RUN) game.paused = true;
+  if(audio.ctx && audio.ctx.state === "running"){
+    var s = audio.ctx.suspend(); if(s && s.catch) s.catch(function(){});
+  }
+  releaseMediaSession();
+}
+// A pause the player chose, an open settings sheet or the rotate guard keeps
+// the run paused; the grace is granted only when this call is the one that
+// resumes it, so a spurious resume mid-run changes nothing.
+export function resumeAfterHidden(){
+  if(document.hidden) return;
+  if(game.paused && game.pausedBy !== "user" && !isPanelOpen() && !isRotateShown()){
+    game.paused = false; game.pausedBy = ""; game.grace = 0.8;
+  }
+  resetClock();
+  if(state.soundOn) ensureAudio();
+  if(state.soundOn && !game.paused) unlockMediaSession();
 }
 
 // A switch asked for mid-run waits for the run to end. Applied live it

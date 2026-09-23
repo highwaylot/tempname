@@ -2,9 +2,9 @@
 // button, slot editor, controls, reset and mode picker. Element refs are
 // filled in initUI(); nothing here runs at import time.
 import { state, saveState, resetSettings, isMouseDevice } from './state.js';
-import { audio, unlockMediaSession, startBeds, blip, thump, isAudioLive, audioStateName, duck } from './audio.js';
+import { audio, unlockMediaSession, releaseMediaSession, startBeds, blip, thump, isAudioLive, audioStateName, duck } from './audio.js';
 import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand, getPendingOneHand, startRun, pauseRun, quitToTitle } from './game.js';
-import { imgCache, ensureImage, clearImageCache } from './render.js';
+import { imgCache, ensureImage, clearImageCache, clearHaloCache, prewarmHalos, setFxAuto } from './render.js';
 import { loop, resetClock } from './loop.js';
 import { ent, isNative } from './native.js';
 
@@ -249,7 +249,7 @@ export function renderSides(){
       b.type = "button";
       b.textContent = mode === "color" ? "Color" : "Image";
       if(slot.mode === mode) b.classList.add("active");
-      b.addEventListener("click", function(){ slot.mode = mode; saveState(); renderSides(); });
+      b.addEventListener("click", function(){ slot.mode = mode; clearHaloCache(); prewarmHalos(); saveState(); renderSides(); });
       seg.appendChild(b);
     });
     row.appendChild(seg);
@@ -262,6 +262,7 @@ export function renderSides(){
         slot.color = ci.value;
         dot.style.setProperty("--dot-color", slot.color);
         dot.style.background = slot.color;
+        clearHaloCache();
         saveState();
       });
       var ss = document.createElement("select");
@@ -271,7 +272,7 @@ export function renderSides(){
         if(slot.shape === o[0]) opt.selected = true;
         ss.appendChild(opt);
       });
-      ss.addEventListener("change", function(){ slot.shape = ss.value; saveState(); });
+      ss.addEventListener("change", function(){ slot.shape = ss.value; clearHaloCache(); prewarmHalos(); saveState(); });
       line.appendChild(ci); line.appendChild(ss);
     } else {
       var fw = document.createElement("div"); fw.className = "file-btn";
@@ -285,7 +286,7 @@ export function renderSides(){
         if(!fi.files || !fi.files[0]) return;
         fileToDataUrl(fi.files[0], function(url){
           slot.image = url; imgCache[slot.id] = null; ensureImage(slot);
-          saveState(); renderSides();
+          clearHaloCache(); saveState(); renderSides();
         });
       });
       fw.appendChild(fl); fw.appendChild(fi);
@@ -314,8 +315,17 @@ var followRange = null;
 var followVal = null;
 var gridToggle = null;
 var fftToggle = null;
+// The analyser taps the master only while the bars are drawn (state.fft);
+// ensureAudio applies the same rule when it builds the graph.
+function syncAnalyserTap(){
+  if(!audio.master) return;
+  try{ if(state.fft) audio.master.connect(audio.analyser); else audio.master.disconnect(audio.analyser); }catch(e){}
+}
 var hapticToggle = null;
 var autoPauseToggle = null;
+// Auto quality (W19): off holds the full tier; on lets the frame-time ring
+// drop to low on a device that cannot hold the frame.
+var autoFxToggle = null;
 
 export function syncControls(){
   soundToggle.checked = state.soundOn;
@@ -330,6 +340,7 @@ export function syncControls(){
   fftToggle.checked = state.fft;
   hapticToggle.checked = state.haptics;
   autoPauseToggle.checked = state.autoPause;
+  autoFxToggle.checked = state.autoFx;
   syncSoundBtn();
 }
 
@@ -433,11 +444,12 @@ export function initUI(){
   errStatus = document.getElementById("errStatus");
   soundBtn.addEventListener("click", function(){
     state.soundOn = !state.soundOn;
+    if(!state.soundOn) audio.soundOffAt = performance.now();
     if(state.soundOn){
       unlockMediaSession();
       startBeds();
       blip(660, 0.22, "triangle", 0.3);
-    }
+    } else releaseMediaSession();
     if(audio.master && audio.ctx){
       audio.master.gain.setTargetAtTime(state.soundOn ? state.volume : 0.0001, audio.ctx.currentTime, 0.05);
     }
@@ -463,9 +475,12 @@ export function initUI(){
   fftToggle = document.getElementById("fftToggle");
   hapticToggle = document.getElementById("hapticToggle");
   autoPauseToggle = document.getElementById("autoPauseToggle");
+  autoFxToggle = document.getElementById("autoFxToggle");
   soundToggle.addEventListener("change", function(){
     state.soundOn = soundToggle.checked;
-    if(state.soundOn) startBeds();
+    if(!state.soundOn) audio.soundOffAt = performance.now();
+    if(state.soundOn){ unlockMediaSession(); startBeds(); }
+    else releaseMediaSession();
     if(audio.master && audio.ctx){
       audio.master.gain.setTargetAtTime(state.soundOn ? state.volume : 0.0001, audio.ctx.currentTime, 0.05);
     }
@@ -499,9 +514,10 @@ export function initUI(){
     followVal.textContent = state.follow; saveState();
   });
   gridToggle.addEventListener("change", function(){ state.grid = gridToggle.checked; saveState(); });
-  fftToggle.addEventListener("change", function(){ state.fft = fftToggle.checked; saveState(); });
+  fftToggle.addEventListener("change", function(){ state.fft = fftToggle.checked; syncAnalyserTap(); saveState(); });
   hapticToggle.addEventListener("change", function(){ state.haptics = hapticToggle.checked; saveState(); });
   autoPauseToggle.addEventListener("change", function(){ state.autoPause = autoPauseToggle.checked; saveState(); });
+  autoFxToggle.addEventListener("change", function(){ state.autoFx = autoFxToggle.checked; setFxAuto(state.autoFx); saveState(); });
 
   resetBtn = document.getElementById("resetBtn");
   resetBtn.addEventListener("click", function(){
@@ -514,6 +530,9 @@ export function initUI(){
     disarmReset();
     resetSettings();
     clearImageCache();
+    clearHaloCache(); prewarmHalos();
+    syncAnalyserTap();
+    setFxAuto(state.autoFx);
     renderSides(); syncControls(); syncOneHand();
   });
 

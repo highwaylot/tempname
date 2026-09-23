@@ -4,12 +4,17 @@
 import './styles.css';
 import { loadPersisted, initNative, ent, wireBackButton, wireLifecycle } from './native.js';
 import { state, hydrateState, saveState } from './state.js';
-import { audio, initAudio, ensureAudio } from './audio.js';
-import { view, initRender, draw } from './render.js';
+import { initAudio } from './audio.js';
+import { view, fx, fxFrame, initRender, draw } from './render.js';
 import { initUI, syncHud, syncGate, isPanelOpen, isRotateShown, openPanel, closePanel } from './ui.js';
 import { initInput } from './input.js';
-import { game, PHASE_RUN, resetCursors, update } from './game.js';
-import { loop, resetClock } from './loop.js';
+import { game, PHASE_RUN, resetCursors, update, suspendRun, resumeAfterHidden } from './game.js';
+import { loop } from './loop.js';
+
+// Safe-area insets are applied once (W28): the stylesheet reads env() into
+// --sat/--sab, and a host that already pads the root by the insets (the
+// artifact iframe) gets them zeroed so the HUD is never inset twice.
+(function(){ var cs = getComputedStyle(document.documentElement); if(parseFloat(cs.paddingTop) > 0 || parseFloat(cs.paddingBottom) > 0) document.documentElement.classList.add("host-inset"); })();
 
 // ===================== loop =====================
 // Section timers for the harness JS-budget gate: a 600-entry ring of
@@ -27,6 +32,7 @@ function initProf(){
 function frame(ts){
   loop.frameNo++;
   var dt = loop.lastTs ? Math.min(0.05, (ts-loop.lastTs)/1000) : 0;
+  fxFrame(loop.lastTs ? ts - loop.lastTs : 0);
   loop.lastTs = ts;
   var t0 = prof ? performance.now() : 0, t1 = t0, t2 = t0;
   // The rAF re-arm is at the end of this function, so one thrown frame
@@ -51,25 +57,15 @@ function frame(ts){
   requestAnimationFrame(frame);
 }
 
-// Background tab: freeze the run and quiet the audio. On return, the world
-// holds still for a beat so you can reposition before it moves again.
-function onVisibilityChange(){
-  if(document.hidden){
-    if(game.phase === PHASE_RUN) game.paused = true;
-    if(audio.ctx && audio.ctx.state === "running"){
-      var s = audio.ctx.suspend(); if(s && s.catch) s.catch(function(){});
-    }
-  } else {
-    if(game.paused && game.pausedBy !== "user" && !isPanelOpen() && !isRotateShown()){ game.paused = false; game.grace = 0.8; }
-    resetClock();
-    if(state.soundOn) ensureAudio();
-  }
-}
+// Background tab: the suspend/resume bodies live in game.js (the native
+// shell drives the same two from appStateChange).
+function onVisibilityChange(){ document.hidden ? suspendRun() : resumeAfterHidden(); }
 
 // The wrapper's surface: the store plugin sets the entitlement and price
 // and takes the unlock/restore taps; the Android back handler (native.js
-// wireBackButton) reads the panel, phase and rotate state. Extended, not
-// replaced: initProf may already own window.BellTheory.prof.
+// wireBackButton) reads the panel, phase and rotate state; the tests read
+// fx and drive suspend/resume. Extended, not replaced: initProf may already
+// own window.BellTheory.prof.
 function initBridge(){
   window.BellTheory = Object.assign(window.BellTheory || {}, {
     isPanelOpen: isPanelOpen,
@@ -78,6 +74,9 @@ function initBridge(){
     phase: function(){ return game.phase; },
     rotateShown: isRotateShown,
     PHASE_RUN: PHASE_RUN,
+    fx: fx,
+    suspend: suspendRun,
+    resume: resumeAfterHidden,
     setUnlocked: function(on){ ent.unlocked = !!on; syncGate(); },
     setPrice: function(str){ ent.price = str ? String(str) : null; syncGate(); },
     onUnlockRequested: function(cb){ ent.onUnlock = typeof cb === "function" ? cb : null; },
