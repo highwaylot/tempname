@@ -262,7 +262,7 @@ export function renderSides(){
         slot.color = ci.value;
         dot.style.setProperty("--dot-color", slot.color);
         dot.style.background = slot.color;
-        clearHaloCache();
+        clearHaloCache(); prewarmHalos();
         saveState();
       });
       var ss = document.createElement("select");

@@ -32,12 +32,17 @@ var camXf = "";
 export function resize(){
   var rect = view.wrap.getBoundingClientRect();
   view.W = rect.width; view.H = rect.height;
-  view.realDpr = Math.max(1, window.devicePixelRatio || 1);
-  view.dpr = Math.min(DPR_CAP, view.realDpr);
+  var realDpr = Math.max(1, window.devicePixelRatio || 1);
+  var dpr = Math.min(DPR_CAP, realDpr);
+  var dprChanged = dpr !== view.dpr || realDpr !== view.realDpr;
+  view.realDpr = realDpr; view.dpr = dpr;
   view.canvas.width = Math.round(view.W*view.dpr);
   view.canvas.height = Math.round(view.H*view.dpr);
   view.ctx2d.setTransform(view.dpr,0,0,view.dpr,0,0);
-  clearHaloCache();
+  // The halo sprites are keyed on dpr/realDpr, not W/H, so a resize that
+  // keeps both needs no rebuild; when one changes, rebuild in idle slices
+  // rather than on the next run frame.
+  if(dprChanged){ clearHaloCache(); prewarmHalos(); }
 }
 export function initRender(){
   view.canvas = document.getElementById("stage");
@@ -152,8 +157,8 @@ function drawImageBlob(x,y,r,img){
 // under the live body is exactly what the live path composited there (a
 // destination-out punch measured 60/255 off inside an inactive orb, where
 // globalAlpha 0.45 stacks shadow then body). Keyed on both dpr values
-// because shadowBlur is in store pixels; cleared on resize and whenever a
-// slot's look changes (ui.js).
+// because shadowBlur is in store pixels; cleared when a resize changes
+// either dpr and whenever a slot's look changes (ui.js), prewarmed after.
 var haloCache = {};
 export function clearHaloCache(){ haloCache = {}; }
 function haloSprite(shape, color, r, blur){
