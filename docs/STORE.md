@@ -293,7 +293,10 @@ list and the privacy policy all change. See the open questions.
 
 ## 4. Pre-ship prerequisites (the copy is only true once these are done)
 
-1. **Bundle the fonts.** `prototype/bell-theory.html` lines 2–4 load Sora and
+1. **Bundle the fonts.** *Done (W03): Sora and IBM Plex Mono ship as woff2 files
+   under `src/fonts/` with `@font-face`, pinned by sha256 in `test/fonts-check.mjs`;
+   the harness with every non-local request aborted shows 0 network requests.*
+   `prototype/bell-theory.html` lines 2–4 load Sora and
    IBM Plex Mono from `fonts.googleapis.com` and `fonts.gstatic.com` at page
    load. In a wrapped app that is a network request (and Google receives the
    device IP) before the first frame, which contradicts "no network requests"

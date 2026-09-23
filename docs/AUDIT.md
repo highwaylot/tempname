@@ -70,6 +70,75 @@ WHAT DOES NOT: p95 < 16.7 ms at --throttle 6 / dpr 2 is 1.7x the harness floor a
 | harness floor | 5.8 | 9.7 | bare canvas + clearRect, harness-driven |
 | device target | — | < 16.7 | DPR-3 iPhone, GPU canvas, Safari timeline (W34 checklist) |
 
+## Results (2026-09-23, after the lane merge)
+
+Measured on the merged tree with `test/harness.mjs` on this 4-CPU sandbox (headless Chromium, software raster, 390×844, dpr 2, `--throttle 6`, two-thumb 20 s, `?fx=full`, medians of 3 runs interleaved base/merged by the perf verifier; base = build of `3bcbbf2`, the split before any work item).
+
+| | base | merged | note |
+|---|---|---|---|
+| p50 | 39.8 ms | 24.1 ms | |
+| p95 | 64.5 ms | 42.4 ms | gate limit 40; misses by ~2 ms on a shared box |
+| p99 | 79.6 ms | 50.6 ms | |
+| frames > 33 ms | 68.2 % | 11.4 % | gate limit 15 %: pass |
+| fps | 24.4 | 41.7 | |
+| JS update+draw+hud p95 | 8.7 ms | 6.3 ms | gate limit 6; one run passed at 5.7 |
+| one-thumb 12 s p50 / p95 | 23.1 / 42.1 | 16.5 / 34.6 | gate pass |
+| dpr 3 p50 / p95 | 76.3 / 120.2 | 24.5 / 44.3 | W06: equal to dpr 2 |
+| `?fx=auto` p50 / p95 | — | 22.1 / 34.3 | W19 drops to low at ~4.6 s at 6x; never at 1x |
+| harness floor p50 / p95 | 5.8 / 8.1 | 6.0 / 9.2 | bare canvas, same session |
+| first-touch startBeds | 55–100 ms | 8–15 ms | W16, instrumented |
+| audio automation events | ~581 /s | ~27 /s | W17c, unthrottled |
+
+Per item (verifier measurements; "n/a, device" = only a phone can tell):
+
+| Item | Result |
+|---|---|
+| W03 fonts | 0 network requests with everything but file:/localhost aborted; `document.fonts.check` true for Sora 400/600/700 and Plex 400/500; sha256 pins pass |
+| W04 seam | `#seamEl` opacity 0.29–0.48 in a two-thumb run, 0 one-thumb, 0 on the crash card; band luminance +37 vs flanks (base one-thumb had +21) |
+| W05 camera | transform on every run frame (sway up to 10.9 px), 28 distinct shake transforms in the death window; held-thumb `tx` error 0.0000 px on swayed frames |
+| W06 DPR cap | `canvas.width` 780 at dpr 2 and 3 (base 1170); halo falloff profile equal to base at 0.5 px steps |
+| W07 HUD | DOM written only on change; prof hud p95 1.2 ms |
+| W08 overlays | mid-run `elementFromPoint` on the picker returns the canvas; taps there no longer flip the mode |
+| W09 mode switch | pending flip applied at run end; note shown; lanes unchanged mid-run |
+| W10 sweep | forced d=1 lit: 0 skips (was 9); ordinary frames bit-identical |
+| W14 arps | audio-clock gaps 70.00/70.00/70.00 ms at 6x (was 0–150); hidden page stays suspended |
+| W15 halo sprite | pixel diff ≤ 2/255 at integer positions, ≤ 6 (dpr 2) / 9 (dpr 3) at fractional ones across the halo band; same-dpr resize rebuilds 0 sprites |
+| W16 audio prebuild | `audio.started` false and nothing connected before the first pointerdown; startBeds 8–15 ms |
+| W17 micro | grid culling 0 differing channels; bars frozen when muted; setTargetAtTime 27/s |
+| W18 voice hygiene | click/crash/coin renders within tolerance; first-hit click gain v·0.6·n (a shadowed local made it ×529 before the fix) |
+| W19 adaptive | low at 4.6 s under 6x, never unthrottled; low-vs-full diff confined to R+10 px of the orbs |
+| W20 one-thumb pump | tank reaches 100 within ~4 s per life (base max 22 in 12 s) |
+| W21 hint | visible ≥ 2.2 s at alpha 1 before every first-barrier death on fresh storage; crash card ends with "pump ↕ to charge" |
+| W22 record | `bestCombo` 0 at every run start; "new best" label + gold flash on a record, "crashed" otherwise |
+| W23 save v4 | seeded `thumbtone.v3` → `belltheory.v4` with v 4 and the seeded best; reset keeps best and life |
+| W24 odds | 6001 rows: blue 3.17 % (nominal 3.33), purple 0.417 % (nominal 0.40) |
+| W25 pause | 20-check probe passes (300 ms lockout, 3-2-1 hold, hide/show keeps a user pause, panel round trip) |
+| W26 gate | `__BT_UNLOCKED=false`, `FREE_RUNS=2`: third run blocked, gate rows shown, `setUnlocked(true)` re-enables; inert by default |
+| W27 Capacitor | `cap:sync` exit 0; 0 Landscape in Info.plist; manifest portrait + predictive back; config parses; usage string present. Compile: n/a, device |
+| W28 safe-area | content offsets identical padded and unpadded (first stat top 78 px, gauge gap 46 px); harness env()=0 unchanged |
+| W29 haptics | web histogram same shape as the prototype; faked bridge routes 24 calls through Haptics impact/notification, 0 `navigator.vibrate`. Feel: n/a, device |
+| W30 Preferences | 61 slider inputs → 61 localStorage writes, 1 `Preferences.set`; flush on hidden; late get no longer clobbered (fixed after the verifier caught it) |
+| W31 lifecycle | suspend freezes dist and suspends audio; resume while hidden or with the sheet open stays paused; user pause survives hide/show |
+| W32 back | title → minimize; run → panel (paused); back → close (grace); rotate guard → minimize |
+| W33 audio session | unlock element paused on hide/mute, playing on show/unmute, never played while hidden; native: 0 audio elements, AVAudioSession set in AppDelegate. Ring switch: n/a, device |
+
+## Device checklist (TestFlight / internal testing)
+
+None of this can be measured in the sandbox. Each line is a pass/fail to record on a real phone before submission.
+
+1. **Frame time on a DPR-3 iPhone.** Safari Web Inspector → Timelines, 60 s of two-thumb play with boost: p95 < 16.7 ms is the real gate (W06, W05, W19 are the levers). Record p50/p95 and whether `fx.level` ever drops to low (`window.BellTheory.fx`).
+2. **Silent switch on.** Bed and thump audible in the app (W33 AVAudioSession). If silent: set `NATIVE_MEDIA_UNLOCK = true` in `src/audio.js` and log it.
+3. **Background music.** Music keeps playing under the bed (`.mixWithOthers`); no Now Playing entry after backgrounding.
+4. **Haptic feel per kind.** tap, combo, blue, surge, smash (light/heavy), empty, crunch, ignite, purple, record, storm, die; note any kind that feels wrong or gets dropped by the rank throttle.
+5. **Safe area.** Screenshot on iPhone 15 Pro (notch) and an Android with a hole punch: HUD not under the notch, gauge above the home indicator.
+6. **Android back.** Settings open → closes; mid-run → pauses into settings; title → minimizes; predictive-back animation works.
+7. **Edge-to-edge (Android 15).** Status/nav bars transparent, no double insets.
+8. **Photo picker.** Orb picture from the library; check whether the sheet still offers "Take Photo" (if so, add `NSCameraUsageDescription`).
+9. **Persistence.** Force-quit mid-run, relaunch: best and settings intact; kill within 1 s of a settings change: nothing lost.
+10. **Pause menu.** Thumbs-down auto pause, 3-2-1 resume, app switcher during a user pause returns paused.
+11. **Cold start on a slow device.** Time to first frame; late Preferences read (log) does not reset settings.
+12. **StoreKit (next round).** Unlock and restore flows against a sandbox account; price label from the product, never hardcoded.
+
 ## Work items
 
 ### W01 · Split prototype/bell-theory.html into the Vite project (index.html + src/*.js) with harness parity
