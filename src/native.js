@@ -75,6 +75,23 @@ export function initNative(){
   }
 }
 
+// ===================== android back =====================
+// Hardware/gesture back, in order: close the settings sheet; mid-run (and
+// not behind the rotate guard) open it, which pauses; otherwise send the
+// app to the background. minimizeApp, never exitApp: the manifest's
+// enableOnBackInvokedCallback (W27) gives the predictive-back animation.
+// Reads window.BellTheory (main.js initBridge), so it must run after it.
+export function wireBackButton(){
+  if(Capacitor.getPlatform() !== 'android') return;
+  App.addListener('backButton', function(){
+    var g = window.BellTheory;
+    if(!g){ App.minimizeApp(); return; }
+    if(g.isPanelOpen()){ g.closePanel(); return; }
+    if(g.phase() === g.PHASE_RUN && !g.rotateShown()){ g.openPanel(); return; }
+    App.minimizeApp();
+  });
+}
+
 // ===================== haptics =====================
 // One call per game moment, by kind. On the web each kind is a Vibration
 // API pattern (ms on/off; a number is one pulse); natively the same kinds

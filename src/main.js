@@ -2,11 +2,11 @@
 // at import time, and the only one that imports the stylesheet, so nothing
 // else may import it.
 import './styles.css';
-import { loadPersisted, initNative, ent } from './native.js';
+import { loadPersisted, initNative, ent, wireBackButton } from './native.js';
 import { state, hydrateState, saveState } from './state.js';
 import { audio, initAudio, ensureAudio } from './audio.js';
 import { view, initRender, draw } from './render.js';
-import { initUI, syncHud, syncGate, isPanelOpen, isRotateShown } from './ui.js';
+import { initUI, syncHud, syncGate, isPanelOpen, isRotateShown, openPanel, closePanel } from './ui.js';
 import { initInput } from './input.js';
 import { game, PHASE_RUN, resetCursors, update } from './game.js';
 import { loop, resetClock } from './loop.js';
@@ -67,10 +67,17 @@ function onVisibilityChange(){
 }
 
 // The wrapper's surface: the store plugin sets the entitlement and price
-// and takes the unlock/restore taps. Extended, not replaced: initProf may
-// already own window.BellTheory.prof.
+// and takes the unlock/restore taps; the Android back handler (native.js
+// wireBackButton) reads the panel, phase and rotate state. Extended, not
+// replaced: initProf may already own window.BellTheory.prof.
 function initBridge(){
   window.BellTheory = Object.assign(window.BellTheory || {}, {
+    isPanelOpen: isPanelOpen,
+    openPanel: openPanel,
+    closePanel: closePanel,
+    phase: function(){ return game.phase; },
+    rotateShown: isRotateShown,
+    PHASE_RUN: PHASE_RUN,
     setUnlocked: function(on){ ent.unlocked = !!on; syncGate(); },
     setPrice: function(str){ ent.price = str ? String(str) : null; syncGate(); },
     onUnlockRequested: function(cb){ ent.onUnlock = typeof cb === "function" ? cb : null; },
@@ -96,6 +103,7 @@ function boot(){
     resetCursors();
     initProf();
     initBridge();
+    wireBackButton();
     document.addEventListener("visibilitychange", onVisibilityChange);
     requestAnimationFrame(frame);
     if(json === undefined) load.then(function(late){
