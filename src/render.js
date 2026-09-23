@@ -18,6 +18,9 @@ export function clearImageCache(){ imgCache = {}; }
 
 // ===================== canvas =====================
 export var view = { canvas:null, ctx2d:null, wrap:null, W:0, H:0, dpr:1, realDpr:1 };
+// The centre seam lives in the DOM (#seamEl, under the canvas); its opacity
+// is written only when it moves by more than a rounding step.
+var seamEl = null, seamLastA = -1;
 export function resize(){
   var rect = view.wrap.getBoundingClientRect();
   view.W = rect.width; view.H = rect.height;
@@ -31,6 +34,7 @@ export function initRender(){
   view.canvas = document.getElementById("stage");
   view.ctx2d = view.canvas.getContext("2d");
   view.wrap = view.canvas.parentElement;
+  seamEl = document.getElementById("seamEl");
   resize();
   window.addEventListener("resize", resize);
   state.slots.forEach(ensureImage);
@@ -140,14 +144,14 @@ export function draw(){
     }
   }
 
-  // centre seam, brightened by world warmth (parallel play)
-  var seamA = 0.08 + world.warmth*0.5;
-  var grad = ctx2d.createLinearGradient(W/2-40,0,W/2+40,0);
-  grad.addColorStop(0,"rgba(255,255,255,0)");
-  grad.addColorStop(0.5,"rgba(255,255,255,"+seamA.toFixed(3)+")");
-  grad.addColorStop(1,"rgba(255,255,255,0)");
-  ctx2d.fillStyle = grad;
-  ctx2d.fillRect(W/2-40, 0, 80, H);
+  // centre seam, brightened by world warmth (parallel play). It is the DOM
+  // band under the canvas: no seam in one-thumb mode (one lane, nothing to
+  // divide) and none on the death screen, where it washed out the CTA.
+  var seamA = (lanes() === 2 && game.phase !== PHASE_DEAD) ? 0.08 + world.warmth*0.5 : 0;
+  if(seamEl && Math.abs(seamA - seamLastA) > 0.003){
+    seamLastA = seamA;
+    seamEl.style.opacity = seamA.toFixed(3);
+  }
 
   // The seam is the tank's fill column: charge rises up the centre line
   // from the gauge, so filling is visible in peripheral vision instead of

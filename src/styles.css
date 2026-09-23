@@ -70,6 +70,17 @@ body{
   flex-direction:column;
 }
 .stage-wrap{ position:relative; flex:1; min-height:0; }
+/* The centre seam is a compositor layer under the canvas (W04): an 80 px
+   gradient band whose opacity render.js writes only when it changes, instead
+   of a full-height gradient fill on the canvas every frame. */
+#seamClip{ position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+#seamEl{
+  position:absolute; top:0; bottom:0; left:calc(50% - 40px); width:80px;
+  transform-origin:50% 50%;
+  background:linear-gradient(90deg,rgba(255,255,255,0),#fff,rgba(255,255,255,0));
+  opacity:0;
+  will-change:opacity,transform;
+}
 #stage{
   position:absolute;
   inset:0;
