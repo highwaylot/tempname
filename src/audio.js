@@ -77,6 +77,8 @@ function silentWavUrl(){
 }
 export function unlockMediaSession(){
   if((isNative && !NATIVE_MEDIA_UNLOCK) || !state.soundOn) return;
+  // A hidden page holds no media session; resumeAfterHidden re-arms on show.
+  if(document.hidden) return;
   try{
     if(!unlockEl){
       unlockEl = new Audio(silentWavUrl());
