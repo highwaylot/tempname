@@ -301,7 +301,10 @@ list and the privacy policy all change. See the open questions.
    `.woff2` files inside the bundle with `@font-face` (both fonts are OFL) or
    fall back to system fonts, and remove the three `<link>` tags. Then run the
    harness with network disabled to prove it.
-2. **Photo picker usage string.** The orb picture chooser is
+2. **Photo picker usage string.** *Done in part (W27): `NSPhotoLibraryUsageDescription`
+   is in `ios/App/App/Info.plist` and the input carries `accept="image/*"`;
+   the camera string is not added — check on a device whether the sheet still
+   offers "Take Photo" and add `NSCameraUsageDescription` if it does.* The orb picture chooser is
    `<input type="file">`, which on iOS opens the system photo picker from the
    WebView. Add `NSPhotoLibraryUsageDescription` (and
    `NSCameraUsageDescription`, since the sheet offers "Take Photo") to
@@ -309,7 +312,8 @@ list and the privacy policy all change. See the open questions.
    It stays on this phone." Without the strings the picker can crash the app
    at review. Alternatively remove the camera option by restricting the
    accept attribute; the library string is still needed.
-3. **Persistence swap.** `localStorage` → Capacitor Preferences, per
+3. **Persistence swap.** *Done (W30): `@capacitor/preferences` holds the durable
+   copy, localStorage is the synchronous cache.* `localStorage` → Capacitor Preferences, per
    DECISIONS.md, so that the WebView's storage is not purged by the OS under
    pressure and the best score survives. The privacy answers already assume
    Preferences.

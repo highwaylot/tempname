@@ -1,6 +1,6 @@
 # Bell Theory — store identity assets
 
-Everything in `public/` that is an icon or a splash is **generated**. The source
+Everything in `store-assets/` that is an icon or a splash is **generated**. The source
 of truth is `test/render-icons.mjs`; the SVGs and PNGs are its output. Edit the
 script, not the files.
 
@@ -38,15 +38,15 @@ the silhouette "one bar, two notches" on a home screen.
 
 | File | Size | Alpha | For |
 |---|---|---|---|
-| `public/icon.svg` | 1024 viewBox | – | Master. Also fine as the web favicon (`<link rel="icon" type="image/svg+xml">`). |
-| `public/icon-1024.png` | 1024 | **none** (RGB) | App Store marketing icon and the single-size `AppIcon` Xcode 14+ uses. App Store Connect rejects any alpha channel here (ITMS-90717), so the script encodes RGB PNGs itself rather than screenshotting. |
-| `public/icon-512.png` | 512 | none | Google Play listing icon (Play Console → Store listing). |
-| `public/icon-180.png` | 180 | none | iOS @3x home screen for older asset catalogs; also `apple-touch-icon` for the web build. |
-| `public/icon-120.png` | 120 | none | iOS @2x home screen. |
-| `public/icon-android-fg-432.png` | 432 | yes | Android adaptive icon **foreground** layer at xxxhdpi (108 dp × 4). |
-| `public/icon-android-bg-432.png` | 432 | none | Android adaptive icon **background** layer at xxxhdpi. |
-| `public/splash.svg` | 2732 viewBox | – | Master splash. Mark at 30 % of the width, centred, stage background. |
-| `public/splash-2732.png` | 2732 | none | Capacitor splash. |
+| `store-assets/icon.svg` | 1024 viewBox | – | Master. Also fine as the web favicon (`<link rel="icon" type="image/svg+xml">`). |
+| `store-assets/icon-1024.png` | 1024 | **none** (RGB) | App Store marketing icon and the single-size `AppIcon` Xcode 14+ uses. App Store Connect rejects any alpha channel here (ITMS-90717), so the script encodes RGB PNGs itself rather than screenshotting. |
+| `store-assets/icon-512.png` | 512 | none | Google Play listing icon (Play Console → Store listing). |
+| `store-assets/icon-180.png` | 180 | none | iOS @3x home screen for older asset catalogs; also `apple-touch-icon` for the web build. |
+| `store-assets/icon-120.png` | 120 | none | iOS @2x home screen. |
+| `store-assets/icon-android-fg-432.png` | 432 | yes | Android adaptive icon **foreground** layer at xxxhdpi (108 dp × 4). |
+| `store-assets/icon-android-bg-432.png` | 432 | none | Android adaptive icon **background** layer at xxxhdpi. |
+| `store-assets/splash.svg` | 2732 viewBox | – | Master splash. Mark at 30 % of the width, centred, stage background. |
+| `store-assets/splash-2732.png` | 2732 | none | Capacitor splash. |
 
 ## iOS
 

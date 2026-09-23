@@ -15,7 +15,10 @@
     "smoke:dist": "node test/harness.mjs --url file://$PWD/dist/index.html",
     "smoke:preview": "node test/harness.mjs --serve dist",
     "icons": "node test/render-icons.mjs",
-    "lint": "eslint src test/harness.mjs"
+    "lint": "eslint src test/harness.mjs",
+    "cap:sync": "vite build && cap sync",
+    "cap:android": "npm run cap:sync && cap open android",
+    "cap:ios": "npm run cap:sync && cap open ios"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
@@ -25,10 +28,13 @@
     "@capacitor/status-bar": "^8.0.3"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
     "@capacitor/cli": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "playwright": "1.56.1",
+    "typescript": "^5.9.3",
     "vite": "^7.1.0",
     "vite-plugin-singlefile": "^2.3.3"
   }

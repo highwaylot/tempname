@@ -1,9 +1,10 @@
-// Store identity for Bell Theory: builds public/icon.svg and public/splash.svg
+// Store identity for Bell Theory: builds store-assets/icon.svg and store-assets/splash.svg
 // from one mark, then rasterizes them with Playwright's Chromium.
 //
 //   npm run icons        (= node test/render-icons.mjs)
 //
-// Outputs (all in public/):
+// Outputs (all in store-assets/; kept out of public/ because Vite copies
+// public/ into every bundle and this is ~750 kB of store art):
 //   icon.svg                 the mark on its tile, 1024 viewBox, opaque, no fonts
 //   splash.svg               2732x2732, mark centred at 30% width, stage background
 //   icon-1024.png            App Store marketing icon — RGB, NO alpha channel
@@ -25,7 +26,7 @@ import { deflateSync } from "node:zlib";
 import { chromium } from "playwright";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const out = (p) => resolve(root, "public", p);
+const out = (p) => resolve(root, "store-assets", p);
 
 // ---- palette (live game; do not invent) ----
 export const STAGE = "#0b0d11", PANEL = "#1a1e26", INK = "#eef0f4", TEAL = "#7dd3c0";
