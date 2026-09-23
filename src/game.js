@@ -60,6 +60,11 @@ export var CHARGE_DECAY = 0.32;
 export var BOOST_DRAIN = 0.4;
 export var BOOST_SPEED = 1.85;
 export var MAGNET_R = 120;
+// One thumb registers half the strokes and never earns the 1.8x bilateral
+// bonus; 3.0 lands ignition ~1.6 s at a casual 2.9 strokes/s (two-thumb
+// 1.4 s); 3.6 = exact two-thumb parity, 1.8 = the bilateral bonus alone.
+// First guess pending play reports.
+export var ONE_HAND_PUMP = 3.0;
 
 // On touch the thumb covers the avatar, so it rides above the contact point.
 export var TOUCH_OFFSET = 62;
@@ -346,7 +351,7 @@ export function registerStroke(side, amp){
   // ±30% jitter so the exact stroke that tips the meter is never certain.
   // Sustained uncertainty about when the payoff lands is what keeps the
   // ramp toward it alive.
-  var add = STROKE_CHARGE * (0.7 + Math.random()*0.6) * (rhythm ? 1.4 : 0.8) * (bilateral ? 1.8 : 1);
+  var add = STROKE_CHARGE * (0.7 + Math.random()*0.6) * (rhythm ? 1.4 : 0.8) * (bilateral ? 1.8 : 1) * (state.oneHand ? ONE_HAND_PUMP : 1);
   game.charge = Math.min(1, game.charge + add);
   if(!state.taughtPump){ state.taughtPump = true; saveState(); }
   gauge.classList.remove("tick"); void gauge.offsetWidth; gauge.classList.add("tick");
