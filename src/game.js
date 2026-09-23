@@ -65,6 +65,10 @@ export var MAGNET_R = 120;
 // 1.4 s); 3.6 = exact two-thumb parity, 1.8 = the bilateral bonus alone.
 // First guess pending play reports.
 export var ONE_HAND_PUMP = 3.0;
+// The rare coin, rolled per row: blue 1 in 30 (a few per run), purple 1 in
+// 250 (once every few runs). No pity counter: uncertainty about how much,
+// never whether.
+export var BLUE_ODDS = 1/30, PURPLE_ODDS = 1/250;
 
 // On touch the thumb covers the avatar, so it rides above the contact point.
 export var TOUCH_OFFSET = 62;
@@ -400,9 +404,9 @@ function spawnRow(){
   // more common the longer you stay continuously lit, so infinite boost
   // demands threading at speed instead of replacing it.
   var pHard = 0.06 + (game.boost > 0 ? Math.min(0.5, 0.14 + game.litTime*0.05) : 0);
-  // The rare coin, rolled per row. Blue ~1 in 50, purple ~1 in 400.
+  // The rare coin, rolled per row (BLUE_ODDS / PURPLE_ODDS).
   var sr = Math.random();
-  var specialTier = sr < 1/400 ? 2 : (sr < 1/50 ? 1 : 0);
+  var specialTier = sr < PURPLE_ODDS ? 2 : (sr < BLUE_ODDS ? 1 : 0);
   var specialSide = lanes() === 1 ? 0 : (Math.random() < 0.5 ? 0 : 1);
   var h = 22 + Math.random()*26;
 
