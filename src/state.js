@@ -1,6 +1,7 @@
 // Settings + persistence. Nothing here touches the DOM or storage at import
 // time: main.js calls hydrateState(json) with whatever native.loadPersisted()
 // resolved, and this module fills the exported state object in place.
+import { save } from './native.js';
 
 // v4: the key carries the schema version. A v3 blob under the old key is
 // read once (native.loadPersisted) and written back under the new key on the
@@ -54,9 +55,13 @@ function loadState(raw){
     return merged;
   }catch(e){ return defaultState(); }
 }
-// STORE_KEY only: the v3 key is never rewritten.
+// STORE_KEY only: the v3 key is never rewritten. localStorage is the
+// synchronous cache; the native bridge (a no-op on the web) keeps the
+// durable copy.
 export function saveState(){
-  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+  var json = JSON.stringify(state);
+  try{ localStorage.setItem(STORE_KEY, json); }catch(e){}
+  save(json);
 }
 // The one settings object every module shares. It is filled in place, so a
 // reference taken by any module stays valid across hydrate and reset.

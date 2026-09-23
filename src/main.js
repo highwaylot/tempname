@@ -3,7 +3,7 @@
 // else may import it.
 import './styles.css';
 import { loadPersisted, initNative, ent } from './native.js';
-import { state, hydrateState } from './state.js';
+import { state, hydrateState, saveState } from './state.js';
 import { audio, initAudio, ensureAudio } from './audio.js';
 import { view, initRender, draw } from './render.js';
 import { initUI, syncHud, syncGate, isPanelOpen, isRotateShown } from './ui.js';
@@ -80,11 +80,14 @@ function initBridge(){
 
 // Persisted settings first (raced against a short timeout so a stalled
 // bridge never blocks the game), then each module's init in dependency
-// order, then the loop.
+// order, then the loop. A load that loses the race (json undefined, as
+// against null for "nothing stored") still lands: its best is recovered
+// when it arrives, so a slow bridge never costs the high score.
 function boot(){
-  var timeout = new Promise(function(resolve){ setTimeout(function(){ resolve(null); }, 1000); });
-  return Promise.race([loadPersisted(), timeout]).then(function(json){
-    hydrateState(json);
+  var load = loadPersisted();
+  var timeout = new Promise(function(resolve){ setTimeout(function(){ resolve(undefined); }, 1000); });
+  return Promise.race([load, timeout]).then(function(json){
+    hydrateState(json == null ? null : json);
     initNative();
     initRender();
     initAudio();
@@ -95,6 +98,12 @@ function boot(){
     initBridge();
     document.addEventListener("visibilitychange", onVisibilityChange);
     requestAnimationFrame(frame);
+    if(json === undefined) load.then(function(late){
+      try{
+        var p = late && JSON.parse(late);
+        if(p && typeof p.best === "number" && p.best > state.best){ state.best = p.best; saveState(); }
+      }catch(e){}
+    });
   });
 }
 boot();

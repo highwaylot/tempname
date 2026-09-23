@@ -1,17 +1,49 @@
-// Platform bridge. Web only for now: persisted settings come straight from
-// localStorage, and a later step routes native builds through Capacitor.
+// Platform bridge. On the web the persisted settings come straight from
+// localStorage; in a Capacitor shell Preferences holds the durable copy and
+// localStorage is the synchronous cache (a WebView can evict it).
+import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
+import { App } from '@capacitor/app';
 import { STORE_KEY, OLD_KEY, state } from './state.js';
 
-export var isNative = false;
-export var platform = "web";
+export var isNative = Capacitor.isNativePlatform();
+export var platform = Capacitor.getPlatform();
 
+// ===================== persistence =====================
+// Every Preferences write is chained on this, so a slow get can never be
+// overtaken by a write of the defaults.
+var loaded = Promise.resolve();
 // Resolves the raw persisted string, or null when there is none or storage
 // is unavailable. The v3 key is the one-time migration source: read when
-// the v4 key is absent, and left in place.
+// the v4 key is absent, and left in place. Native: Preferences first; a
+// local copy with nothing durable yet is migrated up. No Preferences
+// .migrate()/removeOld(): the schema key does the versioning.
 export function loadPersisted(){
-  var raw = null;
-  try{ raw = localStorage.getItem(STORE_KEY) || localStorage.getItem(OLD_KEY); }catch(e){}
-  return Promise.resolve(raw);
+  var local = null;
+  try{ local = localStorage.getItem(STORE_KEY) || localStorage.getItem(OLD_KEY); }catch(e){}
+  if(!isNative) return Promise.resolve(local);
+  loaded = Preferences.get({ key: STORE_KEY }).then(function(r){
+    if(r.value != null) return r.value;
+    if(local != null) return Preferences.set({ key: STORE_KEY, value: local }).then(function(){ return local; });
+    return null;
+  }).catch(function(){ return local; });
+  return loaded;
+}
+// Debounced bridge write: 61 slider ticks are one Preferences.set. flush()
+// runs on the timer, on the page going hidden and on the App pause event,
+// so the best score written on death survives an immediate home press.
+var pending = null, pendingValue = null;
+function flush(){
+  if(pendingValue == null) return;
+  var value = pendingValue;
+  pendingValue = null;
+  if(pending){ clearTimeout(pending); pending = null; }
+  loaded.then(function(){ return Preferences.set({ key: STORE_KEY, value: value }); }).catch(function(){});
+}
+export function save(value){
+  if(!isNative) return;
+  pendingValue = value;
+  if(!pending) pending = setTimeout(flush, 250);
 }
 
 // ===================== entitlement =====================
@@ -36,6 +68,10 @@ export var ent = {
 // Called from boot after hydrateState, before initUI renders the gate.
 export function initNative(){
   if(window.__BT_UNLOCKED === false) ent.unlocked = false;
+  if(isNative){
+    document.addEventListener("visibilitychange", function(){ if(document.hidden) flush(); });
+    App.addListener("pause", flush);
+  }
 }
 
 // ===================== haptics =====================
