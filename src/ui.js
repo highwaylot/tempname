@@ -58,8 +58,9 @@ export function showDeath(score){
   var toNext = 5 - (game.bestCombo % 5);
   var nextMult = 2 + Math.floor(game.bestCombo/5);
   var gap = state.best - score;
+  // Replace, not append: three clauses wrap to three lines at the 34ch width.
   deadLoop.textContent = (gap > 0 ? gap + " short of your best" : "New best")
-    + " · " + toNext + " more clean to ×" + nextMult;
+    + " · " + (state.taughtPump ? toNext + " more clean to ×" + nextMult : "pump ↕ to charge");
   overlayDead.classList.remove("gone");
 }
 

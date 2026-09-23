@@ -524,9 +524,11 @@ export function update(dt){
     var ramp = Math.min(1, game.rampT/1.2); ramp = ramp*ramp*(3 - 2*ramp);
     var d = difficulty();
     game.runTime += wdt;
-    if(!state.taughtPump && !game.hinted && game.runTime > 3){
+    // Ramp is fully finished at 1.2 s; the first barrier reaches the orb at
+    // ~3.3 s, so the hint is up before it and fades from 3.86 s.
+    if(!state.taughtPump && !game.hinted && game.runTime > 1.2){
       game.hinted = true;
-      game.texts.push({ x:W/2, y:H*0.8, text:"pump ↕ to charge", life:2.6, color:"#7dd3c0", size:12 });
+      game.texts.push({ x:W/2, y:H*0.8, text:"pump ↕ to charge", life:4.0, color:"#7dd3c0", size:12 });
       while(game.texts.length > 4) game.texts.shift();
     }
     // Boost is a spendable tank: ignites at full, drains while lit, and
