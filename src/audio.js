@@ -5,11 +5,55 @@ import { syncSoundBtn } from './ui.js';
 // ===================== audio (ported + trimmed) =====================
 export var audio = {
   ctx:null, master:null, comp:null, click:null, analyser:null, freqData:null, binIndex:null,
-  droneGain:null, noiseGain:null, noiseFilter:null, started:false, soundOffAt:0
+  droneGain:null, noiseGain:null, noiseFilter:null, started:false, soundOffAt:0,
+  drone:null, noisePCM:null, noiseBuf:null
 };
-// Nothing is built ahead of the first gesture yet; the boot sequence still
-// calls this so the hook exists.
-export function initAudio(){}
+// The graph is built at load in idle time so the first touch only resumes
+// the context and starts the sources: the context + static graph, the four
+// drone voices (created, not started) and the noise PCM. Nothing sounds
+// before the gesture: the context is suspended until a resume() from one,
+// and no source node is started here. On a muted start only the PCM is
+// prepared (no context without the user asking for sound).
+export function initAudio(){
+  var idle = window.requestIdleCallback || function(cb){ return setTimeout(function(){ cb(); }, 0); };
+  idle(function(){
+    if(state.soundOn && !audio.started){
+      var c = ensureAudio();
+      if(c) buildDroneVoices(c);
+    }
+    if(!audio.started) prepNoise((audio.ctx && audio.ctx.sampleRate) || 44100);
+  });
+}
+// The four drone stacks (osc -> voice -> droneGain, lfo -> lfoGain -> detune),
+// created but not started; startBeds starts them. Idempotent.
+function buildDroneVoices(ctx){
+  if(audio.drone) return;
+  audio.drone = [];
+  // Weighted an octave above loom's original 110/165/220 stack: phone speakers
+  // roll off below ~200Hz, so the loudest voice there was inaudible on mobile.
+  [[110,0.3],[220,1.0],[330,0.7],[440,0.45]].forEach(function(pair){
+    var osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = pair[0];
+    var voice = ctx.createGain();
+    voice.gain.value = pair[1];
+    var lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.05 + Math.random()*0.05;
+    var lfoGain = ctx.createGain();
+    lfoGain.gain.value = 4;
+    lfo.connect(lfoGain); lfoGain.connect(osc.detune);
+    osc.connect(voice); voice.connect(audio.droneGain);
+    audio.drone.push([osc, lfo]);
+  });
+}
+// 2 s of white noise as a Float32Array (xorshift: no Math.random call per
+// sample, and copyToChannel into the AudioBuffer later is one memcpy).
+function prepNoise(sr){
+  if(audio.noisePCM && audio.noisePCM.length === 2*sr) return;
+  var n = 2*sr, pcm = new Float32Array(n), s = 0x9e3779b9|0;
+  for(var i=0;i<n;i++){ s ^= s<<13; s ^= s>>>17; s ^= s<<5; pcm[i] = (s>>>0)/2147483648 - 1; }
+  audio.noisePCM = pcm;
+}
 
 // iOS routes raw Web Audio through a session category that the hardware
 // silent switch mutes. An actually-playing HTMLAudioElement flips the
@@ -38,7 +82,7 @@ export function unlockMediaSession(){
   }catch(e){}
 }
 export function audioStateName(){
-  if(!audio.ctx) return "not started";
+  if(!audio.ctx || !audio.started) return "not started";
   return audio.ctx.state;
 }
 export function isAudioLive(){
@@ -101,27 +145,16 @@ export function startBeds(){
   if(!ctx || audio.started) return;
   audio.started = true;
   driveAcc = 1; lastNF = -1; lastNG = -1; lastDG = -1;
-  // Weighted an octave above loom's original 110/165/220 stack: phone speakers
-  // roll off below ~200Hz, so the loudest voice there was inaudible on mobile.
-  [[110,0.3],[220,1.0],[330,0.7],[440,0.45]].forEach(function(pair){
-    var osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = pair[0];
-    var voice = ctx.createGain();
-    voice.gain.value = pair[1];
-    var lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.05 + Math.random()*0.05;
-    var lfoGain = ctx.createGain();
-    lfoGain.gain.value = 4;
-    lfo.connect(lfoGain); lfoGain.connect(osc.detune);
-    lfo.start();
-    osc.connect(voice); voice.connect(audio.droneGain);
-    osc.start();
-  });
-  var size = 2 * ctx.sampleRate;
-  var buf = ctx.createBuffer(1, size, ctx.sampleRate);
-  var data = buf.getChannelData(0);
-  for(var i=0;i<size;i++) data[i] = Math.random()*2 - 1;
+  // Both builders are no-ops when the idle prebuild already ran; they are
+  // the fallback for a touch that lands before it, and for the sound-off-
+  // then-on path.
+  buildDroneVoices(ctx);
+  audio.drone.forEach(function(pair){ pair[1].start(); pair[0].start(); });
+  prepNoise(ctx.sampleRate);
+  var buf = ctx.createBuffer(1, audio.noisePCM.length, ctx.sampleRate);
+  buf.copyToChannel(audio.noisePCM, 0);
+  audio.noiseBuf = buf;
+  audio.noisePCM = null;
   var src = ctx.createBufferSource();
   src.buffer = buf; src.loop = true;
   src.connect(audio.noiseFilter);
