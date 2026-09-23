@@ -40,7 +40,7 @@
 // and inGameFrameErrors, the floor page included), 2 when the gate fails and
 // --gate was passed, 64 on a malformed flag, else 0. Console lines of the form
 // 'Failed to load resource' go to resourceErrors[] and do not set the exit
-// code (the Google Fonts stylesheet through the sandbox proxy, until W03).
+// code (the fonts are self-hosted since W03, so none is expected now).
 
 import { chromium } from 'playwright';
 import path from 'node:path';
