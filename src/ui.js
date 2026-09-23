@@ -344,6 +344,18 @@ export function syncControls(){
   syncSoundBtn();
 }
 
+// Everything that caches or displays a piece of state, refreshed after the
+// state object was replaced under it: the reset button and the late native
+// load in boot (main.js).
+export function applyState(){
+  clearImageCache();
+  clearHaloCache(); prewarmHalos();
+  syncAnalyserTap();
+  setFxAuto(state.autoFx);
+  if(audio.master && audio.ctx) audio.master.gain.setTargetAtTime(state.soundOn ? state.volume : 0.0001, audio.ctx.currentTime, 0.05);
+  renderSides(); syncControls(); syncOneHand();
+}
+
 // Two taps to reset, and the high score is earned so it survives.
 var resetBtn = null;
 var resetArmed = 0;
@@ -529,11 +541,7 @@ export function initUI(){
     }
     disarmReset();
     resetSettings();
-    clearImageCache();
-    clearHaloCache(); prewarmHalos();
-    syncAnalyserTap();
-    setFxAuto(state.autoFx);
-    renderSides(); syncControls(); syncOneHand();
+    applyState();
   });
 
   modeSeg = document.getElementById("modeSeg");

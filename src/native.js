@@ -13,8 +13,12 @@ export var platform = Capacitor.getPlatform();
 
 // ===================== persistence =====================
 // Every Preferences write is chained on this, so a slow get can never be
-// overtaken by a write of the defaults.
+// overtaken by a write of the defaults. loadSettled flips once the get has
+// landed: a value queued before that was built from the defaults (boot lost
+// its race against the bridge) and is dropped in flush() when a durable copy
+// exists, since the late-load path in main.js re-hydrates and re-saves.
 var loaded = Promise.resolve();
+var loadSettled = false;
 // Resolves the raw persisted string, or null when there is none or storage
 // is unavailable. The v3 key is the one-time migration source: read when
 // the v4 key is absent, and left in place. Native: Preferences first; a
@@ -29,6 +33,7 @@ export function loadPersisted(){
     if(local != null) return Preferences.set({ key: STORE_KEY, value: local }).then(function(){ return local; });
     return null;
   }).catch(function(){ return local; });
+  loaded.then(function(){ loadSettled = true; });
   return loaded;
 }
 // Debounced bridge write: 61 slider ticks are one Preferences.set. flush()
@@ -37,10 +42,13 @@ export function loadPersisted(){
 var pending = null, pendingValue = null;
 function flush(){
   if(pendingValue == null) return;
-  var value = pendingValue;
+  var value = pendingValue, early = !loadSettled;
   pendingValue = null;
   if(pending){ clearTimeout(pending); pending = null; }
-  loaded.then(function(){ return Preferences.set({ key: STORE_KEY, value: value }); }).catch(function(){});
+  loaded.then(function(stored){
+    if(early && stored != null) return;
+    return Preferences.set({ key: STORE_KEY, value: value });
+  }).catch(function(){});
 }
 export function save(value){
   if(!isNative) return;

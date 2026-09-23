@@ -3,10 +3,10 @@
 // else may import it.
 import './styles.css';
 import { loadPersisted, initNative, ent, wireBackButton, wireLifecycle } from './native.js';
-import { state, hydrateState, saveState } from './state.js';
+import { state, hydrateState, hydrateLate, saveState } from './state.js';
 import { initAudio } from './audio.js';
 import { view, fx, fxFrame, initRender, draw } from './render.js';
-import { initUI, syncHud, syncGate, isPanelOpen, isRotateShown, openPanel, closePanel } from './ui.js';
+import { initUI, syncHud, syncGate, applyState, isPanelOpen, isRotateShown, openPanel, closePanel } from './ui.js';
 import { initInput } from './input.js';
 import { game, PHASE_RUN, resetCursors, update, suspendRun, resumeAfterHidden } from './game.js';
 import { loop } from './loop.js';
@@ -87,8 +87,12 @@ function initBridge(){
 // Persisted settings first (raced against a short timeout so a stalled
 // bridge never blocks the game), then each module's init in dependency
 // order, then the loop. A load that loses the race (json undefined, as
-// against null for "nothing stored") still lands: its best is recovered
-// when it arrives, so a slow bridge never costs the high score.
+// against null for "nothing stored") still lands: the game runs on the
+// defaults meanwhile, and when the durable copy arrives it is hydrated with
+// the keys touched since boot replayed on top, best and the lifetime
+// counters merged (state.hydrateLate), the sheet re-rendered and the result
+// saved. Saves queued before it arrived carry the defaults and native.flush
+// drops them, so a slow bridge never costs a setting or the high score.
 function boot(){
   var load = loadPersisted();
   var timeout = new Promise(function(resolve){ setTimeout(function(){ resolve(undefined); }, 1000); });
@@ -106,12 +110,13 @@ function boot(){
     wireBackButton();
     document.addEventListener("visibilitychange", onVisibilityChange);
     requestAnimationFrame(frame);
-    if(json === undefined) load.then(function(late){
-      try{
-        var p = late && JSON.parse(late);
-        if(p && typeof p.best === "number" && p.best > state.best){ state.best = p.best; saveState(); }
-      }catch(e){}
-    });
+    if(json === undefined){
+      var base = JSON.parse(JSON.stringify(state));
+      load.then(function(late){
+        if(late == null) return;
+        try{ hydrateLate(late, base); applyState(); saveState(); }catch(e){}
+      });
+    }
   });
 }
 boot();

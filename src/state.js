@@ -85,6 +85,22 @@ export function hydrateState(json){
   if(fresh && isMouseDevice){ state.oneHand = true; saveState(); }
 }
 
+// Boot lost the load race (native only, main.js): the game hydrated the
+// defaults and the durable copy arrives late. It wins, except for the keys
+// the user touched since boot (any value that moved from the boot snapshot
+// base is replayed on top), the high score (the larger one) and the lifetime
+// counters (the delta since boot is added). The caller re-renders and saves.
+export function hydrateLate(json, base){
+  var late = loadState(json);
+  Object.keys(late).forEach(function(k){
+    if(k === "v" || k === "best" || k === "life") return;
+    if(JSON.stringify(state[k]) !== JSON.stringify(base[k])) late[k] = state[k];
+  });
+  late.best = Math.max(late.best, state.best);
+  Object.keys(late.life).forEach(function(k){ late.life[k] += (state.life[k] || 0) - (base.life[k] || 0); });
+  replaceState(late);
+}
+
 // The high score and the lifetime counters are earned so they survive a
 // reset. The caller re-renders.
 export function resetSettings(){
