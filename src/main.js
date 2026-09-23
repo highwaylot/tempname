@@ -5,7 +5,7 @@ import './styles.css';
 import { loadPersisted } from './native.js';
 import { state, hydrateState } from './state.js';
 import { audio, initAudio, ensureAudio } from './audio.js';
-import { view, initRender, draw } from './render.js';
+import { view, fx, fxFrame, initRender, draw } from './render.js';
 import { initUI, syncHud, isPanelOpen, isRotateShown } from './ui.js';
 import { initInput } from './input.js';
 import { game, PHASE_RUN, resetCursors, update } from './game.js';
@@ -26,6 +26,7 @@ function initProf(){
 }
 function frame(ts){
   var dt = loop.lastTs ? Math.min(0.05, (ts-loop.lastTs)/1000) : 0;
+  fxFrame(loop.lastTs ? ts - loop.lastTs : 0);
   loop.lastTs = ts;
   var t0 = prof ? performance.now() : 0, t1 = t0, t2 = t0;
   // The rAF re-arm is at the end of this function, so one thrown frame
@@ -78,6 +79,9 @@ function boot(){
     initInput();
     resetCursors();
     initProf();
+    // The page-level hooks (tests, the native shell): the prof ring joins
+    // them when ?prof=1 is on.
+    window.BellTheory = Object.assign(window.BellTheory || {}, { fx: fx });
     document.addEventListener("visibilitychange", onVisibilityChange);
     requestAnimationFrame(frame);
   });

@@ -48,6 +48,61 @@ export function initRender(){
   window.addEventListener("resize", resize);
   state.slots.forEach(ensureImage);
   prewarmHalos();
+  initFx();
+}
+
+// ===================== adaptive quality =====================
+// Straight grid rows and no spectrum bars, only on a device that is already
+// dropping frames (W19). A 120-entry ring of rAF intervals is filled while a
+// run is on; every 60 frames, once the run is 3 s old, a ring p95 over 33 ms
+// drops the tier to "low". The step back to "full" happens only at the next
+// startRun, when the previous run's last 120 frames held p95 under 20 ms, so
+// the change is never seen as a pop. ?fx=full / ?fx=low pin the tier (the
+// gate is measured pinned full); the Auto quality switch (state.autoFx) off
+// holds full. The saved grid/fft toggles are untouched either way.
+export var fx = { level:"full", auto:true };
+var FX_N = 120;
+var fxRing = new Float32Array(FX_N), fxSorted = new Float32Array(FX_N);
+var fxHead = 0, fxCount = 0, fxFrames = 0, fxRunMs = 0, fxPinned = false;
+function fxReset(){ fxHead = 0; fxCount = 0; fxFrames = 0; fxRunMs = 0; }
+// p95 of the ring (the harness's percentile: sorted[floor(n*0.95)]); null
+// until the ring is full.
+function fxP95(){
+  if(fxCount < FX_N) return null;
+  fxSorted.set(fxRing);
+  fxSorted.sort();
+  return fxSorted[Math.floor(FX_N*0.95)];
+}
+// Once per frame from main.js with the raw rAF interval in ms.
+export function fxFrame(ms){
+  if(!fx.auto || game.phase !== PHASE_RUN || !(ms > 0)) return;
+  fxRing[fxHead] = ms; fxHead = (fxHead + 1) % FX_N;
+  if(fxCount < FX_N) fxCount++;
+  fxRunMs += ms;
+  if(++fxFrames % 60) return;
+  if(fx.level === "low" || fxRunMs < 3000) return;
+  var p95 = fxP95();
+  if(p95 !== null && p95 > 33) fx.level = "low";
+}
+// startRun: the one place the tier may step back up.
+export function fxRunStart(){
+  if(fx.auto && fx.level === "low"){
+    var p95 = fxP95();
+    if(p95 !== null && p95 < 20) fx.level = "full";
+  }
+  fxReset();
+}
+// The Auto quality switch; a URL pin wins over it.
+export function setFxAuto(on){
+  if(fxPinned) return;
+  fx.auto = !!on;
+  if(!fx.auto) fx.level = "full";
+  fxReset();
+}
+function initFx(){
+  var m = /(^|[?&])fx=(full|low)(&|$)/.exec(location.search);
+  if(m){ fxPinned = true; fx.auto = false; fx.level = m[2]; return; }
+  setFxAuto(state.autoFx);
 }
 
 // ===================== drawing helpers =====================
@@ -155,7 +210,7 @@ function warmStep(deadline){
 }
 
 export function draw(){
-  var ctx2d = view.ctx2d, W = view.W, H = view.H;
+  var ctx2d = view.ctx2d, W = view.W, H = view.H, low = fx.level === "low";
   ctx2d.clearRect(0,0,W,H);
   ctx2d.save();
   // Shake and camera sway move the whole canvas element (a compositor
@@ -197,8 +252,9 @@ export function draw(){
       ctx2d.moveTo(0, y0);
       // A row more than R from every orb gets dy === 0 at every vertex, so
       // one straight segment draws the same pixels as the 19-vertex polyline.
+      // The low tier draws every row that way.
       var near = false;
-      if(!reduceMotion){
+      if(!reduceMotion && !low){
         for(var ci=0; ci<nl; ci++){
           var ddy0 = y0 - cursors[ci].y;
           if(ddy0 < R && ddy0 > -R){ near = true; break; }
@@ -228,7 +284,7 @@ export function draw(){
   // spectrum bars along the bottom — audio driving visuals. Read only while
   // sound is on (or for 300 ms after muting, so the bars fall instead of
   // vanishing): the analyser smooths per call, so it is read every frame.
-  if(state.fft && audio.started && audio.analyser && audio.freqData && (state.soundOn || performance.now() - audio.soundOffAt < 300)){
+  if(state.fft && !low && audio.started && audio.analyser && audio.freqData && (state.soundOn || performance.now() - audio.soundOffAt < 300)){
     audio.analyser.getByteFrequencyData(audio.freqData);
     var bars = 40;
     var bw = W / bars;

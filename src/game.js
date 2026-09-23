@@ -3,7 +3,7 @@
 import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
 import { startBeds, driveAudio, blip, thump, crashSound, arp } from './audio.js';
-import { view } from './render.js';
+import { view, fxRunStart } from './render.js';
 import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, showDeath, syncOneHand } from './ui.js';
 import { sidePointer } from './input.js';
 import { haptic } from './native.js';
@@ -92,6 +92,7 @@ export var HIT_R = 12;
 export var DRAW_R = 17;
 
 export function startRun(){
+  fxRunStart();
   game.phase = PHASE_RUN;
   game.dist = 0;
   game.coins = 0;

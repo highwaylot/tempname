@@ -4,7 +4,7 @@
 import { state, saveState, resetSettings, isMouseDevice } from './state.js';
 import { audio, unlockMediaSession, startBeds, blip, thump, isAudioLive, audioStateName } from './audio.js';
 import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand } from './game.js';
-import { imgCache, ensureImage, clearImageCache, clearHaloCache, prewarmHalos } from './render.js';
+import { imgCache, ensureImage, clearImageCache, clearHaloCache, prewarmHalos, setFxAuto } from './render.js';
 import { loop, resetClock } from './loop.js';
 
 // ===================== hud =====================
@@ -229,6 +229,9 @@ function syncAnalyserTap(){
   try{ if(state.fft) audio.master.connect(audio.analyser); else audio.master.disconnect(audio.analyser); }catch(e){}
 }
 var hapticToggle = null;
+// Auto quality (W19): off holds the full tier; on lets the frame-time ring
+// drop to low on a device that cannot hold the frame.
+var autoFxToggle = null;
 
 export function syncControls(){
   soundToggle.checked = state.soundOn;
@@ -242,6 +245,7 @@ export function syncControls(){
   gridToggle.checked = state.grid;
   fftToggle.checked = state.fft;
   hapticToggle.checked = state.haptics;
+  autoFxToggle.checked = state.autoFx;
   syncSoundBtn();
 }
 
@@ -344,6 +348,7 @@ export function initUI(){
   gridToggle = document.getElementById("gridToggle");
   fftToggle = document.getElementById("fftToggle");
   hapticToggle = document.getElementById("hapticToggle");
+  autoFxToggle = document.getElementById("autoFxToggle");
   soundToggle.addEventListener("change", function(){
     state.soundOn = soundToggle.checked;
     if(!state.soundOn) audio.soundOffAt = performance.now();
@@ -383,6 +388,7 @@ export function initUI(){
   gridToggle.addEventListener("change", function(){ state.grid = gridToggle.checked; saveState(); });
   fftToggle.addEventListener("change", function(){ state.fft = fftToggle.checked; syncAnalyserTap(); saveState(); });
   hapticToggle.addEventListener("change", function(){ state.haptics = hapticToggle.checked; saveState(); });
+  autoFxToggle.addEventListener("change", function(){ state.autoFx = autoFxToggle.checked; setFxAuto(state.autoFx); saveState(); });
 
   resetBtn = document.getElementById("resetBtn");
   resetBtn.addEventListener("click", function(){
@@ -397,6 +403,7 @@ export function initUI(){
     clearImageCache();
     clearHaloCache(); prewarmHalos();
     syncAnalyserTap();
+    setFxAuto(state.autoFx);
     renderSides(); syncControls(); syncOneHand();
   });
 
