@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "smoke": "node test/harness.mjs",
     "smoke:one": "node test/harness.mjs --mode one",
-    "smoke:proto": "node test/harness.mjs --url file://$PWD/prototype/index.html"
+    "smoke:proto": "node test/harness.mjs --url file://$PWD/prototype/index.html",
+    "icons": "node test/render-icons.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",

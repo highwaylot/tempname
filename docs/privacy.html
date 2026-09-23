@@ -1,0 +1,154 @@
+<!doctype html>
+<!--
+  Bell Theory privacy policy. Standalone: no scripts, no external fonts, no
+  requests of any kind. Publish at https://belltheory.TLD/privacy.html and put
+  that URL in App Store Connect and Google Play Console.
+
+  PLACEHOLDERS TO FILL BEFORE PUBLISHING (search for each string):
+    belltheory.TLD          -> the real domain (the TLD is unknown to the author
+                               of this file; it appears in the header link,
+                               the contact section and the footer)
+    [CONTACT ADDRESS]       -> an email address or contact form URL you will
+                               actually read; never invented here
+    [EFFECTIVE DATE]        -> the date this version takes effect, e.g.
+                               2026-10-15 (appears twice: header and <time>)
+    [DEVELOPER NAME]        -> the legal name or sole-trader name the app is
+                               published under, as it appears on the store
+
+  ASSUMPTIONS THIS POLICY MAKES ABOUT THE SHIPPED BUILD (see docs/STORE.md,
+  section 4): the Sora / IBM Plex Mono web-font <link> tags have been removed
+  from the game and the fonts are bundled, so the app makes no network request
+  at all; persistence uses Capacitor Preferences; the in-app purchase goes
+  through StoreKit / Google Play Billing directly, not through a third-party
+  purchase service. If any of those change, this text is no longer true and
+  must be revised before it is published.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Bell Theory — Privacy Policy</title>
+<meta name="description" content="Bell Theory collects no personal data, has no accounts, no ads, no analytics and no third-party code, and makes no network requests while you play.">
+<style>
+  :root{
+    --stage:#0b0d11; --panel:#1a1e26;
+    --ink:#eef0f4; --ink-dim:#8991a1; --ink-faint:#565d6b;
+    --accent:#7dd3c0; --gold:#f2c14e; --left:#ffb454; --right:#5ec8ff;
+  }
+  *{ box-sizing:border-box; }
+  html{ background:var(--stage); -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--stage); color:var(--ink);
+    font:17px/1.6 Sora, "Segoe UI", system-ui, -apple-system, sans-serif;
+    padding:0 16px calc(48px + env(safe-area-inset-bottom));
+    background-image:repeating-linear-gradient(to bottom, rgba(238,240,244,.035) 0 1px, transparent 1px 28px);
+  }
+  main{ max-width:640px; margin:0 auto; }
+  header{ padding:40px 0 24px; border-bottom:1px solid rgba(238,240,244,.08); }
+  .mark{ display:flex; align-items:center; gap:12px; margin-bottom:22px; }
+  .mark svg{ width:44px; height:44px; flex:none; }
+  .mark a{ color:var(--ink-dim); text-decoration:none; font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; font-size:13px; letter-spacing:.14em; text-transform:uppercase; }
+  .mark a:hover{ color:var(--accent); }
+  h1{ font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; font-weight:500; font-size:26px; letter-spacing:.14em; text-transform:uppercase; margin:0 0 8px; }
+  h1 span{ display:block; font-size:13px; letter-spacing:.2em; color:var(--accent); margin-bottom:10px; }
+  .meta{ color:var(--ink-dim); font-size:14px; margin:0; font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  .summary{
+    margin:28px 0 0; padding:18px 20px; background:var(--panel); border-radius:12px;
+    border-left:3px solid var(--accent); font-size:18px; line-height:1.55;
+  }
+  h2{ font-size:15px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin:40px 0 10px; font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; font-weight:500; }
+  p{ margin:0 0 14px; }
+  ul{ padding-left:22px; margin:0 0 14px; }
+  li{ margin:0 0 8px; }
+  li::marker{ color:var(--ink-faint); }
+  strong{ color:var(--ink); font-weight:600; }
+  a{ color:var(--accent); }
+  code{ font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; font-size:.92em; color:var(--gold); background:var(--panel); padding:1px 6px; border-radius:5px; }
+  .placeholder{ color:var(--gold); background:rgba(242,193,78,.12); border:1px dashed rgba(242,193,78,.5); padding:1px 8px; border-radius:6px; font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; font-size:.92em; }
+  table{ width:100%; border-collapse:collapse; margin:0 0 16px; font-size:15px; }
+  th,td{ text-align:left; vertical-align:top; padding:10px 8px; border-bottom:1px solid rgba(238,240,244,.08); }
+  th{ color:var(--ink-dim); font-weight:500; font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; font-size:12px; letter-spacing:.1em; text-transform:uppercase; }
+  td:first-child{ color:var(--ink); white-space:nowrap; }
+  td:last-child{ color:var(--ink-dim); }
+  footer{ margin-top:48px; padding-top:20px; border-top:1px solid rgba(238,240,244,.08); color:var(--ink-faint); font-size:13px; font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  @media (max-width:420px){ body{ font-size:16px; } h1{ font-size:22px; } .summary{ font-size:17px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="mark" aria-hidden="false">
+      <svg viewBox="0 0 64 64" role="img" aria-label="Bell Theory">
+        <rect width="64" height="64" rx="14" fill="#1a1e26"/>
+        <rect x="31" y="18" width="2" height="30" rx="1" fill="#7dd3c0"/>
+        <circle cx="19" cy="42" r="7" fill="#ffb454"/>
+        <circle cx="45" cy="42" r="7" fill="#5ec8ff"/>
+        <path d="M19 42 C 24 26, 40 26, 45 42" fill="none" stroke="#eef0f4" stroke-width="1.5" opacity=".6"/>
+      </svg>
+      <a href="https://belltheory.TLD">belltheory.TLD</a>
+    </div>
+    <h1><span>Bell Theory</span>Privacy Policy</h1>
+    <p class="meta">Effective <time datetime="[EFFECTIVE DATE]">[EFFECTIVE DATE]</time> · applies to the Bell Theory app for iOS and Android, bundle id <code>com.belltheory.game</code></p>
+    <p class="summary">Bell Theory collects no personal data. There are no accounts, no ads, no analytics, and no third-party code. Nothing you do in the game is sent anywhere. What the game remembers, it remembers on your device, and uninstalling the app deletes it.</p>
+  </header>
+
+  <h2>1. What we collect</h2>
+  <p>Nothing. The app has no way to identify you and does not try to. It does not ask for your name, email address, contacts, location, advertising identifier, or any other personal information, and it does not generate an identifier of its own.</p>
+
+  <h2>2. Accounts, ads, analytics, third parties</h2>
+  <ul>
+    <li><strong>No accounts.</strong> There is no sign-up, no login, and no cloud save.</li>
+    <li><strong>No ads.</strong> The app shows no advertising and contains no advertising software.</li>
+    <li><strong>No analytics.</strong> We do not measure how you play, how long you play, or whether you play. No crash reports are sent.</li>
+    <li><strong>No third-party SDKs.</strong> The app contains no code from analytics, advertising, attribution, or social companies. The only code in it is the game and the open-source shell it runs in.</li>
+  </ul>
+
+  <h2>3. What stays on your device</h2>
+  <p>The game keeps a small amount of data so it behaves the way you left it. All of it is stored in the app's own storage on your phone and is never transmitted.</p>
+  <table>
+    <thead><tr><th>Data</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td>Settings</td><td>Sound on or off, volume, impact, trail length, glow, follow speed, lane grid, spectrum bars, haptic buzz, play mode, and the colour of each orb.</td></tr>
+      <tr><td>Best distance</td><td>Your highest score, kept so the death screen can show it.</td></tr>
+      <tr><td>A one-time hint flag</td><td>Whether the pump hint has been shown, so it is shown once.</td></tr>
+      <tr><td>Orb picture (optional)</td><td>If you choose a photo for an orb, the app makes a small square copy of it (160 pixels) on the device and stores that copy with your settings. The original is not touched and the copy is never uploaded. You can replace or remove it in Customize.</td></tr>
+      <tr><td>Purchase state</td><td>Whether the one-time unlock has been bought, as reported to the app by the App Store or Google Play.</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Deleting it:</strong> uninstall the app. Every item above is removed with it. The <em>reset settings</em> button in Customize clears the settings but keeps your best distance, since that is earned rather than configured.</p>
+
+  <h2>4. Network</h2>
+  <p>The app makes <strong>no network requests during play</strong>. It does not need an internet connection and works the same with Wi-Fi and mobile data turned off.</p>
+  <p>The only time your phone talks to anyone on the app's behalf is the optional one-time purchase, and that conversation is between your phone and Apple or Google, not us:</p>
+  <ul>
+    <li>On iOS the purchase is handled by the App Store (StoreKit) under <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a>.</li>
+    <li>On Android it is handled by Google Play Billing under <a href="https://policies.google.com/privacy">Google's privacy policy</a>.</li>
+  </ul>
+  <p>The app receives a yes-or-no purchase state from the store. It receives no payment details and no personal information, and we do not operate a server that the app reports to.</p>
+
+  <h2>5. Permissions</h2>
+  <ul>
+    <li><strong>Photos</strong> (only if you choose a picture for an orb): the app opens the system picker and reads only the picture you select. It never scans your library.</li>
+    <li><strong>Haptics</strong>: used for the buzz on impacts. No data is involved and it can be turned off in Customize.</li>
+    <li>The app does not request location, camera access beyond the optional picture, microphone, contacts, notifications, or Bluetooth.</li>
+  </ul>
+
+  <h2>6. Children</h2>
+  <p>The app is suitable for all ages and collects no data from anyone, including children. Because it collects nothing, there is nothing for a parent or guardian to review, correct, or delete beyond uninstalling the app.</p>
+
+  <h2>7. Your rights</h2>
+  <p>Privacy laws such as the GDPR and the CCPA give you rights over personal data that a company holds about you. We hold none, so there is nothing to access, export, correct, or delete on our side. Everything the app stores is on your device and under your control. If you believe this policy is wrong about something, write to us at the address below and we will look into it.</p>
+
+  <h2>8. Changes to this policy</h2>
+  <p>If the app ever starts collecting data, this page will say so before that version is released, the effective date at the top will change, and the app's store listing will be updated to match. A change that reduces what the app remembers, or that only reorganises this text, may be made without notice.</p>
+
+  <h2>9. Contact</h2>
+  <p>Bell Theory is made and published by <span class="placeholder">[DEVELOPER NAME]</span>.</p>
+  <p>Questions about this policy: <span class="placeholder">[CONTACT ADDRESS]</span></p>
+  <p>Website: <a href="https://belltheory.TLD">https://belltheory.TLD</a></p>
+
+  <footer>Bell Theory · privacy policy · effective [EFFECTIVE DATE] · belltheory.TLD</footer>
+</main>
+</body>
+</html>
