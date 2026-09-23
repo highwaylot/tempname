@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <style>
-  /* Mirrors the artifact host's skeleton so the standalone page matches the
-     published one: safe-area padding on the root, zero body margin. */
-  :root{ color-scheme:light; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  /* Mirrors the artifact host's skeleton (zero body margin) without its
+     safe-area padding on the root: the stylesheet applies the insets once
+     (W28), and a host that pads the root is detected in main.js. */
+  :root{ color-scheme:dark; background:#0b0d11; }
   html,body{ margin:0; }
   body{ font:14px system-ui, sans-serif; }
   img{ max-width:100%; }

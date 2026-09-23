@@ -11,6 +11,11 @@ import { initInput } from './input.js';
 import { game, PHASE_RUN, resetCursors, update, suspendRun, resumeAfterHidden } from './game.js';
 import { loop } from './loop.js';
 
+// Safe-area insets are applied once (W28): the stylesheet reads env() into
+// --sat/--sab, and a host that already pads the root by the insets (the
+// artifact iframe) gets them zeroed so the HUD is never inset twice.
+(function(){ var cs = getComputedStyle(document.documentElement); if(parseFloat(cs.paddingTop) > 0 || parseFloat(cs.paddingBottom) > 0) document.documentElement.classList.add("host-inset"); })();
+
 // ===================== loop =====================
 // Section timers for the harness JS-budget gate: a 600-entry ring of
 // {update, draw, hud} ms per frame, filled only when the page was opened
