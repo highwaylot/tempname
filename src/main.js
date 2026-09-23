@@ -3,13 +3,13 @@
 // else may import it.
 import './styles.css';
 import { loadPersisted } from './native.js';
-import { state, hydrateState } from './state.js';
-import { audio, initAudio, ensureAudio } from './audio.js';
+import { hydrateState } from './state.js';
+import { initAudio } from './audio.js';
 import { view, fx, fxFrame, initRender, draw } from './render.js';
-import { initUI, syncHud, isPanelOpen, isRotateShown } from './ui.js';
+import { initUI, syncHud, isPanelOpen, isRotateShown, openPanel, closePanel } from './ui.js';
 import { initInput } from './input.js';
-import { game, PHASE_RUN, resetCursors, update } from './game.js';
-import { loop, resetClock } from './loop.js';
+import { game, PHASE_RUN, resetCursors, update, suspendRun, resumeAfterHidden } from './game.js';
+import { loop } from './loop.js';
 
 // ===================== loop =====================
 // Section timers for the harness JS-budget gate: a 600-entry ring of
@@ -51,20 +51,9 @@ function frame(ts){
   requestAnimationFrame(frame);
 }
 
-// Background tab: freeze the run and quiet the audio. On return, the world
-// holds still for a beat so you can reposition before it moves again.
-function onVisibilityChange(){
-  if(document.hidden){
-    if(game.phase === PHASE_RUN) game.paused = true;
-    if(audio.ctx && audio.ctx.state === "running"){
-      var s = audio.ctx.suspend(); if(s && s.catch) s.catch(function(){});
-    }
-  } else {
-    if(game.paused && !isPanelOpen() && !isRotateShown()){ game.paused = false; game.grace = 0.8; }
-    resetClock();
-    if(state.soundOn) ensureAudio();
-  }
-}
+// Background tab: the suspend/resume bodies live in game.js (the native
+// shell drives the same two from appStateChange).
+function onVisibilityChange(){ document.hidden ? suspendRun() : resumeAfterHidden(); }
 
 // Persisted settings first (raced against a short timeout so a stalled
 // bridge never blocks the game), then each module's init in dependency
@@ -79,9 +68,15 @@ function boot(){
     initInput();
     resetCursors();
     initProf();
-    // The page-level hooks (tests, the native shell): the prof ring joins
-    // them when ?prof=1 is on.
-    window.BellTheory = Object.assign(window.BellTheory || {}, { fx: fx });
+    // The page-level hooks (tests, the native back button and lifecycle):
+    // the prof ring joins them when ?prof=1 is on.
+    window.BellTheory = Object.assign(window.BellTheory || {}, {
+      fx: fx,
+      isPanelOpen: isPanelOpen, openPanel: openPanel, closePanel: closePanel,
+      phase: function(){ return game.phase; },
+      rotateShown: isRotateShown, PHASE_RUN: PHASE_RUN,
+      suspend: suspendRun, resume: resumeAfterHidden
+    });
     document.addEventListener("visibilitychange", onVisibilityChange);
     requestAnimationFrame(frame);
   });

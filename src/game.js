@@ -2,9 +2,10 @@
 // locals at the top of each function that uses them.
 import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
-import { startBeds, driveAudio, blip, thump, crashSound, arp } from './audio.js';
+import { audio, ensureAudio, startBeds, driveAudio, blip, thump, crashSound, arp } from './audio.js';
 import { view, fxRunStart } from './render.js';
-import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, showDeath, syncOneHand } from './ui.js';
+import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, showDeath, syncOneHand, isPanelOpen, isRotateShown } from './ui.js';
+import { resetClock } from './loop.js';
 import { sidePointer } from './input.js';
 import { haptic } from './native.js';
 
@@ -41,6 +42,8 @@ export var game = {
   rampT: 0,
   grace: 0,
   paused: false,
+  // Who paused: "user" for the pause menu, which no auto-resume may undo.
+  pausedBy: null,
   litTime: 0,
   slowmo: 0,
   // Loop-owned values that were closure vars: grid scroll phase, the
@@ -695,6 +698,29 @@ export function update(dt){
   targetWarmth = Math.min(1, targetWarmth);
   world.tick(dt, targetEntropy, targetWarmth);
   driveAudio(dt);
+}
+
+// ===================== lifecycle =====================
+// Background tab, or the native app going inactive: freeze the run and
+// quiet the audio. On return, the world holds still for a beat so you can
+// reposition before it moves again. Both are idempotent, so visibilitychange
+// and a native appStateChange delivering the same edge twice is harmless.
+export function suspendRun(){
+  if(game.phase === PHASE_RUN) game.paused = true;
+  if(audio.ctx && audio.ctx.state === "running"){
+    var s = audio.ctx.suspend(); if(s && s.catch) s.catch(function(){});
+  }
+}
+// A pause the player chose, an open settings sheet or the rotate guard keeps
+// the run paused; the grace is granted only when this call is the one that
+// resumes it, so a spurious resume mid-run changes nothing.
+export function resumeAfterHidden(){
+  if(document.hidden) return;
+  if(game.paused && game.pausedBy !== "user" && !isPanelOpen() && !isRotateShown()){
+    game.paused = false; game.pausedBy = null; game.grace = 0.8;
+  }
+  resetClock();
+  if(state.soundOn) ensureAudio();
 }
 
 export function setOneHand(on){

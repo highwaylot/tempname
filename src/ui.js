@@ -79,7 +79,7 @@ export function closePanel(){
   panelOpen = false;
   panel.hidden = true; scrim.hidden = true;
   panelToggle.setAttribute("aria-expanded","false");
-  if(game.paused && !document.hidden){ game.paused = false; game.grace = 0.8; resetClock(); }
+  if(game.paused && !document.hidden){ game.paused = false; game.pausedBy = null; game.grace = 0.8; resetClock(); }
 }
 export function isPanelOpen(){ return panelOpen; }
 
@@ -91,7 +91,7 @@ function checkOrientation(){
   var bad = landscapeMq.matches && ("ontouchstart" in window);
   rotateOverlay.hidden = !bad;
   if(bad && game.phase === PHASE_RUN) game.paused = true;
-  else if(!bad && game.paused && !panelOpen && !document.hidden){ game.paused = false; game.grace = 0.8; resetClock(); }
+  else if(!bad && game.paused && !panelOpen && !document.hidden){ game.paused = false; game.pausedBy = null; game.grace = 0.8; resetClock(); }
 }
 export function isRotateShown(){ return !rotateOverlay.hidden; }
 
