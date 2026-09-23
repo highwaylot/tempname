@@ -191,14 +191,24 @@ export function draw(){
     // Horizontal only — the scrolling lines read as speed. Each line is a
     // polyline so it can bow around a moving orb like a wake: vertical motion
     // drags it, fast lateral motion bulges it outward.
-    var gstep = 22, R = 110, R2 = R*R;
+    var gstep = 22, R = 110, R2 = R*R, nl = lanes();
     for(var y = -42 + game.scrollOffset; y < H; y += 42){
       var y0 = Math.round(y)+.5;
       ctx2d.moveTo(0, y0);
+      // A row more than R from every orb gets dy === 0 at every vertex, so
+      // one straight segment draws the same pixels as the 19-vertex polyline.
+      var near = false;
+      if(!reduceMotion){
+        for(var ci=0; ci<nl; ci++){
+          var ddy0 = y0 - cursors[ci].y;
+          if(ddy0 < R && ddy0 > -R){ near = true; break; }
+        }
+      }
+      if(!near){ ctx2d.lineTo(W, y0); continue; }
       for(var gx = gstep; gx <= W + gstep; gx += gstep){
         var dy = 0;
         if(!reduceMotion){
-          for(var ci=0; ci<lanes(); ci++){
+          for(var ci=0; ci<nl; ci++){
             var cc = cursors[ci];
             var ddx = gx - cc.x, ddy = y0 - cc.y;
             var d2 = ddx*ddx + ddy*ddy;
@@ -215,16 +225,19 @@ export function draw(){
     ctx2d.stroke();
   }
 
-  // spectrum bars along the bottom — audio driving visuals
-  if(state.fft && audio.analyser && audio.freqData){
+  // spectrum bars along the bottom — audio driving visuals. Read only while
+  // sound is on (or for 300 ms after muting, so the bars fall instead of
+  // vanishing): the analyser smooths per call, so it is read every frame.
+  if(state.fft && audio.started && audio.analyser && audio.freqData && (state.soundOn || performance.now() - audio.soundOffAt < 300)){
     audio.analyser.getByteFrequencyData(audio.freqData);
     var bars = 40;
     var bw = W / bars;
     ctx2d.fillStyle = "rgba(125,211,192,0.085)";
     for(var bi=0; bi<bars; bi++){
-      // Non-linear bin mapping: the drone lives in the first few bins, so a
-      // straight 1:1 map piled all the energy into the far-left corner.
-      var bin = 1 + Math.floor(Math.pow(bi/bars, 1.8) * 70);
+      // Non-linear bin mapping (audio.binIndex): the drone lives in the
+      // first few bins, so a straight 1:1 map piled all the energy into the
+      // far-left corner.
+      var bin = audio.binIndex[bi];
       var bh = (audio.freqData[bin] / 255) * H * 0.1;
       ctx2d.fillRect(bi*bw, H - bh, bw - 1.5, bh);
     }

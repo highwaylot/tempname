@@ -222,6 +222,12 @@ var followRange = null;
 var followVal = null;
 var gridToggle = null;
 var fftToggle = null;
+// The analyser taps the master only while the bars are drawn (state.fft);
+// ensureAudio applies the same rule when it builds the graph.
+function syncAnalyserTap(){
+  if(!audio.master) return;
+  try{ if(state.fft) audio.master.connect(audio.analyser); else audio.master.disconnect(audio.analyser); }catch(e){}
+}
 var hapticToggle = null;
 
 export function syncControls(){
@@ -308,6 +314,7 @@ export function initUI(){
   errStatus = document.getElementById("errStatus");
   soundBtn.addEventListener("click", function(){
     state.soundOn = !state.soundOn;
+    if(!state.soundOn) audio.soundOffAt = performance.now();
     if(state.soundOn){
       unlockMediaSession();
       startBeds();
@@ -339,6 +346,7 @@ export function initUI(){
   hapticToggle = document.getElementById("hapticToggle");
   soundToggle.addEventListener("change", function(){
     state.soundOn = soundToggle.checked;
+    if(!state.soundOn) audio.soundOffAt = performance.now();
     if(state.soundOn) startBeds();
     if(audio.master && audio.ctx){
       audio.master.gain.setTargetAtTime(state.soundOn ? state.volume : 0.0001, audio.ctx.currentTime, 0.05);
@@ -373,7 +381,7 @@ export function initUI(){
     followVal.textContent = state.follow; saveState();
   });
   gridToggle.addEventListener("change", function(){ state.grid = gridToggle.checked; saveState(); });
-  fftToggle.addEventListener("change", function(){ state.fft = fftToggle.checked; saveState(); });
+  fftToggle.addEventListener("change", function(){ state.fft = fftToggle.checked; syncAnalyserTap(); saveState(); });
   hapticToggle.addEventListener("change", function(){ state.haptics = hapticToggle.checked; saveState(); });
 
   resetBtn = document.getElementById("resetBtn");
@@ -388,6 +396,7 @@ export function initUI(){
     resetSettings();
     clearImageCache();
     clearHaloCache(); prewarmHalos();
+    syncAnalyserTap();
     renderSides(); syncControls(); syncOneHand();
   });
 

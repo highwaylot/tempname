@@ -4,8 +4,8 @@ import { syncSoundBtn } from './ui.js';
 
 // ===================== audio (ported + trimmed) =====================
 export var audio = {
-  ctx:null, master:null, comp:null, click:null, analyser:null, freqData:null,
-  droneGain:null, noiseGain:null, noiseFilter:null, started:false
+  ctx:null, master:null, comp:null, click:null, analyser:null, freqData:null, binIndex:null,
+  droneGain:null, noiseGain:null, noiseFilter:null, started:false, soundOffAt:0
 };
 // Nothing is built ahead of the first gesture yet; the boot sequence still
 // calls this so the hook exists.
@@ -56,6 +56,10 @@ export function ensureAudio(){
     audio.analyser = ctx.createAnalyser();
     audio.analyser.fftSize = 512;
     audio.freqData = new Uint8Array(audio.analyser.frequencyBinCount);
+    // Bar -> bin table for the spectrum, computed once instead of a pow per
+    // bar per frame.
+    audio.binIndex = new Uint8Array(40);
+    for(var i=0;i<40;i++) audio.binIndex[i] = 1 + Math.floor(Math.pow(i/40, 1.8) * 70);
     // Compressor lets impact hits run hot without hard clipping, and ducks
     // the bed under each hit, which itself reads as more impact.
     audio.comp = ctx.createDynamicsCompressor();
@@ -64,7 +68,9 @@ export function ensureAudio(){
     audio.comp.ratio.value = 5;
     audio.comp.attack.value = 0.003;
     audio.comp.release.value = 0.12;
-    audio.master.connect(audio.analyser);
+    // The analyser taps the master only while the bars are on (the fft
+    // toggle connects and disconnects it).
+    if(state.fft) audio.master.connect(audio.analyser);
     audio.master.connect(audio.comp);
     audio.comp.connect(ctx.destination);
 
@@ -91,6 +97,7 @@ export function startBeds(){
   var ctx = ensureAudio();
   if(!ctx || audio.started) return;
   audio.started = true;
+  driveAcc = 1; lastNF = -1; lastNG = -1; lastDG = -1;
   // Weighted an octave above loom's original 110/165/220 stack: phone speakers
   // roll off below ~200Hz, so the loudest voice there was inaudible on mobile.
   [[110,0.3],[220,1.0],[330,0.7],[440,0.45]].forEach(function(pair){
@@ -121,12 +128,23 @@ export function startBeds(){
   blip(660, 0.22, "triangle", 0.3);
   syncSoundBtn();
 }
-export function driveAudio(){
+// The beds follow the world at 10 Hz: the targets move on a ~1 s time
+// constant, so three setTargetAtTime calls per frame (128 automation
+// events/s at 42 fps) bought nothing. Accumulates the unscaled dt; a param is written only when its
+// target moved (> 1 Hz / > 0.0003). startBeds resets the four.
+var driveAcc = 1, lastNF = -1, lastNG = -1, lastDG = -1;
+export function driveAudio(dt){
   if(!audio.ctx || !audio.started) return;
+  driveAcc += dt;
+  if(driveAcc < 0.1) return;
+  driveAcc = 0;
   var t = audio.ctx.currentTime;
-  audio.noiseFilter.frequency.setTargetAtTime(1400 + world.warmth*4200, t, 0.35);
-  audio.noiseGain.gain.setTargetAtTime(0.04 + world.entropy*0.24, t, 0.4);
-  audio.droneGain.gain.setTargetAtTime(0.12 + world.warmth*0.12, t, 0.6);
+  var nf = 1400 + world.warmth*4200;
+  var ng = 0.04 + world.entropy*0.24;
+  var dg = 0.12 + world.warmth*0.12;
+  if(Math.abs(nf - lastNF) > 1){ lastNF = nf; audio.noiseFilter.frequency.setTargetAtTime(nf, t, 0.35); }
+  if(Math.abs(ng - lastNG) > 0.0003){ lastNG = ng; audio.noiseGain.gain.setTargetAtTime(ng, t, 0.4); }
+  if(Math.abs(dg - lastDG) > 0.0003){ lastDG = dg; audio.droneGain.gain.setTargetAtTime(dg, t, 0.6); }
 }
 export function blip(freq, dur, type, vol){
   var ctx = ensureAudio();
