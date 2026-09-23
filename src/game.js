@@ -121,6 +121,7 @@ export function startRun(){
   game.runTime = 0;
   game.hinted = false;
   game.wreck = 0;
+  game.bestCombo = 0;
   game.debris.length = 0;
   game.flash = 0;
   game.dying = 0;
@@ -160,9 +161,16 @@ export function finishDeath(){
   game.phase = PHASE_DEAD;
   game.deadAt = world.time;
   var score = Math.floor(game.dist);
+  // The first run ever is not a record: there was nothing to beat.
+  var isRecord = score > state.best && state.best > 0;
   if(score > state.best){ state.best = score; }
   saveState();
-  showDeath(score);
+  if(isRecord){
+    game.flash = 0.8; game.flashColor = "242,193,78";
+    if(state.soundOn){ arp([523,659,784,1047], 70, "triangle", 0.16); thump(200, 0.2, 0.4); }
+    haptic("record");
+  }
+  showDeath(score, isRecord);
 }
 
 // Barrier rects break into chunks with real velocity away from the impact,

@@ -24,6 +24,7 @@ var statsEl = null;
 var appEl = null;
 export var GAUGE_C = 2 * Math.PI * 27;
 export function resetComboStat(){ comboNum.textContent = "0"; comboMult.textContent = "×1"; }
+var deadLabel = null;
 var deadDist = null;
 var deadCoins = null;
 var deadBest = null;
@@ -50,7 +51,9 @@ export function syncHud(ts){
 }
 
 // The DOM half of finishDeath().
-export function showDeath(score){
+export function showDeath(score, isRecord){
+  deadLabel.textContent = isRecord ? "new best" : "crashed";
+  deadLabel.classList.toggle("record", !!isRecord);
   deadDist.textContent = score;
   deadCoins.textContent = game.coins;
   deadBest.textContent = state.best;
@@ -59,8 +62,9 @@ export function showDeath(score){
   var nextMult = 2 + Math.floor(game.bestCombo/5);
   var gap = state.best - score;
   // Replace, not append: three clauses wrap to three lines at the 34ch width.
-  deadLoop.textContent = (gap > 0 ? gap + " short of your best" : "New best")
-    + " · " + (state.taughtPump ? toNext + " more clean to ×" + nextMult : "pump ↕ to charge");
+  // A record is carried by the label above, not repeated here.
+  deadLoop.textContent = (gap > 0 ? gap + " short of your best · " : "")
+    + (state.taughtPump ? toNext + " more clean to ×" + nextMult : "pump ↕ to charge");
   overlayDead.classList.remove("gone");
 }
 
@@ -283,6 +287,7 @@ export function initUI(){
   coinMult = document.getElementById("coinMult");
   statsEl = document.querySelector(".stats");
   appEl = document.querySelector(".app");
+  deadLabel = document.getElementById("deadLabel");
   deadDist = document.getElementById("deadDist");
   deadCoins = document.getElementById("deadCoins");
   deadBest = document.getElementById("deadBest");
