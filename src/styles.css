@@ -69,7 +69,9 @@ body{
   display:flex;
   flex-direction:column;
 }
-.stage-wrap{ position:relative; flex:1; min-height:0; }
+/* overflow:hidden clips the canvas where its bitmap edge used to end: the
+   camera shake and sway are a CSS transform on the canvas (W05). */
+.stage-wrap{ position:relative; flex:1; min-height:0; overflow:hidden; }
 /* The centre seam is a compositor layer under the canvas (W04): an 80 px
    gradient band whose opacity render.js writes only when it changes, instead
    of a full-height gradient fill on the canvas every frame. */
@@ -89,6 +91,7 @@ body{
   touch-action:none;
   display:block;
   cursor:crosshair;
+  will-change:transform;
 }
 /* The orb is the cursor while a run is live; two cursors is one too many. */
 .app.playing #stage{ cursor:none; }

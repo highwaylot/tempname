@@ -21,6 +21,9 @@ export var view = { canvas:null, ctx2d:null, wrap:null, W:0, H:0, dpr:1, realDpr
 // The centre seam lives in the DOM (#seamEl, under the canvas); its opacity
 // is written only when it moves by more than a rounding step.
 var seamEl = null, seamLastA = -1;
+// The camera (shake + sway) is a CSS transform on the canvas and the seam,
+// written only when the string changes.
+var camXf = "";
 export function resize(){
   var rect = view.wrap.getBoundingClientRect();
   view.W = rect.width; view.H = rect.height;
@@ -83,18 +86,29 @@ export function draw(){
   var ctx2d = view.ctx2d, W = view.W, H = view.H;
   ctx2d.clearRect(0,0,W,H);
   ctx2d.save();
+  // Shake and camera sway move the whole canvas element (a compositor
+  // transform) instead of re-rasterising every frame through a ctx2d
+  // rotate. Sway grows with level: slow lateral drift plus a hint of lean,
+  // so the track starts to feel like it is curving under you. Draw-space
+  // only — collision and input run in unswayed coordinates. The CSS
+  // transform-origin is the element centre (W/2,H/2), so this composition
+  // equals the old translate(shake) translate(c) rotate(r) translate(-c+sway)
+  // exactly; Math.random is still called twice per shaking frame so the
+  // spawn RNG order is unchanged.
+  var sx = 0, sy = 0, swx = 0, rot = 0;
   if(game.shake > 0 && !reduceMotion){
-    ctx2d.translate((Math.random()-0.5)*game.shake*14, (Math.random()-0.5)*game.shake*14);
+    sx = (Math.random()-0.5)*game.shake*14; sy = (Math.random()-0.5)*game.shake*14;
   }
-  // Camera sway grows with level: slow lateral drift plus a hint of lean, so
-  // the track starts to feel like it is curving under you. Draw-space only —
-  // collision runs in unswayed coordinates.
   if(game.phase === PHASE_RUN && !reduceMotion){
     var swayAmp = difficulty()*9 + (game.boost > 0 ? 4 : 0);
-    var swayX = Math.sin(world.time*0.85)*swayAmp;
-    ctx2d.translate(W/2, H/2);
-    ctx2d.rotate(swayX*0.0009);
-    ctx2d.translate(-W/2 + swayX, -H/2);
+    swx = Math.sin(world.time*0.85)*swayAmp;
+    rot = swx*0.0009;
+  }
+  var xf = (sx || sy || swx) ? "translate(" + sx.toFixed(2) + "px," + sy.toFixed(2) + "px) rotate(" + rot.toFixed(5) + "rad) translate(" + swx.toFixed(2) + "px,0)" : "";
+  if(xf !== camXf){
+    camXf = xf;
+    view.canvas.style.transform = xf;
+    if(seamEl) seamEl.style.transform = xf;
   }
 
   // lane grid, scrolling
