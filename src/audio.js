@@ -254,10 +254,10 @@ export function thump(freq, dur, vol, n){
   osc.start(t); osc.stop(t + dur + 0.02);
 
   if(!audio.click){
-    var n = Math.floor(ctx.sampleRate * 0.012);
-    audio.click = ctx.createBuffer(1, n, ctx.sampleRate);
+    var len = Math.floor(ctx.sampleRate * 0.012);
+    audio.click = ctx.createBuffer(1, len, ctx.sampleRate);
     var d = audio.click.getChannelData(0);
-    for(var i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1 - i/n);
+    for(var i=0;i<len;i++) d[i] = (Math.random()*2-1) * (1 - i/len);
   }
   var src = ctx.createBufferSource();
   src.buffer = audio.click;
