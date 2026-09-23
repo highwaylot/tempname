@@ -107,6 +107,9 @@ export var HIT_R = 12;
 export var DRAW_R = 17;
 
 export function startRun(){
+  // Counted on start, so a run killed mid-way still counts.
+  state.life.runs++;
+  saveState();
   game.phase = PHASE_RUN;
   game.dist = 0;
   game.coins = 0;
@@ -276,6 +279,8 @@ function wreckStorm(){
 function collectSpecial(p, gain){
   var purple = p.tier === 2;
   var hex = purple ? "#b04bff" : "#3d7bff";
+  // Lifetime tally; finishDeath saves.
+  if(purple) state.life.purples++; else state.life.blues++;
   world.perturb(p.x, p.y, purple ? 1.6 : 1.1, 1.6);
   game.shake = Math.max(game.shake, purple ? 0.7 : 0.35);
   game.flash = purple ? 0.9 : 0.5;

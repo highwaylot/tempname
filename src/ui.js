@@ -45,6 +45,10 @@ var deadDist = null;
 var deadCoins = null;
 var deadBest = null;
 var deadLoop = null;
+var deadLife = null;
+var deadLifeRun = null;
+var deadLifeBlue = null;
+var deadLifePurple = null;
 var overlayPause = null;
 var pauseBtn = null;
 var pauseDist = null;
@@ -106,6 +110,12 @@ export function showDeath(score, isRecord){
   // A record is carried by the label above, not repeated here.
   deadLoop.textContent = (gap > 0 ? gap + " short of your best · " : "")
     + (state.taughtPump ? toNext + " more clean to ×" + nextMult : "pump ↕ to charge");
+  // Lifetime line, only once a rare coin has ever been taken.
+  var life = state.life;
+  deadLife.hidden = life.blues + life.purples === 0;
+  deadLifeRun.textContent = life.runs;
+  deadLifeBlue.textContent = life.blues;
+  deadLifePurple.textContent = life.purples;
   setOverlay(overlayDead, true);
 }
 // The DOM half of pauseRun() / resumeRun().
@@ -357,6 +367,10 @@ export function initUI(){
   deadCoins = document.getElementById("deadCoins");
   deadBest = document.getElementById("deadBest");
   deadLoop = document.getElementById("deadLoop");
+  deadLife = document.getElementById("deadLife");
+  deadLifeRun = document.getElementById("deadLifeRun");
+  deadLifeBlue = document.getElementById("deadLifeBlue");
+  deadLifePurple = document.getElementById("deadLifePurple");
   overlayPause = document.getElementById("overlayPause");
   pauseBtn = document.getElementById("pauseBtn");
   pauseDist = document.getElementById("pauseDist");

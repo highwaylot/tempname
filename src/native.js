@@ -1,15 +1,16 @@
 // Platform bridge. Web only for now: persisted settings come straight from
 // localStorage, and a later step routes native builds through Capacitor.
-import { STORE_KEY, state } from './state.js';
+import { STORE_KEY, OLD_KEY, state } from './state.js';
 
 export var isNative = false;
 export var platform = "web";
 
 // Resolves the raw persisted string, or null when there is none or storage
-// is unavailable.
+// is unavailable. The v3 key is the one-time migration source: read when
+// the v4 key is absent, and left in place.
 export function loadPersisted(){
   var raw = null;
-  try{ raw = localStorage.getItem(STORE_KEY); }catch(e){}
+  try{ raw = localStorage.getItem(STORE_KEY) || localStorage.getItem(OLD_KEY); }catch(e){}
   return Promise.resolve(raw);
 }
 
