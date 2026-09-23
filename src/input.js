@@ -1,7 +1,7 @@
 // Pointer handling on the canvas. initInput() attaches everything.
 import { state } from './state.js';
 import { world } from './world.js';
-import { unlockMediaSession, startBeds } from './audio.js';
+import { audio, ensureAudio, unlockMediaSession, startBeds } from './audio.js';
 import { haptic } from './native.js';
 import { view } from './render.js';
 import { game, cursors, lanes, startRun, PHASE_READY, PHASE_RUN, PHASE_DEAD, TOUCH_OFFSET } from './game.js';
@@ -80,6 +80,12 @@ export function release(e){
 // A mouse is sticky: one click starts, then the orb follows the pointer with
 // no button held. Only leaving the field lets go.
 function releaseUnlessMouse(e){ if(e.pointerType !== "mouse") release(e); }
+// A lifted thumb is also the gesture that re-arms a context the platform
+// suspended behind our back (an interruption, a route change).
+function onPointerUp(e){
+  releaseUnlessMouse(e);
+  if(state.soundOn && audio.ctx && audio.ctx.state !== "running") ensureAudio();
+}
 // A mouse crossing from the canvas onto the strip the camera slid it away
 // from is still in the field; only leaving the wrap lets go.
 function onPointerOut(e){
@@ -94,7 +100,7 @@ export function initInput(){
   var canvas = view.canvas, wrap = view.wrap;
   canvas.addEventListener("pointerdown", onPointerDown, { passive:true });
   canvas.addEventListener("pointermove", onPointerMove, { passive:true });
-  canvas.addEventListener("pointerup", releaseUnlessMouse, { passive:true });
+  canvas.addEventListener("pointerup", onPointerUp, { passive:true });
   canvas.addEventListener("pointercancel", releaseUnlessMouse, { passive:true });
   canvas.addEventListener("pointerout", onPointerOut, { passive:true });
   wrap.addEventListener("pointerdown", onWrapPointerDown, { passive:true });

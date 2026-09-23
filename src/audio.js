@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { world } from './world.js';
+import { isNative } from './native.js';
 import { syncSoundBtn } from './ui.js';
 
 // ===================== audio (ported + trimmed) =====================
@@ -57,7 +58,11 @@ function prepNoise(sr){
 
 // iOS routes raw Web Audio through a session category that the hardware
 // silent switch mutes. An actually-playing HTMLAudioElement flips the
-// webview into media playback, which ignores the switch. Best-effort.
+// webview into media playback, which ignores the switch. Best-effort, and
+// released on hide and on mute so a silent page holds no media session
+// (W33). The native app's AVAudioSession does this job, so the element is
+// off there unless the flag below says otherwise.
+export var NATIVE_MEDIA_UNLOCK = false; // flip to true if the first TestFlight build is silent with the ring switch on.
 var unlockEl = null;
 function silentWavUrl(){
   var sr = 8000, n = sr/2;
@@ -71,15 +76,20 @@ function silentWavUrl(){
   return URL.createObjectURL(new Blob([buf], { type:"audio/wav" }));
 }
 export function unlockMediaSession(){
-  if(unlockEl) return;
+  if((isNative && !NATIVE_MEDIA_UNLOCK) || !state.soundOn) return;
   try{
-    unlockEl = new Audio(silentWavUrl());
-    unlockEl.loop = true;
-    unlockEl.playsInline = true;
-    unlockEl.volume = 0.01;
+    if(!unlockEl){
+      unlockEl = new Audio(silentWavUrl());
+      unlockEl.loop = true;
+      unlockEl.playsInline = true;
+      // iOS ignores HTMLMediaElement.volume; the wav is digital silence.
+    } else if(!unlockEl.paused) return;
     var p = unlockEl.play();
     if(p && p.catch) p.catch(function(){});
   }catch(e){}
+}
+export function releaseMediaSession(){
+  if(unlockEl){ try{ unlockEl.pause(); }catch(e){} }
 }
 export function audioStateName(){
   if(!audio.ctx || !audio.started) return "not started";

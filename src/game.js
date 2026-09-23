@@ -2,7 +2,7 @@
 // locals at the top of each function that uses them.
 import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
-import { audio, ensureAudio, startBeds, driveAudio, blip, thump, crashSound, arp } from './audio.js';
+import { audio, ensureAudio, unlockMediaSession, releaseMediaSession, startBeds, driveAudio, blip, thump, crashSound, arp } from './audio.js';
 import { view, fxRunStart } from './render.js';
 import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, showDeath, syncOneHand, isPanelOpen, isRotateShown } from './ui.js';
 import { resetClock } from './loop.js';
@@ -710,6 +710,7 @@ export function suspendRun(){
   if(audio.ctx && audio.ctx.state === "running"){
     var s = audio.ctx.suspend(); if(s && s.catch) s.catch(function(){});
   }
+  releaseMediaSession();
 }
 // A pause the player chose, an open settings sheet or the rotate guard keeps
 // the run paused; the grace is granted only when this call is the one that
@@ -721,6 +722,7 @@ export function resumeAfterHidden(){
   }
   resetClock();
   if(state.soundOn) ensureAudio();
+  if(state.soundOn && !game.paused) unlockMediaSession();
 }
 
 export function setOneHand(on){

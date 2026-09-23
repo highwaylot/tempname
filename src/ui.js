@@ -2,7 +2,7 @@
 // button, slot editor, controls, reset and mode picker. Element refs are
 // filled in initUI(); nothing here runs at import time.
 import { state, saveState, resetSettings, isMouseDevice } from './state.js';
-import { audio, unlockMediaSession, startBeds, blip, thump, isAudioLive, audioStateName } from './audio.js';
+import { audio, unlockMediaSession, releaseMediaSession, startBeds, blip, thump, isAudioLive, audioStateName } from './audio.js';
 import { game, PHASE_READY, PHASE_RUN, PHASE_DEAD, setOneHand } from './game.js';
 import { imgCache, ensureImage, clearImageCache, clearHaloCache, prewarmHalos, setFxAuto } from './render.js';
 import { loop, resetClock } from './loop.js';
@@ -323,7 +323,7 @@ export function initUI(){
       unlockMediaSession();
       startBeds();
       blip(660, 0.22, "triangle", 0.3);
-    }
+    } else releaseMediaSession();
     if(audio.master && audio.ctx){
       audio.master.gain.setTargetAtTime(state.soundOn ? state.volume : 0.0001, audio.ctx.currentTime, 0.05);
     }
@@ -352,7 +352,8 @@ export function initUI(){
   soundToggle.addEventListener("change", function(){
     state.soundOn = soundToggle.checked;
     if(!state.soundOn) audio.soundOffAt = performance.now();
-    if(state.soundOn) startBeds();
+    if(state.soundOn){ unlockMediaSession(); startBeds(); }
+    else releaseMediaSession();
     if(audio.master && audio.ctx){
       audio.master.gain.setTargetAtTime(state.soundOn ? state.volume : 0.0001, audio.ctx.currentTime, 0.05);
     }
