@@ -121,8 +121,15 @@ body{
   font-family:'IBM Plex Mono', monospace; font-size:7.5px; letter-spacing:.28em;
   color:var(--ink-faint);
 }
-.gauge.tick{ animation:gaugeTick .16s ease-out; }
+/* tick/tick2 (and pop/pop2 below) are identical pairs: ui.restartAnim
+   alternates them to replay the animation without a forced reflow. */
+.gauge.tick, .gauge.tick2{ animation:gaugeTick .16s ease-out; }
+.gauge.tick2{ animation-name:gaugeTick2; }
 @keyframes gaugeTick{
+  from{ transform:translateX(-50%) scale(1.14); }
+  to{ transform:translateX(-50%) scale(1); }
+}
+@keyframes gaugeTick2{
   from{ transform:translateX(-50%) scale(1.14); }
   to{ transform:translateX(-50%) scale(1); }
 }
@@ -133,7 +140,10 @@ body{
 .gauge.hot .g-fill{ stroke:var(--coin); filter:drop-shadow(0 0 8px rgba(242,193,78,.9)); animation:none; }
 .gauge.hot .g-num, .gauge.hot .g-label{ color:var(--coin); }
 @keyframes gaugePulse{ from{ opacity:.65; } to{ opacity:1; } }
-@media (prefers-reduced-motion: reduce){ .gauge.ready .g-fill, .gauge.tick{ animation:none; } }
+@media (prefers-reduced-motion: reduce){ .gauge.ready .g-fill, .gauge.tick, .gauge.tick2{ animation:none; } }
+/* Neither box affects layout outside itself; keeps a HUD write from
+   invalidating the rest of the tree. */
+.gauge, .stats{ contain:layout style paint; }
 
 /* Overlays are positioned blocks, not a centered stack: the title lives in
    the upper third and the call to action sits just above the orbs, so text
@@ -463,10 +473,11 @@ button.reset-btn:hover{ color:var(--danger); border-color:rgba(255,111,111,.3); 
    where incoming barriers are read. */
 .stat b{ display:inline-block; transform-origin:left center; }
 .stat b em{ font-style:normal; font-size:10px; color:var(--coin); margin-left:4px; font-weight:600; }
-.stat.pop b{ animation:statPop .2s ease-out; }
+.stat.pop b, .stat.pop2 b{ animation:statPop .2s ease-out; }
+.stat.pop2 b{ animation-name:statPop2; }
 @keyframes statPop{ from{ transform:scale(1.35); } to{ transform:scale(1); } }
 @keyframes statPop2{ from{ transform:scale(1.35); } to{ transform:scale(1); } }
-@media (prefers-reduced-motion: reduce){ .stat.pop b, .dead-label.record{ animation:none; } }
+@media (prefers-reduced-motion: reduce){ .stat.pop b, .stat.pop2 b, .dead-label.record{ animation:none; } }
 
 .icon-btn{
   width:36px; height:36px;

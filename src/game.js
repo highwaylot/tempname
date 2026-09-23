@@ -4,7 +4,7 @@ import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
 import { startBeds, driveAudio, blip, thump, crashSound, arp } from './audio.js';
 import { view } from './render.js';
-import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, showDeath, syncOneHand } from './ui.js';
+import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, showDeath, syncOneHand } from './ui.js';
 import { sidePointer } from './input.js';
 import { haptic } from './native.js';
 
@@ -231,7 +231,7 @@ function shatter(o, c){
   if(crunch) haptic("crunch"); else haptic("smash", power);
   comboNum.textContent = game.combo;
   comboMult.textContent = "×" + (1 + Math.floor(game.combo/5));
-  comboBadge.classList.remove("pop"); void comboBadge.offsetWidth; comboBadge.classList.add("pop");
+  restartAnim(comboBadge, "pop");
   if(game.wreck >= game.wreckTarget) wreckStorm();
 }
 
@@ -350,9 +350,7 @@ function threaded(o, c){
   if(surge) haptic("surge");
   comboNum.textContent = game.combo;
   comboMult.textContent = "×" + mult;
-  comboBadge.classList.remove("pop");
-  void comboBadge.offsetWidth;
-  comboBadge.classList.add("pop");
+  restartAnim(comboBadge, "pop");
 }
 
 var lastTickAt = -9;
@@ -369,7 +367,7 @@ export function registerStroke(side, amp){
   var add = STROKE_CHARGE * (0.7 + Math.random()*0.6) * (rhythm ? 1.4 : 0.8) * (bilateral ? 1.8 : 1) * (state.oneHand ? ONE_HAND_PUMP : 1);
   game.charge = Math.min(1, game.charge + add);
   if(!state.taughtPump){ state.taughtPump = true; saveState(); }
-  gauge.classList.remove("tick"); void gauge.offsetWidth; gauge.classList.add("tick");
+  restartAnim(gauge, "tick");
   // Frantic pumping can hit 20 strokes/s; cap the tick so it does not spawn
   // a fresh audio graph on every one.
   if(state.soundOn && now - lastTickAt > 0.08){

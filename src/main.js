@@ -25,6 +25,7 @@ function initProf(){
   window.BellTheory.prof = prof;
 }
 function frame(ts){
+  loop.frameNo++;
   var dt = loop.lastTs ? Math.min(0.05, (ts-loop.lastTs)/1000) : 0;
   loop.lastTs = ts;
   var t0 = prof ? performance.now() : 0, t1 = t0, t2 = t0;

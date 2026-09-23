@@ -23,6 +23,22 @@ var coinMult = null;
 var statsEl = null;
 var appEl = null;
 export var GAUGE_C = 2 * Math.PI * 27;
+// Last value written to each HUD field: the DOM is touched only on change,
+// so a steady frame costs comparisons, not style invalidations. frame() and
+// syncSoundBtn() are the only writers, so nothing ever resets these.
+var hud = { off:null, num:null, hot:null, ready:null, mult:null, gh:null, sh:null, playing:null, label:null, dist:null, coins:null, sOn:null, live:null, aname:null, err:null };
+// CSS animation restarts without the remove / void offsetWidth / add reflow:
+// alternate between two identical keyframe sets (cls and cls + "2").
+// Idempotent per frame, so two same-frame strokes or threads still restart
+// where a bare toggle would flip the class back to where it started.
+var animFrame = { tick:-1, pop:-1 };
+export function restartAnim(el, cls){
+  if(animFrame[cls] === loop.frameNo) return;
+  animFrame[cls] = loop.frameNo;
+  var alt = cls + "2";
+  if(el.classList.contains(cls)){ el.classList.remove(cls); el.classList.add(alt); }
+  else { el.classList.remove(alt); el.classList.add(cls); }
+}
 export function resetComboStat(){ comboNum.textContent = "0"; comboMult.textContent = "×1"; }
 var deadLabel = null;
 var deadDist = null;
@@ -33,18 +49,29 @@ var lastHud = 0;
 
 // Runs once per frame after update/draw.
 export function syncHud(ts){
-  gaugeFill.style.strokeDashoffset = (GAUGE_C * (1 - Math.max(0, Math.min(1, game.charge)))).toFixed(1);
-  gaugeNum.textContent = Math.round(game.charge*100);
-  gauge.classList.toggle("hot", game.boost > 0);
-  gauge.classList.toggle("ready", game.boost === 0 && game.charge >= 0.85);
-  coinMult.hidden = !game.parallelOn;
-  gauge.hidden = game.phase === PHASE_DEAD;
-  statsEl.hidden = game.phase === PHASE_READY;
-  appEl.classList.toggle("playing", game.phase === PHASE_RUN);
-  gaugeLabel.textContent = game.boost > 0 ? "LIT" : (game.charge < 0.03 ? "PUMP ↕" : "BOOST");
+  // The exact toFixed(1) string is the key: the ring is not quantised to 1%.
+  var c = Math.max(0, Math.min(1, game.charge));
+  var off = (GAUGE_C * (1 - c)).toFixed(1);
+  if(off !== hud.off){ hud.off = off; gaugeFill.style.strokeDashoffset = off; }
+  var n = Math.round(game.charge*100);
+  if(n !== hud.num){ hud.num = n; gaugeNum.textContent = n; }
+  var hot = game.boost > 0;
+  if(hot !== hud.hot){ hud.hot = hot; gauge.classList.toggle("hot", hot); }
+  var ready = game.boost === 0 && game.charge >= 0.85;
+  if(ready !== hud.ready){ hud.ready = ready; gauge.classList.toggle("ready", ready); }
+  if(game.parallelOn !== hud.mult){ hud.mult = game.parallelOn; coinMult.hidden = !game.parallelOn; }
+  var gh = game.phase === PHASE_DEAD;
+  if(gh !== hud.gh){ hud.gh = gh; gauge.hidden = gh; }
+  var sh = game.phase === PHASE_READY;
+  if(sh !== hud.sh){ hud.sh = sh; statsEl.hidden = sh; }
+  var pl = game.phase === PHASE_RUN;
+  if(pl !== hud.playing){ hud.playing = pl; appEl.classList.toggle("playing", pl); }
+  var lb = hot ? "LIT" : (game.charge < 0.03 ? "PUMP ↕" : "BOOST");
+  if(lb !== hud.label){ hud.label = lb; gaugeLabel.textContent = lb; }
   if(ts - lastHud > 90){
-    distVal.textContent = Math.floor(game.dist);
-    coinVal.textContent = game.coins;
+    var d = Math.floor(game.dist);
+    if(d !== hud.dist){ hud.dist = d; distVal.textContent = d; }
+    if(game.coins !== hud.coins){ hud.coins = game.coins; coinVal.textContent = game.coins; }
     syncSoundBtn();
     lastHud = ts;
   }
@@ -107,13 +134,16 @@ var audioStatus = null;
 var errStatus = null;
 export function syncSoundBtn(){
   if(!soundBtn) return;
+  var live = isAudioLive(), an = state.soundOn ? audioStateName() : "muted";
+  if(hud.sOn === state.soundOn && hud.live === live && hud.aname === an && hud.err === loop.errCount) return;
+  hud.sOn = state.soundOn; hud.live = live; hud.aname = an; hud.err = loop.errCount;
   waveOn.style.display = state.soundOn ? "" : "none";
   waveOff.style.display = state.soundOn ? "none" : "";
   soundBtn.classList.toggle("muted", !state.soundOn);
-  soundBtn.classList.toggle("live", isAudioLive());
+  soundBtn.classList.toggle("live", live);
   soundBtn.setAttribute("aria-label", state.soundOn ? "Mute sound" : "Unmute sound");
   if(audioStatus){
-    audioStatus.textContent = state.soundOn ? audioStateName() : "muted";
+    audioStatus.textContent = an;
   }
   if(errStatus){
     errStatus.textContent = loop.errCount
