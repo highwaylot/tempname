@@ -4,7 +4,7 @@ import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
 import { startBeds, driveAudio, blip, thump, crashSound, arp } from './audio.js';
 import { view } from './render.js';
-import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, showDeath, syncOneHand } from './ui.js';
+import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, setOverlay, showDeath, syncOneHand } from './ui.js';
 import { sidePointer } from './input.js';
 import { haptic } from './native.js';
 
@@ -131,8 +131,8 @@ export function startRun(){
   game.slowmo = 0;
   cursors.forEach(function(c){ c.strokeDir = 0; c.lastStrokeAt = -9; c.prevTy = c.ty; c.strokeStart = c.ty; c.trail.length = 0; });
   resetComboStat();
-  overlayReady.classList.add("gone");
-  overlayDead.classList.add("gone");
+  setOverlay(overlayReady, false);
+  setOverlay(overlayDead, false);
   startBeds();
 }
 // The hit itself: burst, sound, shake, and half a second of slow motion so

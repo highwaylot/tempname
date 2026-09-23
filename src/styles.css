@@ -148,14 +148,25 @@ body{
 /* Overlays are positioned blocks, not a centered stack: the title lives in
    the upper third and the call to action sits just above the orbs, so text
    never lands on top of them. */
+/* A hidden overlay leaves hit-testing, focus and the a11y tree: visibility
+   flips after the fade so the cross-fades are unchanged, the picker stops
+   taking taps at once, and the CTA pulse stops running unseen. */
 .overlay{
   position:absolute; inset:0;
   pointer-events:none; user-select:none;
   text-align:center;
-  transition:opacity .3s ease, transform .3s ease;
+  transition:opacity .3s ease, transform .3s ease, visibility 0s linear 0s;
 }
-.overlay.gone{ opacity:0; transform:translateY(8px); }
-@media (prefers-reduced-motion: reduce){ .overlay{ transition:opacity .2s ease; } .overlay.gone{ transform:none; } }
+.overlay.gone{
+  opacity:0; transform:translateY(8px); visibility:hidden;
+  transition:opacity .3s ease, transform .3s ease, visibility 0s linear .3s;
+}
+.overlay.gone .mode-seg{ pointer-events:none; }
+.overlay.gone .cta{ animation-play-state:paused; }
+@media (prefers-reduced-motion: reduce){
+  .overlay{ transition:opacity .2s ease, visibility 0s linear 0s; }
+  .overlay.gone{ transform:none; transition:opacity .2s ease, visibility 0s linear .2s; }
+}
 .overlay > div{ position:absolute; left:0; right:0; padding:0 24px; }
 .title-block{ top:24%; }
 .title{

@@ -77,6 +77,13 @@ export function syncHud(ts){
   }
 }
 
+// Show or hide an overlay: the class drives the fade and visibility, inert
+// takes it out of focus and the accessibility tree at once.
+export function setOverlay(el, shown){
+  el.classList.toggle("gone", !shown);
+  if(shown) el.removeAttribute("inert"); else el.setAttribute("inert", "");
+}
+
 // The DOM half of finishDeath().
 export function showDeath(score, isRecord){
   deadLabel.textContent = isRecord ? "new best" : "crashed";
@@ -92,7 +99,7 @@ export function showDeath(score, isRecord){
   // A record is carried by the label above, not repeated here.
   deadLoop.textContent = (gap > 0 ? gap + " short of your best · " : "")
     + (state.taughtPump ? toNext + " more clean to ×" + nextMult : "pump ↕ to charge");
-  overlayDead.classList.remove("gone");
+  setOverlay(overlayDead, true);
 }
 
 // ===================== panel =====================
