@@ -1,4 +1,7 @@
 node_modules
 dist
+.harness/
+prototype/_scratch-*
+test/scratch-*
 *.log
 *.tsbuildinfo

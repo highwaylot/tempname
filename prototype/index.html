@@ -1,0 +1,2471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<style>
+  /* Mirrors the artifact host's skeleton so the standalone page matches the
+     published one: safe-area padding on the root, zero body margin. */
+  :root{ color-scheme:light; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  html,body{ margin:0; }
+  body{ font:14px system-ui, sans-serif; }
+  img{ max-width:100%; }
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+<title>Bell Theory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --stage:#12151b;
+    --stage-deep:#0b0d11;
+    --grid-line: rgba(255,255,255,0.05);
+    --panel-bg:#1a1e26;
+    --panel-bg-raised:#20242e;
+    --panel-border: rgba(255,255,255,0.09);
+    --ink:#eef0f4;
+    --ink-dim:#8991a1;
+    --ink-faint:#565d6b;
+    --accent:#7dd3c0;
+    --accent-ink:#0a0d11;
+    --coin:#f2c14e;
+    --danger:#ff6f6f;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box;}
+  html{height:100%;}
+  body{
+    background:var(--stage-deep);
+    color:var(--ink);
+    font-family:'Sora', system-ui, sans-serif;
+    overflow:hidden;
+    height:100%;
+    /* No overscroll bounce, no double-tap zoom, no long-press callout: this
+       is a game surface, not a document. */
+    overscroll-behavior:none;
+    touch-action:manipulation;
+    -webkit-touch-callout:none;
+    -webkit-user-select:none; user-select:none;
+  }
+
+  /* 100% not 100dvh: the host pads the root by the phone's safe-area insets,
+     and 100dvh overflowed that padding — which is what clipped the gauge. */
+  .app{
+    position:relative;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+  }
+  .stage-wrap{ position:relative; flex:1; min-height:0; }
+  #stage{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    touch-action:none;
+    display:block;
+    cursor:crosshair;
+  }
+  /* The orb is the cursor while a run is live; two cursors is one too many. */
+  .app.playing #stage{ cursor:none; }
+  /* On a wide window the field becomes a phone-width column: a lane the width
+     of a monitor is a different, easier game, and the port should be the same
+     game. */
+  @media (min-width:700px){
+    .app{ max-width:520px; margin:0 auto; box-shadow:0 0 0 1px var(--panel-border); }
+  }
+
+  /* One flex row owns the whole top edge, so stats and buttons can never
+     land on top of each other the way three absolute boxes did. */
+  .topbar{
+    position:absolute;
+    top:0; left:0; right:0;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    padding-top:calc(10px + env(safe-area-inset-top, 0px));
+    pointer-events:none;
+    z-index:2;
+  }
+  .stats{
+    display:flex; align-items:center; gap:15px;
+    min-width:0; flex:0 1 auto; overflow:hidden;
+    padding:7px 13px;
+    background:rgba(18,21,27,.72);
+    backdrop-filter:blur(8px);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-variant-numeric:tabular-nums;
+    user-select:none;
+  }
+  .stat{ display:flex; flex-direction:column; line-height:1.15; }
+  .stat i{
+    font-style:normal; font-size:8.5px; letter-spacing:.16em;
+    color:var(--ink-faint); text-transform:uppercase;
+  }
+  .stat b{ font-size:14px; font-weight:600; color:var(--ink); }
+  .stat .gold{ color:var(--coin); }
+  .stat b em.ent{ color:var(--accent); }
+  .tools{ display:flex; gap:8px; flex:none; pointer-events:auto; }
+
+  /* Boost tank sits on the seam at the bottom: between the thumbs so it is
+     never occluded, and in lower periphery where fill level reads by shape. */
+  .gauge{
+    position:absolute;
+    left:50%;
+    bottom:calc(12px + env(safe-area-inset-bottom, 0px));
+    transform:translateX(-50%);
+    width:74px; height:74px;
+    display:flex; align-items:center; justify-content:center;
+    pointer-events:none; user-select:none;
+    z-index:2;
+  }
+  .gauge[hidden]{ display:none; }
+  .gauge svg{ position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
+  .gauge .g-track{ fill:none; stroke:rgba(255,255,255,.08); stroke-width:4; }
+  .gauge .g-fill{
+    fill:none; stroke:var(--accent); stroke-width:4; stroke-linecap:round;
+    stroke-dasharray:169.6; stroke-dashoffset:169.6;
+    filter:drop-shadow(0 0 3px rgba(125,211,192,.5));
+  }
+  .gauge .g-num{
+    font-family:'IBM Plex Mono', monospace; font-variant-numeric:tabular-nums;
+    font-size:19px; font-weight:600; color:var(--ink); line-height:1;
+    margin-top:-7px;
+  }
+  .gauge .g-label{
+    position:absolute; bottom:16px; left:0; right:0; text-align:center;
+    font-family:'IBM Plex Mono', monospace; font-size:7.5px; letter-spacing:.28em;
+    color:var(--ink-faint);
+  }
+  .gauge.tick{ animation:gaugeTick .16s ease-out; }
+  @keyframes gaugeTick{
+    from{ transform:translateX(-50%) scale(1.14); }
+    to{ transform:translateX(-50%) scale(1); }
+  }
+  .gauge.ready .g-fill{
+    filter:drop-shadow(0 0 7px rgba(125,211,192,.9));
+    animation:gaugePulse .45s ease-in-out infinite alternate;
+  }
+  .gauge.hot .g-fill{ stroke:var(--coin); filter:drop-shadow(0 0 8px rgba(242,193,78,.9)); animation:none; }
+  .gauge.hot .g-num, .gauge.hot .g-label{ color:var(--coin); }
+  @keyframes gaugePulse{ from{ opacity:.65; } to{ opacity:1; } }
+  @media (prefers-reduced-motion: reduce){ .gauge.ready .g-fill, .gauge.tick{ animation:none; } }
+
+  /* Overlays are positioned blocks, not a centered stack: the title lives in
+     the upper third and the call to action sits just above the orbs, so text
+     never lands on top of them. */
+  .overlay{
+    position:absolute; inset:0;
+    pointer-events:none; user-select:none;
+    text-align:center;
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .overlay.gone{ opacity:0; transform:translateY(8px); }
+  @media (prefers-reduced-motion: reduce){ .overlay{ transition:opacity .2s ease; } .overlay.gone{ transform:none; } }
+  .overlay > div{ position:absolute; left:0; right:0; padding:0 24px; }
+  .title-block{ top:24%; }
+  .title{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:26px; font-weight:500;
+    letter-spacing:.34em; text-indent:.34em;
+    color:var(--ink);
+    text-wrap:balance;
+  }
+  .tagline{
+    margin-top:10px;
+    font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+  .cta-block{ top:62%; }
+  .cta{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px; letter-spacing:.28em; text-transform:uppercase;
+    color:var(--ink-dim);
+    animation:ctaPulse 2.2s ease-in-out infinite;
+  }
+  @keyframes ctaPulse{ 0%,100%{ opacity:.5; } 50%{ opacity:1; } }
+  @media (prefers-reduced-motion: reduce){ .cta{ animation:none; opacity:.85; } }
+
+  .dead-block{
+    top:20%;
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+  .dead-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px; letter-spacing:.3em; text-transform:uppercase;
+    color:var(--danger);
+  }
+  .overlay .big{
+    font-family:'IBM Plex Mono', monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:46px; font-weight:500; line-height:1;
+    color:var(--ink); letter-spacing:-.02em;
+  }
+  .overlay .row{
+    display:flex; gap:18px;
+    font-family:'IBM Plex Mono', monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:12px; color:var(--ink-dim);
+  }
+  .overlay .row b{ color:var(--coin); font-weight:600; }
+  .overlay .loop{
+    margin:2px 0 0;
+    color:var(--accent);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px; letter-spacing:.02em;
+    max-width:34ch;
+  }
+  .dead-block .cta{ margin-top:8px; }
+  /* Two equal modes, so the picker reads as a choice, not a toggle off a default. */
+  .mode-seg{
+    pointer-events:auto;
+    display:inline-flex;
+    margin-top:16px;
+    border:1px solid var(--panel-border); border-radius:99px;
+    background:rgba(26,30,38,.72);
+    overflow:hidden;
+  }
+  .mode-seg button{
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px;
+    letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-faint); background:transparent; border:none;
+    padding:0 16px; min-height:42px; cursor:pointer;
+  }
+  .mode-seg button.active{ color:var(--accent-ink); background:var(--accent); }
+  .mode-seg button:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+
+  .panel-toggle{
+    width:36px; height:36px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:rgba(26,30,38,.8);
+    backdrop-filter:blur(6px);
+    color:var(--ink-dim);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    flex:none;
+  }
+  .panel-toggle:hover{ color:var(--ink); border-color:rgba(255,255,255,.18); }
+  .panel-toggle:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .panel-toggle svg{ width:17px; height:17px; }
+
+  .panel{
+    position:absolute;
+    top:0; right:0;
+    width:318px; max-width:88vw;
+    height:100%;
+    background:var(--panel-bg);
+    border-left:1px solid var(--panel-border);
+    display:flex; flex-direction:column;
+    transform:translateX(0);
+    transition:transform .25s ease;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  /* !important here because the global [hidden] rule is !important too — without
+     it the sheet was display:none while hidden and the slide never played. */
+  .panel[hidden]{ display:flex !important; transform:translateX(100%); visibility:visible; }
+  /* Tap outside the sheet to close it, and keep taps off the field beneath. */
+  .scrim{
+    position:absolute; inset:0;
+    background:rgba(6,8,11,.5);
+    z-index:3;
+    opacity:1; transition:opacity .25s ease;
+  }
+  .scrim[hidden]{ display:block !important; opacity:0; pointer-events:none; }
+  .rotate{
+    position:absolute; inset:0; z-index:10;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--stage-deep);
+    font-family:'IBM Plex Mono', monospace; font-size:12px;
+    letter-spacing:.24em; text-transform:uppercase; color:var(--ink-dim);
+    text-align:center; padding:0 24px;
+  }
+  .panel{ z-index:4; }
+  .overlay{ z-index:1; }
+
+  .panel-head{
+    padding:18px 18px 14px;
+    border-bottom:1px solid var(--panel-border);
+    display:flex; align-items:baseline; justify-content:space-between;
+  }
+  .panel-head h1{
+    font-size:13px; margin:0;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink);
+  }
+  .panel-close{
+    background:none; border:none; color:var(--ink-faint);
+    font-size:13px; cursor:pointer;
+    min-width:44px; min-height:44px; margin:-12px -10px -12px 0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .panel-close:hover{ color:var(--ink); }
+
+  .panel-section{ padding:16px 18px; border-bottom:1px solid var(--panel-border); }
+  .panel-section h2{
+    font-size:11px; text-transform:uppercase; letter-spacing:.1em;
+    color:var(--ink-faint); margin:0 0 12px; font-weight:600;
+  }
+  .howto summary{
+    cursor:pointer; list-style:none;
+    font-size:11px; text-transform:uppercase; letter-spacing:.1em;
+    color:var(--ink-faint); font-weight:600;
+    display:flex; justify-content:space-between; align-items:center;
+    min-height:36px; margin:-6px 0;
+  }
+  .howto summary::-webkit-details-marker{ display:none; }
+  .howto summary::after{ content:"+"; font-size:14px; color:var(--ink-faint); }
+  .howto[open] summary::after{ content:"–"; }
+  .howto summary:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; border-radius:4px; }
+  .howto p{ margin:12px 0 0; font-size:12.5px; line-height:1.65; color:var(--ink-dim); max-width:46ch; }
+  .howto p b{ color:var(--accent); font-weight:600; }
+
+  .slot-row{
+    background:var(--panel-bg-raised);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:12px;
+    margin-bottom:10px;
+  }
+  .slot-row:last-child{ margin-bottom:0; }
+  .slot-row-top{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .slot-dot{
+    width:15px; height:15px; border-radius:50%; flex:none;
+    box-shadow:0 0 10px 1px var(--dot-color,transparent);
+  }
+  .slot-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px; letter-spacing:.08em; color:var(--ink); flex:1;
+  }
+
+  .seg{
+    display:flex;
+    border:1px solid var(--panel-border);
+    border-radius:7px;
+    overflow:hidden;
+    margin-bottom:10px;
+  }
+  .seg button{
+    flex:1; background:transparent; border:none;
+    color:var(--ink-dim);
+    font-family:'Sora', sans-serif; font-size:12.5px;
+    padding:0; min-height:42px; cursor:pointer;
+  }
+  .seg button.active{ background:var(--accent); color:var(--accent-ink); font-weight:600; }
+
+  .row-line{ display:flex; align-items:center; gap:10px; }
+
+  input[type="color"]{
+    -webkit-appearance:none; appearance:none;
+    width:42px; height:42px; flex:none;
+    border:1px solid var(--panel-border);
+    border-radius:8px; background:none; padding:0; cursor:pointer;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper{ padding:2px; }
+  input[type="color"]::-webkit-color-swatch{ border-radius:6px; border:none; }
+
+  select{
+    flex:1;
+    background:var(--stage); color:var(--ink);
+    border:1px solid var(--panel-border);
+    border-radius:8px; padding:0 10px; min-height:42px;
+    font-family:'Sora', sans-serif; font-size:13px;
+  }
+
+  .file-btn{ flex:1; display:flex; align-items:center; gap:8px; }
+  .file-btn label{
+    flex:1; text-align:center;
+    background:var(--stage);
+    border:1px solid var(--panel-border);
+    border-radius:8px; padding:0 8px; min-height:42px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12.5px; color:var(--ink-dim); cursor:pointer;
+  }
+  .file-btn label:hover{ color:var(--ink); }
+  .file-btn input[type="file"]{ display:none; }
+  .thumb{
+    width:34px; height:34px; border-radius:8px;
+    object-fit:cover; border:1px solid var(--panel-border); flex:none;
+  }
+
+  .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+  .field:last-child{ margin-bottom:0; }
+  .field-label{ display:flex; justify-content:space-between; font-size:12px; color:var(--ink-dim); }
+  .field-label span.val{ font-family:'IBM Plex Mono', monospace; color:var(--ink-faint); }
+  /* The input is 32px tall for the thumb to land on; the visible track is 4px. */
+  input[type="range"]{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:32px; margin:0;
+    background:transparent; outline:none;
+  }
+  input[type="range"]::-webkit-slider-runnable-track{
+    height:4px; border-radius:2px; background:var(--panel-border);
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:22px; height:22px; border-radius:50%; margin-top:-9px;
+    background:var(--accent); cursor:pointer;
+    border:2px solid var(--stage-deep);
+  }
+  input[type="range"]::-moz-range-track{
+    height:4px; border-radius:2px; background:var(--panel-border);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:22px; height:22px; border-radius:50%;
+    background:var(--accent); border:2px solid var(--stage-deep); cursor:pointer;
+  }
+  input[type="range"]:focus-visible::-webkit-slider-thumb{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .toggle-line{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:13px; color:var(--ink-dim); margin-bottom:10px; min-height:36px;
+  }
+  .toggle-line:last-child{ margin-bottom:0; }
+  .switch{ position:relative; width:46px; height:27px; flex:none; }
+  .switch input{ opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+  .switch .track{
+    position:absolute; inset:0;
+    background:var(--panel-border); border-radius:99px;
+    transition:background .15s ease; pointer-events:none;
+  }
+  .switch .knob{
+    position:absolute; top:3px; left:3px;
+    width:21px; height:21px; border-radius:50%;
+    background:var(--ink-dim);
+    transition:transform .15s ease, background .15s ease;
+    pointer-events:none;
+  }
+  .switch input:checked ~ .track{ background:var(--accent); opacity:.35; }
+  .switch input:checked ~ .knob{ transform:translateX(19px); background:var(--accent); }
+  .switch input:focus-visible ~ .track{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .note{ font-size:11px; color:var(--ink-faint); line-height:1.5; margin:10px 0 0; }
+  .note b{ color:var(--ink-dim); font-weight:600; font-family:'IBM Plex Mono', monospace; }
+  .note #errStatus{ color:var(--danger); font-family:'IBM Plex Mono', monospace; }
+
+  button.reset-btn{
+    width:100%; min-height:44px; padding:0 12px; border-radius:8px;
+    border:1px solid var(--panel-border);
+    background:transparent; color:var(--ink-faint);
+    font-family:'Sora', sans-serif; font-size:12.5px; cursor:pointer;
+  }
+  button.reset-btn.armed{ color:var(--danger); border-color:rgba(255,111,111,.45); }
+  button.reset-btn:hover{ color:var(--danger); border-color:rgba(255,111,111,.3); }
+
+  @media (max-width:560px){
+    .panel{
+      top:auto; bottom:0; right:0; left:0;
+      width:100%; max-width:100%;
+      height:auto; max-height:76%;
+      border-left:none; border-top:1px solid var(--panel-border);
+      border-radius:16px 16px 0 0;
+      transform:translateY(0);
+      padding-bottom:env(safe-area-inset-bottom, 0px);
+    }
+    .panel::before{
+      content:""; display:block; flex:none;
+      width:36px; height:4px; border-radius:2px;
+      background:var(--panel-border); margin:10px auto 0;
+    }
+    .panel[hidden]{ transform:translateY(100%); }
+  }
+
+  /* Combo lives in the top bar with the other numbers, out of the scan zone
+     where incoming barriers are read. */
+  .stat b{ display:inline-block; transform-origin:left center; }
+  .stat b em{ font-style:normal; font-size:10px; color:var(--coin); margin-left:4px; font-weight:600; }
+  .stat.pop b{ animation:statPop .2s ease-out; }
+  @keyframes statPop{ from{ transform:scale(1.35); } to{ transform:scale(1); } }
+  @media (prefers-reduced-motion: reduce){ .stat.pop b{ animation:none; } }
+
+  .icon-btn{
+    width:36px; height:36px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:rgba(26,30,38,.7);
+    backdrop-filter:blur(6px);
+    color:var(--ink-dim);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .icon-btn:hover{ color:var(--ink); border-color:rgba(255,255,255,.18); }
+  .icon-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .icon-btn svg{ width:17px; height:17px; }
+  .icon-btn{ flex:none; }
+  .sound-btn.muted{ color:var(--ink-faint); }
+  .sound-btn.live{ color:var(--accent); border-color:rgba(125,211,192,.35); }
+
+  [hidden]{ display:none !important; }
+</style>
+
+<div class="app">
+  <div class="stage-wrap">
+    <canvas id="stage"></canvas>
+
+    <div class="topbar">
+      <div class="stats">
+        <span class="stat"><i>Dist</i><b id="distVal">0</b></span>
+        <span class="stat"><i>Coins</i><b><span class="gold" id="coinVal">0</span><em id="coinMult" class="ent" hidden>×2</em></b></span>
+        <span class="stat" id="comboStat"><i>Combo</i><b><span id="comboNum">0</span><em id="comboMult">×1</em></b></span>
+      </div>
+      <div class="tools">
+        <button class="icon-btn sound-btn" id="soundBtn" aria-label="Toggle sound">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 5 6 9H3v6h3l5 4z"/>
+            <path id="waveOn" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>
+            <path id="waveOff" d="M17 9.5l4 5M21 9.5l-4 5"/>
+          </svg>
+        </button>
+        <button class="panel-toggle" id="panelToggle" aria-label="Open customization panel" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.63 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.63a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.37 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.04z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="gauge" id="gauge" hidden>
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <circle class="g-track" cx="32" cy="32" r="27"/>
+        <circle class="g-fill" id="gaugeFill" cx="32" cy="32" r="27"/>
+      </svg>
+      <div class="g-num" id="gaugeNum">0</div>
+      <div class="g-label" id="gaugeLabel">PUMP ↕</div>
+    </div>
+
+    <div class="overlay" id="overlayReady">
+      <div class="title-block">
+        <div class="title">BELL THEORY</div>
+        <div class="tagline">thread it · or wreck it</div>
+      </div>
+      <div class="cta-block">
+        <div class="cta" id="readyCta">both thumbs down</div>
+        <div class="mode-seg" id="modeSeg" role="group" aria-label="Play mode">
+          <button type="button" data-mode="two">two thumbs</button>
+          <button type="button" data-mode="one">one thumb</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay gone" id="overlayDead">
+      <div class="dead-block">
+        <div class="dead-label">crashed</div>
+        <div class="big" id="deadDist">0</div>
+        <div class="row"><span>coins <b id="deadCoins">0</b></span><span>best <span id="deadBest">0</span></span></div>
+        <p class="loop" id="deadLoop"></p>
+        <div class="cta" id="deadCta">both thumbs to run again</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="panel" id="panel" hidden>
+    <div class="panel-head">
+      <h1>Customize</h1>
+      <button class="panel-close" id="panelClose">close ✕</button>
+    </div>
+
+    <details class="panel-section howto">
+      <summary>How to play</summary>
+      <p>Left thumb drives the left lane, right thumb the right. Thread the gaps, take the coins. Lift a thumb and that side stops moving — it does not stop being hit.</p>
+      <p><b>Pump</b> both thumbs up and down to fill the tank. At 100 it ignites and drains as you ride it. Faster, coins pull to you, and barriers break on you instead of the other way round. Every smash refills the tank, so you can stay lit and wreck as long as you keep hitting things.</p>
+    </details>
+
+    <div class="panel-section">
+      <h2>Thumbs</h2>
+      <div class="toggle-line">
+        <span>One-handed</span>
+        <label class="switch">
+          <input type="checkbox" id="oneHandToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+      <div id="slotList"></div>
+    </div>
+
+    <div class="panel-section">
+      <h2>World</h2>
+      <div class="toggle-line">
+        <span>Sound</span>
+        <label class="switch">
+          <input type="checkbox" id="soundToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Volume</span><span class="val" id="volumeVal"></span></div>
+        <input type="range" id="volumeRange" min="0" max="100" step="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Impact</span><span class="val" id="impactVal"></span></div>
+        <input type="range" id="impactRange" min="0" max="200" step="5">
+      </div>
+      <p class="note">Engine: <b id="audioStatus">not started</b> <span id="errStatus"></span></p>
+      <p class="note">Silent on iPhone with the engine running? Flip the ring/silent switch — web audio obeys it.</p>
+    </div>
+
+    <div class="panel-section">
+      <h2>Feel</h2>
+      <div class="field">
+        <div class="field-label"><span>Trail length</span><span class="val" id="trailVal"></span></div>
+        <input type="range" id="trailRange" min="0" max="40" step="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Glow</span><span class="val" id="glowVal"></span></div>
+        <input type="range" id="glowRange" min="0" max="40" step="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Follow speed</span><span class="val" id="followVal"></span></div>
+        <input type="range" id="followRange" min="8" max="60" step="1">
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Scene</h2>
+      <div class="toggle-line">
+        <span>Lane grid</span>
+        <label class="switch">
+          <input type="checkbox" id="gridToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+      <div class="toggle-line">
+        <span>Spectrum bars</span>
+        <label class="switch">
+          <input type="checkbox" id="fftToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+      <div class="toggle-line">
+        <span>Haptic buzz</span>
+        <label class="switch">
+          <input type="checkbox" id="hapticToggle">
+          <span class="track"></span><span class="knob"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section" style="border-bottom:none;">
+      <button class="reset-btn" id="resetBtn">reset settings</button>
+    </div>
+  </aside>
+  <div class="rotate" id="rotateOverlay" hidden>turn your phone upright</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORE_KEY = "thumbtone.v3";
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ===================== settings =====================
+  function defaultState(){
+    return {
+      slots: [
+        { id:"left",  mode:"color", color:"#ffb454", shape:"circle", image:null },
+        { id:"right", mode:"color", color:"#5ec8ff", shape:"circle", image:null }
+      ],
+      soundOn: true,
+      volume: 0.75,
+      trailLength: 18,
+      glow: 20,
+      follow: 26,
+      grid: true,
+      fft: true,
+      haptics: true,
+      best: 0,
+      taughtPump: false,
+      impact: 1.2,
+      oneHand: false
+    };
+  }
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORE_KEY);
+      if(!raw) return defaultState();
+      var parsed = JSON.parse(raw);
+      if(!parsed || !Array.isArray(parsed.slots) || parsed.slots.length !== 2) return defaultState();
+      var merged = defaultState();
+      merged.slots = parsed.slots;
+      ["soundOn","volume","trailLength","glow","follow","grid","fft","haptics","best","taughtPump","impact","oneHand"].forEach(function(k){
+        if(typeof parsed[k] !== "undefined") merged[k] = parsed[k];
+      });
+      return merged;
+    }catch(e){ return defaultState(); }
+  }
+  function saveState(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+  var state = loadState();
+
+  // A mouse is one pointer; two-thumb mode cannot start with it. First visit
+  // on a mouse device defaults to one thumb. A saved choice is never overridden.
+  var isMouseDevice = !!(window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches) && !("ontouchstart" in window);
+  (function(){
+    var fresh = false;
+    try{ fresh = !localStorage.getItem(STORE_KEY); }catch(e){}
+    if(fresh && isMouseDevice){ state.oneHand = true; saveState(); }
+  })();
+
+  var imgCache = {};
+  function ensureImage(slot){
+    if(!slot.image) return null;
+    if(imgCache[slot.id] && imgCache[slot.id].src === slot.image) return imgCache[slot.id];
+    var img = new Image();
+    img.src = slot.image;
+    imgCache[slot.id] = img;
+    return img;
+  }
+  state.slots.forEach(ensureImage);
+
+  // ===================== world (ported from loom) =====================
+  function makeDrifter(seed, speed){
+    var phase = seed;
+    return function(dt){
+      phase += dt * speed;
+      var v = 0.5 + 0.3*Math.sin(phase) + 0.15*Math.sin(phase*2.7+seed) + 0.05*Math.sin(phase*5.3-seed);
+      return Math.min(1, Math.max(0, v));
+    };
+  }
+  var world = {
+    time: 0,
+    entropy: 0.35,
+    depth: 0.5,
+    warmth: 0.5,
+    ripples: [],
+    _depthDrift: makeDrifter(5.678, 0.012),
+    nextId: 0,
+    perturb: function(x, y, strength, life){
+      this.ripples.push({ id:this.nextId++, x:x, y:y, bornAt:this.time, strength:strength, life:life||1.6 });
+      if(this.ripples.length > 40) this.ripples.shift();
+    },
+    influenceAt: function(x, y, radius){
+      var total = 0;
+      for(var i=0;i<this.ripples.length;i++){
+        var r = this.ripples[i];
+        var age = this.time - r.bornAt;
+        var decay = Math.max(0, 1 - age/r.life);
+        if(decay <= 0) continue;
+        var d = Math.hypot(x-r.x, y-r.y);
+        var spatial = Math.max(0, 1 - d/(radius||260));
+        total += r.strength * decay * spatial;
+      }
+      return total;
+    },
+    tick: function(dt, targetEntropy, targetWarmth){
+      this.time += dt;
+      this.depth = this._depthDrift(dt);
+      // gameplay drives entropy/warmth instead of pure drift
+      this.entropy += (targetEntropy - this.entropy) * Math.min(1, dt*1.2);
+      this.warmth  += (targetWarmth  - this.warmth)  * Math.min(1, dt*1.6);
+      var t = this.time;
+      this.ripples = this.ripples.filter(function(r){ return t - r.bornAt < r.life; });
+    }
+  };
+
+  // ===================== audio (ported + trimmed) =====================
+  var audio = {
+    ctx:null, master:null, comp:null, click:null, analyser:null, freqData:null,
+    droneGain:null, noiseGain:null, noiseFilter:null, started:false
+  };
+  // iOS routes raw Web Audio through a session category that the hardware
+  // silent switch mutes. An actually-playing HTMLAudioElement flips the
+  // webview into media playback, which ignores the switch. Best-effort.
+  var unlockEl = null;
+  function silentWavUrl(){
+    var sr = 8000, n = sr/2;
+    var buf = new ArrayBuffer(44 + n*2);
+    var v = new DataView(buf);
+    function str(o,s){ for(var i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); }
+    str(0,"RIFF"); v.setUint32(4, 36+n*2, true); str(8,"WAVE");
+    str(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+    v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+    str(36,"data"); v.setUint32(40, n*2, true);
+    return URL.createObjectURL(new Blob([buf], { type:"audio/wav" }));
+  }
+  function unlockMediaSession(){
+    if(unlockEl) return;
+    try{
+      unlockEl = new Audio(silentWavUrl());
+      unlockEl.loop = true;
+      unlockEl.playsInline = true;
+      unlockEl.volume = 0.01;
+      var p = unlockEl.play();
+      if(p && p.catch) p.catch(function(){});
+    }catch(e){}
+  }
+  function audioStateName(){
+    if(!audio.ctx) return "not started";
+    return audio.ctx.state;
+  }
+  function isAudioLive(){
+    return !!(audio.ctx && audio.ctx.state === "running" && audio.started && state.soundOn);
+  }
+
+  function ensureAudio(){
+    if(!state.soundOn) return null;
+    if(!audio.ctx){
+      try{ audio.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){ return null; }
+      var ctx = audio.ctx;
+      audio.master = ctx.createGain();
+      audio.master.gain.value = state.volume;
+      audio.analyser = ctx.createAnalyser();
+      audio.analyser.fftSize = 512;
+      audio.freqData = new Uint8Array(audio.analyser.frequencyBinCount);
+      // Compressor lets impact hits run hot without hard clipping, and ducks
+      // the bed under each hit, which itself reads as more impact.
+      audio.comp = ctx.createDynamicsCompressor();
+      audio.comp.threshold.value = -14;
+      audio.comp.knee.value = 8;
+      audio.comp.ratio.value = 5;
+      audio.comp.attack.value = 0.003;
+      audio.comp.release.value = 0.12;
+      audio.master.connect(audio.analyser);
+      audio.master.connect(audio.comp);
+      audio.comp.connect(ctx.destination);
+
+      audio.droneGain = ctx.createGain();
+      audio.droneGain.gain.value = 0.22;
+      audio.droneGain.connect(audio.master);
+
+      audio.noiseFilter = ctx.createBiquadFilter();
+      audio.noiseFilter.type = "bandpass";
+      audio.noiseFilter.frequency.value = 3000;
+      audio.noiseFilter.Q.value = 0.6;
+      audio.noiseGain = ctx.createGain();
+      audio.noiseGain.gain.value = 0.0;
+      audio.noiseFilter.connect(audio.noiseGain);
+      audio.noiseGain.connect(audio.master);
+    }
+    if(audio.ctx.state !== "running"){
+      var r = audio.ctx.resume();
+      if(r && r.catch) r.catch(function(){});
+    }
+    return audio.ctx;
+  }
+  function startBeds(){
+    var ctx = ensureAudio();
+    if(!ctx || audio.started) return;
+    audio.started = true;
+    // Weighted an octave above loom's original 110/165/220 stack: phone speakers
+    // roll off below ~200Hz, so the loudest voice there was inaudible on mobile.
+    [[110,0.3],[220,1.0],[330,0.7],[440,0.45]].forEach(function(pair){
+      var osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = pair[0];
+      var voice = ctx.createGain();
+      voice.gain.value = pair[1];
+      var lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.05 + Math.random()*0.05;
+      var lfoGain = ctx.createGain();
+      lfoGain.gain.value = 4;
+      lfo.connect(lfoGain); lfoGain.connect(osc.detune);
+      lfo.start();
+      osc.connect(voice); voice.connect(audio.droneGain);
+      osc.start();
+    });
+    var size = 2 * ctx.sampleRate;
+    var buf = ctx.createBuffer(1, size, ctx.sampleRate);
+    var data = buf.getChannelData(0);
+    for(var i=0;i<size;i++) data[i] = Math.random()*2 - 1;
+    var src = ctx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    src.connect(audio.noiseFilter);
+    src.start();
+    // Mid-range confirmation chirp: far easier to hear on a phone speaker than
+    // the drone, so it separates "no audio at all" from "bed is too quiet".
+    blip(660, 0.22, "triangle", 0.3);
+    syncSoundBtn();
+  }
+  function driveAudio(){
+    if(!audio.ctx || !audio.started) return;
+    var t = audio.ctx.currentTime;
+    audio.noiseFilter.frequency.setTargetAtTime(1400 + world.warmth*4200, t, 0.35);
+    audio.noiseGain.gain.setTargetAtTime(0.04 + world.entropy*0.24, t, 0.4);
+    audio.droneGain.gain.setTargetAtTime(0.12 + world.warmth*0.12, t, 0.6);
+  }
+  function blip(freq, dur, type, vol){
+    var ctx = ensureAudio();
+    if(!ctx) return;
+    var t = ctx.currentTime;
+    var osc = ctx.createOscillator();
+    var g = ctx.createGain();
+    osc.type = type || "triangle";
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(freq*1.6, t + dur*0.8);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.16, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g); g.connect(audio.master);
+    osc.start(t); osc.stop(t + dur + 0.02);
+  }
+  // Impact hit, tuned for speaker-to-chassis coupling: a lowpassed square
+  // gives a strong fundamental plus odd harmonics in the band a phone driver
+  // can actually push, and at high volume that buzzes the frame. Pitch stays
+  // in that band instead of sweeping below it. Scaled by the Impact setting.
+  function thump(freq, dur, vol){
+    var ctx = ensureAudio();
+    if(!ctx) return;
+    var t = ctx.currentTime;
+    var v = vol * (state.impact || 1);
+    var osc = ctx.createOscillator();
+    var lp = ctx.createBiquadFilter();
+    var g = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(120, freq*0.7), t + dur);
+    lp.type = "lowpass"; lp.frequency.value = 1400; lp.Q.value = 0.7;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(lp); lp.connect(g); g.connect(audio.master);
+    osc.start(t); osc.stop(t + dur + 0.02);
+
+    if(!audio.click){
+      var n = Math.floor(ctx.sampleRate * 0.012);
+      audio.click = ctx.createBuffer(1, n, ctx.sampleRate);
+      var d = audio.click.getChannelData(0);
+      for(var i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1 - i/n);
+    }
+    var src = ctx.createBufferSource();
+    src.buffer = audio.click;
+    var bp = ctx.createBiquadFilter();
+    bp.type = "bandpass"; bp.frequency.value = 900; bp.Q.value = 1.2;
+    var ng = ctx.createGain(); ng.gain.value = v*0.6;
+    src.connect(bp); bp.connect(ng); ng.connect(audio.master);
+    src.start(t);
+  }
+  function crashSound(){
+    var ctx = ensureAudio();
+    if(!ctx) return;
+    var t = ctx.currentTime;
+    var osc = ctx.createOscillator();
+    var g = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.5);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.4, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    osc.connect(g); g.connect(audio.master);
+    osc.start(t); osc.stop(t + 0.65);
+
+    var size = Math.floor(ctx.sampleRate * 0.35);
+    var buf = ctx.createBuffer(1, size, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for(var i=0;i<size;i++) d[i] = (Math.random()*2-1) * (1 - i/size);
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    var lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 900;
+    var ng = ctx.createGain(); ng.gain.value = 0.32;
+    src.connect(lp); lp.connect(ng); ng.connect(audio.master);
+    src.start(t);
+  }
+
+  // ===================== canvas =====================
+  var canvas = document.getElementById("stage");
+  var ctx2d = canvas.getContext("2d");
+  var wrap = canvas.parentElement;
+  var W = 0, H = 0, dpr = 1;
+  function resize(){
+    var rect = wrap.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width = Math.round(W*dpr);
+    canvas.height = Math.round(H*dpr);
+    ctx2d.setTransform(dpr,0,0,dpr,0,0);
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  // ===================== game state =====================
+  var PHASE_READY = 0, PHASE_RUN = 1, PHASE_DEAD = 2;
+  var game = {
+    phase: PHASE_READY,
+    dist: 0,
+    coins: 0,
+    speed: 0,
+    obstacles: [],
+    pickups: [],
+    sparks: [],
+    spawnTimer: 0,
+    shake: 0,
+    deadAt: 0,
+    combo: 0,
+    bestCombo: 0,
+    texts: [],
+    rings: [],
+    charge: 0,
+    boost: 0,
+    boostMult: 1,
+    recentClean: [],
+    diffAdj: 0,
+    runTime: 0,
+    hinted: false,
+    wreck: 0,
+    wreckTarget: 5,
+    debris: [],
+    flash: 0,
+    flashColor: "255,190,140",
+    dying: 0,
+    rampT: 0,
+    grace: 0,
+    paused: false,
+    litTime: 0,
+    slowmo: 0
+  };
+
+  // Pump: rhythmic vertical strokes build charge, full charge fires a boost.
+  // Strokes are read off the thumb's target, not the eased avatar, so it
+  // tracks what the hand is actually doing.
+  var STROKE_MIN = 34;
+  var STROKE_WINDOW = 0.5;
+  var STROKE_CHARGE = 0.085;
+  var CHARGE_DECAY = 0.32;
+  var BOOST_DRAIN = 0.4;
+  var BOOST_SPEED = 1.85;
+  var MAGNET_R = 120;
+
+  // On touch the thumb covers the avatar, so it rides above the contact point.
+  var TOUCH_OFFSET = 62;
+  function makeCursor(){
+    return { x:0, y:0, tx:0, ty:0, rawX:0, rawY:0, offset:0, active:false, trail:[],
+             prevTy:0, strokeDir:0, strokeStart:0, lastStrokeAt:-9,
+             px:0, py:0, vx:0, vy:0 };
+  }
+  var cursors = [ makeCursor(), makeCursor() ];
+  function lanes(){ return state.oneHand ? 1 : 2; }
+  function laneList(){ return state.oneHand ? [0] : [0,1]; }
+  function laneBounds(side){
+    if(state.oneHand) return { x0:0, x1:W };
+    return side === 0 ? { x0:0, x1:W/2 } : { x0:W/2, x1:W };
+  }
+  function resetCursors(){
+    [0,1].forEach(function(side){
+      var b = laneBounds(side);
+      var c = cursors[side];
+      c.x = c.tx = (b.x0 + b.x1)/2;
+      c.y = c.ty = H * 0.75;
+      c.px = c.x; c.py = c.y; c.vx = 0; c.vy = 0;
+      c.trail.length = 0;
+    });
+  }
+  resetCursors();
+
+  var HIT_R = 12;
+  var DRAW_R = 17;
+
+  function startRun(){
+    game.phase = PHASE_RUN;
+    game.dist = 0;
+    game.coins = 0;
+    game.speed = 200;
+    game.obstacles.length = 0;
+    game.pickups.length = 0;
+    game.sparks.length = 0;
+    game.spawnTimer = 0.5;
+    game.shake = 0;
+    game.combo = 0;
+    game.texts.length = 0;
+    game.rings.length = 0;
+    game.charge = 0;
+    game.boost = 0;
+    game.boostMult = 1;
+    game.recentClean.length = 0;
+    game.diffAdj = 0;
+    game.runTime = 0;
+    game.hinted = false;
+    game.wreck = 0;
+    game.debris.length = 0;
+    game.flash = 0;
+    game.dying = 0;
+    game.rampT = 0;
+    game.grace = 0;
+    game.litTime = 0;
+    game.slowmo = 0;
+    cursors.forEach(function(c){ c.strokeDir = 0; c.lastStrokeAt = -9; c.prevTy = c.ty; c.strokeStart = c.ty; c.trail.length = 0; });
+    resetComboStat();
+    overlayReady.classList.add("gone");
+    overlayDead.classList.add("gone");
+    startBeds();
+  }
+  // The hit itself: burst, sound, shake, and half a second of slow motion so
+  // the crash reads before the screen changes. finishDeath() does the rest.
+  function die(x, y, reason){
+    if(game.phase !== PHASE_RUN || game.dying > 0) return;
+    game.dying = 0.55;
+    game.boost = 0; game.wreck = 0;
+    game.shake = 1;
+    game.flash = 0.6; game.flashColor = "255,111,111";
+    game.combo = 0;
+    resetComboStat();
+    world.perturb(x, y, 1.6, 2.2);
+    for(var i=0;i<26;i++){
+      var a = Math.random()*Math.PI*2, sp = 60 + Math.random()*260;
+      game.sparks.push({ x:x, y:y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:1.3, color:"#ff6f6f" });
+    }
+    if(reason === "steel"){
+      game.texts.push({ x:x, y:y - 34, text:"STEEL", life:1.6, color:"#ff6f6f", size:16 });
+      while(game.texts.length > 5) game.texts.shift();
+    }
+    if(state.soundOn) crashSound();
+    if(state.haptics && navigator.vibrate){ try{ navigator.vibrate([30,40,60]); }catch(e){} }
+  }
+  function finishDeath(){
+    game.phase = PHASE_DEAD;
+    game.deadAt = world.time;
+    var score = Math.floor(game.dist);
+    if(score > state.best){ state.best = score; }
+    saveState();
+    deadDist.textContent = score;
+    deadCoins.textContent = game.coins;
+    deadBest.textContent = state.best;
+    // Leave a concrete, nearly-finished goal on the table.
+    var toNext = 5 - (game.bestCombo % 5);
+    var nextMult = 2 + Math.floor(game.bestCombo/5);
+    var gap = state.best - score;
+    deadLoop.textContent = (gap > 0 ? gap + " short of your best" : "New best")
+      + " · " + toNext + " more clean to ×" + nextMult;
+    overlayDead.classList.remove("gone");
+  }
+
+  // Barrier rects break into chunks with real velocity away from the impact,
+  // gravity, spin, and fade. The visceral half of smashing.
+  function spawnDebris(o, ix, iy, n){
+    o.rects.forEach(function(rc){
+      for(var i=0;i<n;i++){
+        var w = 8 + Math.random()*Math.min(28, rc.w);
+        var h = 6 + Math.random()*Math.min(14, o.h);
+        var x = rc.x + Math.random()*Math.max(1, rc.w - w);
+        var y = o.y + Math.random()*Math.max(1, o.h - h);
+        var dx = (x + w/2) - ix, dy = (y + h/2) - iy;
+        var d = Math.hypot(dx, dy) || 1;
+        var sp = 120 + Math.random()*260;
+        game.debris.push({
+          x:x, y:y, w:w, h:h,
+          vx: dx/d*sp + (Math.random()-0.5)*80, vy: dy/d*sp - 120,
+          rot:(Math.random()-0.5)*0.6, vr:(Math.random()-0.5)*9, life:1
+        });
+      }
+    });
+    while(game.debris.length > 60) game.debris.shift();
+  }
+
+  // Wrecking is its own loop, not a worse version of threading: a chain that
+  // escalates within one boost, CRUNCH as the variable-magnitude hit, a
+  // refund per smash so wrecking sustains wrecking, and a storm as payoff.
+  function shatter(o, c){
+    var idx = game.obstacles.indexOf(o);
+    if(idx >= 0) game.obstacles.splice(idx, 1);
+    game.wreck += 1;
+    game.combo += 1;
+    if(game.combo > game.bestCombo) game.bestCombo = game.combo;
+    var crunch = Math.random() < 0.12;
+    var power = Math.min(1, game.wreck/6);
+    var pts = Math.round(6 * (1 + game.wreck*0.25) * (crunch ? 3 : 1));
+    game.dist += pts;
+    game.charge = Math.min(1, game.charge + 0.08);
+    world.perturb(c.x, c.y, 1.0 + power*0.8, 1.4);
+    game.shake = Math.max(game.shake, 0.4 + power*0.5);
+    spawnDebris(o, c.x, c.y, 5 + Math.round(power*5) + (crunch ? 4 : 0));
+    game.texts.push({
+      x:c.x, y:c.y - 30,
+      text:(crunch ? "CRUNCH" : "SMASH") + (game.wreck > 1 ? " ×" + game.wreck : "") + " +" + pts,
+      life: crunch ? 1.4 : 1,
+      color: crunch ? "#f2c14e" : "#ff9b6a",
+      size: (crunch ? 14 : 12) + Math.min(6, game.wreck)
+    });
+    while(game.texts.length > 5) game.texts.shift();
+    if(state.soundOn){
+      thump(170 - power*50, 0.22 + power*0.1, 0.45 + power*0.2);
+      blip(140, 0.18, "square", 0.16);
+      if(crunch){ blip(880, 0.1, "triangle", 0.12); blip(1320, 0.18, "triangle", 0.1); }
+    }
+    if(state.haptics && navigator.vibrate){
+      try{ navigator.vibrate(crunch ? [12,20,30] : 14 + Math.round(power*20)); }catch(e){}
+    }
+    comboNum.textContent = game.combo;
+    comboMult.textContent = "×" + (1 + Math.floor(game.combo/5));
+    comboBadge.classList.remove("pop"); void comboBadge.offsetWidth; comboBadge.classList.add("pop");
+    if(game.wreck >= game.wreckTarget) wreckStorm();
+  }
+
+  function wreckStorm(){
+    game.wreck = 0;
+    game.wreckTarget = 4 + Math.floor(Math.random()*3);
+    var bonus = 40;
+    game.dist += bonus;
+    game.charge = Math.min(1, game.charge + 0.25);
+    game.shake = 1;
+    game.flash = 1; game.flashColor = "255,190,140";
+    world.perturb(W/2, H/2, 2.0, 2.4);
+    for(var i=game.obstacles.length-1;i>=0;i--){
+      var o = game.obstacles[i];
+      if(o.hard) continue;
+      spawnDebris(o, o.gapC, o.y + o.h/2, 4);
+      game.obstacles.splice(i,1);
+    }
+    game.texts.push({ x:W/2, y:H*0.45, text:"WRECKED +" + bonus, life:1.6, color:"#ff9b6a", size:26 });
+    while(game.texts.length > 5) game.texts.shift();
+    if(state.soundOn){
+      thump(110, 0.4, 0.6);
+      thump(160, 0.3, 0.4);
+      blip(440, 0.3, "sawtooth", 0.14);
+      blip(660, 0.45, "triangle", 0.12);
+    }
+    if(state.haptics && navigator.vibrate){ try{ navigator.vibrate([30,40,60,40,80]); }catch(e){} }
+  }
+
+  // Staggered notes. A chord reads as a hit; an arpeggio reads as a reward.
+  function arp(freqs, gapMs, type, vol){
+    freqs.forEach(function(f, i){
+      setTimeout(function(){ if(state.soundOn) blip(f, 0.18, type, vol); }, i*gapMs);
+    });
+  }
+
+  // The rare coin. The value is the smaller half of it; the moment is the point.
+  function collectSpecial(p, gain){
+    var purple = p.tier === 2;
+    var hex = purple ? "#b04bff" : "#3d7bff";
+    world.perturb(p.x, p.y, purple ? 1.6 : 1.1, 1.6);
+    game.shake = Math.max(game.shake, purple ? 0.7 : 0.35);
+    game.flash = purple ? 0.9 : 0.5;
+    game.flashColor = purple ? "176,75,255" : "61,123,255";
+    if(purple) game.slowmo = 0.35;
+    game.rings.push({ x:p.x, y:p.y, r:p.r, max: purple ? 90 : 60, life:1, special:hex });
+    if(purple) game.rings.push({ x:p.x, y:p.y, r:p.r, max:130, life:1.2, special:"#eef0f4" });
+    var n = purple ? 30 : 18;
+    for(var k=0;k<n;k++){
+      var a = Math.random()*Math.PI*2, sp = 80 + Math.random()*(purple ? 300 : 200);
+      game.sparks.push({ x:p.x, y:p.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:1.2,
+                         color: (purple && k % 3 === 0) ? "#eef0f4" : hex });
+    }
+    game.texts.push({ x:p.x, y:p.y - 34, text:(purple ? "PURPLE +" : "BLUE +") + gain,
+                      life: purple ? 1.9 : 1.5, color:hex, size: purple ? 22 : 16 });
+    while(game.texts.length > 5) game.texts.shift();
+    if(state.soundOn){
+      thump(purple ? 160 : 240, purple ? 0.3 : 0.12, purple ? 0.5 : 0.32);
+      if(purple) arp([523, 659, 784, 1047, 1319], 55, "triangle", 0.15);
+      else arp([659, 988, 1319], 60, "triangle", 0.14);
+    }
+    if(state.haptics && navigator.vibrate){
+      try{ navigator.vibrate(purple ? [20,40,30,40,60] : [12,30,24]); }catch(e){}
+    }
+  }
+
+  // Fired the instant a barrier clears your avatar without touching it.
+  // Reward scales with how near the gap's centre you threaded it, and a
+  // GRAZE pays extra for clearing a wall by a hair.
+  function threaded(o, c){
+    var off = Math.abs(c.x - o.gapC) / (o.gapW/2);
+    var clean = off < 0.34;
+    var near = !clean && off < 0.52;
+    var graze = o.minGraze < 7;
+    var steel = graze && o.hard && game.boost > 0;
+    // Variable magnitude. A fixed payout stops producing a prediction error once
+    // learned; some passes pay far more and the player cannot know which.
+    var surge = clean && Math.random() < 0.12;
+    game.combo += 1;
+    if(game.combo > game.bestCombo) game.bestCombo = game.combo;
+    var mult = 1 + Math.floor(game.combo/5);
+    var base = (surge ? 10 : (clean ? 3 : 1)) + (graze ? (steel ? 10 : 4) : 0);
+    var pts = base * mult;
+    game.dist += pts;
+
+    game.recentClean.push(clean);
+    while(game.recentClean.length > 10) game.recentClean.shift();
+    if(game.recentClean.length >= 6){
+      var rate = game.recentClean.filter(Boolean).length / game.recentClean.length;
+      var target = rate > 0.7 ? 0.1 : (rate < 0.3 ? -0.1 : 0);
+      game.diffAdj += (target - game.diffAdj) * 0.25;
+    }
+
+    world.perturb(c.x, c.y, surge ? 1.0 : (clean ? 0.7 : 0.4), 1.2);
+    game.rings.push({ x:c.x, y:c.y, r:HIT_R, max: surge ? 56 : (clean ? 44 : 30), life:1, clean:clean, surge:surge });
+    if(graze) game.rings.push({ x:c.x, y:c.y, r:HIT_R, max:36, life:1, graze:true });
+    var label = (graze ? (steel ? "STEEL GRAZE " : "GRAZE ") : "") + (surge ? "SURGE +" + pts : (clean ? "CLEAN +" + pts : (near ? "CLOSE +" + pts : "+" + pts)));
+    game.texts.push({
+      x:c.x, y:c.y - 30, text:label, life: (surge || graze) ? 1.4 : 1,
+      color: surge ? "#f2c14e" : (clean ? "#7dd3c0" : (graze ? "#eef0f4" : (near ? "#5fa89a" : "#8991a1"))),
+      size: surge ? 14 : (clean ? 12 : 11)
+    });
+    while(game.texts.length > 4) game.texts.shift();
+
+    if(game.combo % 5 === 0){
+      if(state.soundOn) blip(520 + Math.min(6, game.combo/5)*90, 0.3, "sine", 0.17);
+      if(state.haptics && navigator.vibrate){ try{ navigator.vibrate(18); }catch(e){} }
+    }
+    if(state.soundOn){
+      var step = Math.min(14, game.combo);
+      if(surge){
+        blip(660, 0.12, "triangle", 0.16);
+        blip(990, 0.22, "triangle", 0.14);
+        thump(200, 0.16, 0.42);
+      } else {
+        blip(330 + step*26, clean ? 0.16 : 0.1, clean ? "triangle" : "sine", clean ? 0.14 : 0.08);
+        if(clean) thump(240, 0.07, 0.16);
+        if(graze) blip(1180, 0.09, "sine", 0.12);
+      }
+    }
+    if(surge && state.haptics && navigator.vibrate){ try{ navigator.vibrate([10,30,22]); }catch(e){} }
+    comboNum.textContent = game.combo;
+    comboMult.textContent = "×" + mult;
+    comboBadge.classList.remove("pop");
+    void comboBadge.offsetWidth;
+    comboBadge.classList.add("pop");
+  }
+
+  var lastTickAt = -9;
+  function registerStroke(side, amp){
+    if(game.dying > 0) return;
+    var now = world.time;
+    var c = cursors[side];
+    var rhythm = (now - c.lastStrokeAt) < STROKE_WINDOW;
+    var bilateral = (now - cursors[1 - side].lastStrokeAt) < 0.22;
+    c.lastStrokeAt = now;
+    // ±30% jitter so the exact stroke that tips the meter is never certain.
+    // Sustained uncertainty about when the payoff lands is what keeps the
+    // ramp toward it alive.
+    var add = STROKE_CHARGE * (0.7 + Math.random()*0.6) * (rhythm ? 1.4 : 0.8) * (bilateral ? 1.8 : 1);
+    game.charge = Math.min(1, game.charge + add);
+    if(!state.taughtPump){ state.taughtPump = true; saveState(); }
+    gauge.classList.remove("tick"); void gauge.offsetWidth; gauge.classList.add("tick");
+    // Frantic pumping can hit 20 strokes/s; cap the tick so it does not spawn
+    // a fresh audio graph on every one.
+    if(state.soundOn && now - lastTickAt > 0.08){
+      lastTickAt = now;
+      blip(220 + game.charge*520, 0.05, "square", 0.05 + game.charge*0.06);
+    }
+    if(game.charge >= 1 && game.boost === 0) fireBoost();
+  }
+  function fireBoost(){
+    game.boost = 1;
+    game.wreck = 0;
+    game.litTime = 0;
+    // Storm lands somewhere in 4–6: known to be coming, not exactly when.
+    game.wreckTarget = 4 + Math.floor(Math.random()*3);
+    game.shake = Math.max(game.shake, 0.35);
+    world.perturb(W/2, H*0.6, 1.4, 2.0);
+    game.texts.push({ x:W/2, y:H*0.5, text:"BOOST", life:1.2, color:"#7dd3c0", size:22 });
+    while(game.texts.length > 4) game.texts.shift();
+    if(state.soundOn){
+      blip(330, 0.35, "sawtooth", 0.14);
+      blip(660, 0.5, "triangle", 0.12);
+      thump(180, 0.34, 0.45);
+    }
+    if(state.haptics && navigator.vibrate){ try{ navigator.vibrate([18,40,60]); }catch(e){} }
+  }
+
+  // ===================== spawning =====================
+  // Three pattern classes. Mirror is easiest (motor system defaults to it),
+  // parallel fights the mirror reflex, independent is the real ceiling.
+  // Distance ramp plus a small performance nudge, so the challenge tracks the
+  // player's actual skill instead of one fixed curve for everyone.
+  function difficulty(){
+    return Math.max(0, Math.min(1, game.dist / 2600 + game.diffAdj));
+  }
+  function spawnRow(){
+    var d = difficulty();
+    var laneW = W / lanes();
+    var gapW = laneW * (state.oneHand ? (0.34 - 0.18*d) : (0.52 - 0.26*d));
+    gapW = Math.max(56, gapW);
+    // Steel: boost cannot break it. Rare at baseline so the look is learned;
+    // more common the longer you stay continuously lit, so infinite boost
+    // demands threading at speed instead of replacing it.
+    var pHard = 0.06 + (game.boost > 0 ? Math.min(0.5, 0.14 + game.litTime*0.05) : 0);
+    // The rare coin, rolled per row. Blue ~1 in 50, purple ~1 in 400.
+    var sr = Math.random();
+    var specialTier = sr < 1/400 ? 2 : (sr < 1/50 ? 1 : 0);
+    var specialSide = lanes() === 1 ? 0 : (Math.random() < 0.5 ? 0 : 1);
+    var h = 22 + Math.random()*26;
+
+    var roll = Math.random();
+    var pMirror = 0.45 - 0.25*d;
+    var pParallel = 0.35 - 0.05*d;
+    var kind = roll < pMirror ? "mirror" : (roll < pMirror + pParallel ? "parallel" : "independent");
+
+    var relL, relR;
+    var margin = (gapW/2) / laneW;
+    function randRel(){ return margin + Math.random()*(1 - margin*2); }
+    if(kind === "mirror"){ relL = randRel(); relR = 1 - relL; }
+    else if(kind === "parallel"){ relL = randRel(); relR = relL; }
+    else { relL = randRel(); relR = randRel(); }
+
+    laneList().forEach(function(side){
+      var b = laneBounds(side);
+      var rel = side === 0 ? relL : relR;
+      var gapC = b.x0 + rel*laneW;
+      var gs = gapC - gapW/2, ge = gapC + gapW/2;
+      var rects = [];
+      if(gs - b.x0 > 3) rects.push({ x:b.x0, w:gs - b.x0 });
+      if(b.x1 - ge > 3) rects.push({ x:ge, w:b.x1 - ge });
+      var hard = Math.random() < pHard;
+      game.obstacles.push({ y:-h, h:h, rects:rects, side:side, kind:kind, gapC:gapC, gapW:gapW, passed:false, flash:0, minGraze:99, hard:hard, warned:false });
+      if(Math.random() < 0.62){
+        game.pickups.push({ x:gapC + (Math.random()-0.5)*gapW*0.5, y:-h - 40 - Math.random()*70, r:9, taken:false, tier:0, val:1 });
+      }
+      if(specialTier && side === specialSide){
+        // Off the safe line on purpose: you have to leave the gap to take it
+        // and get back before the barrier arrives.
+        var dir = Math.random() < 0.5 ? -1 : 1;
+        var srel = Math.max(0.1, Math.min(0.9, rel + dir*(0.28 + Math.random()*0.14)));
+        game.pickups.push({ x:b.x0 + srel*laneW, y:-h - 90, r:11, taken:false, tier:specialTier, val: specialTier === 2 ? 100 : 25 });
+      }
+    });
+    // occasional coin arc that sits off the safe line — greed costs you
+    if(Math.random() < 0.22){
+      var side = lanes() === 1 ? 0 : (Math.random() < 0.5 ? 0 : 1);
+      var b = laneBounds(side);
+      var cx = b.x0 + laneW*(0.2 + Math.random()*0.6);
+      for(var i=0;i<4;i++){
+        game.pickups.push({ x:cx + Math.sin(i*0.9)*26, y:-140 - i*30, r:9, taken:false, tier:0, val:1 });
+      }
+    }
+  }
+
+  // ===================== input =====================
+  var sidePointer = [null, null];
+  var overlayReady = document.getElementById("overlayReady");
+  var overlayDead = document.getElementById("overlayDead");
+
+  canvas.addEventListener("pointerdown", function(e){
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left, y = e.clientY - rect.top;
+    var side = lanes() === 1 ? 0 : (x < W/2 ? 0 : 1);
+    if(sidePointer[side] !== null){
+      // Already bound — a sticky mouse, or a second finger on a held side. The
+      // only thing a fresh press can mean here is "run again".
+      if(game.phase === PHASE_DEAD && world.time - game.deadAt > 0.6){
+        var readyNow = lanes() === 1 ? cursors[0].active : (cursors[0].active && cursors[1].active);
+        if(readyNow) startRun();
+      }
+      return;
+    }
+    try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+    sidePointer[side] = e.pointerId;
+    var c = cursors[side];
+    c.active = true;
+    c.offset = e.pointerType === "touch" ? TOUCH_OFFSET : 0;
+    c.rawX = x; c.rawY = y;
+    c.tx = x; c.ty = y - c.offset;
+    if(game.phase !== PHASE_RUN){ c.x = x; c.y = c.ty; c.px = c.x; c.py = c.y; c.trail.length = 0; }
+    if(state.haptics && navigator.vibrate){ try{ navigator.vibrate(8); }catch(err){} }
+    unlockMediaSession();
+    startBeds();
+    var ready = lanes() === 1 ? cursors[0].active : (cursors[0].active && cursors[1].active);
+    if(ready){
+      if(game.phase === PHASE_READY) startRun();
+      else if(game.phase === PHASE_DEAD && world.time - game.deadAt > 0.6){ startRun(); }
+    }
+  }, { passive:true });
+
+  canvas.addEventListener("pointermove", function(e){
+    var side = sidePointer[0] === e.pointerId ? 0 : (sidePointer[1] === e.pointerId ? 1 : -1);
+    if(side < 0){
+      // A mouse re-entering the field mid-run picks the orb back up, no click.
+      if(e.pointerType === "mouse" && lanes() === 1 && game.phase === PHASE_RUN && sidePointer[0] === null){
+        side = 0; sidePointer[0] = e.pointerId;
+        cursors[0].active = true; cursors[0].offset = 0;
+      } else return;
+    }
+    var rect = canvas.getBoundingClientRect();
+    var c = cursors[side];
+    var nx = e.clientX - rect.left, ny = e.clientY - rect.top;
+    var moved = Math.abs(nx - c.rawX) + Math.abs(ny - c.rawY);
+    c.rawX = nx; c.rawY = ny;
+    c.tx = c.rawX;
+    c.ty = c.rawY - (c.offset || 0);
+    // A thumb that never lifted after a crash never fires a new pointerdown,
+    // so moving a held thumb also restarts once the lockout has passed.
+    if(e.pointerType !== "mouse" && game.phase === PHASE_DEAD && moved > 3 && world.time - game.deadAt > 0.6){
+      var readyNow = lanes() === 1 ? cursors[0].active : (cursors[0].active && cursors[1].active);
+      if(readyNow) startRun();
+    }
+  }, { passive:true });
+
+  function release(e){
+    var side = sidePointer[0] === e.pointerId ? 0 : (sidePointer[1] === e.pointerId ? 1 : -1);
+    if(side < 0) return;
+    sidePointer[side] = null;
+    cursors[side].active = false;
+  }
+  // A mouse is sticky: one click starts, then the orb follows the pointer with
+  // no button held. Only leaving the field lets go.
+  function releaseUnlessMouse(e){ if(e.pointerType !== "mouse") release(e); }
+  canvas.addEventListener("pointerup", releaseUnlessMouse, { passive:true });
+  canvas.addEventListener("pointercancel", releaseUnlessMouse, { passive:true });
+  canvas.addEventListener("pointerout", function(e){
+    if(e.pointerType === "mouse") release(e);
+  }, { passive:true });
+
+  // Background tab: freeze the run and quiet the audio. On return, the world
+  // holds still for a beat so you can reposition before it moves again.
+  document.addEventListener("visibilitychange", function(){
+    if(document.hidden){
+      if(game.phase === PHASE_RUN) game.paused = true;
+      if(audio.ctx && audio.ctx.state === "running"){
+        var s = audio.ctx.suspend(); if(s && s.catch) s.catch(function(){});
+      }
+    } else {
+      if(game.paused && !panelOpen && rotateOverlay.hidden){ game.paused = false; game.grace = 0.8; }
+      lastTs = 0;
+      if(state.soundOn) ensureAudio();
+    }
+  });
+
+  // ===================== drawing helpers =====================
+  function drawShape(shape, x, y, r, color){
+    if(shape === "ring"){
+      ctx2d.beginPath(); ctx2d.arc(x,y,r,0,Math.PI*2);
+      ctx2d.lineWidth = Math.max(4, r*0.32); ctx2d.strokeStyle = color; ctx2d.stroke();
+    } else if(shape === "star"){
+      ctx2d.beginPath();
+      for(var i=0;i<10;i++){
+        var ang = -Math.PI/2 + i*Math.PI/5;
+        var rad = (i%2===0) ? r : r*0.45;
+        var px = x + Math.cos(ang)*rad, py = y + Math.sin(ang)*rad;
+        if(i===0) ctx2d.moveTo(px,py); else ctx2d.lineTo(px,py);
+      }
+      ctx2d.closePath(); ctx2d.fillStyle = color; ctx2d.fill();
+    } else if(shape === "diamond"){
+      ctx2d.save(); ctx2d.translate(x,y); ctx2d.rotate(Math.PI/4);
+      ctx2d.fillStyle = color; ctx2d.fillRect(-r*0.72,-r*0.72,r*1.44,r*1.44);
+      ctx2d.restore();
+    } else {
+      ctx2d.beginPath(); ctx2d.arc(x,y,r,0,Math.PI*2);
+      ctx2d.fillStyle = color; ctx2d.fill();
+    }
+  }
+  function drawImageBlob(x,y,r,img){
+    if(!img || !img.complete || !img.naturalWidth){
+      drawShape("circle",x,y,r,"#555b66"); return;
+    }
+    ctx2d.save();
+    ctx2d.beginPath(); ctx2d.arc(x,y,r,0,Math.PI*2); ctx2d.clip();
+    var scale = Math.max((r*2)/img.naturalWidth, (r*2)/img.naturalHeight);
+    var dw = img.naturalWidth*scale, dh = img.naturalHeight*scale;
+    ctx2d.drawImage(img, x-dw/2, y-dh/2, dw, dh);
+    ctx2d.restore();
+    ctx2d.beginPath(); ctx2d.arc(x,y,r,0,Math.PI*2);
+    ctx2d.lineWidth = 2; ctx2d.strokeStyle = "rgba(255,255,255,.42)"; ctx2d.stroke();
+  }
+
+  function circleRectHit(cx, cy, cr, rx, ry, rw, rh){
+    var nx = Math.max(rx, Math.min(cx, rx+rw));
+    var ny = Math.max(ry, Math.min(cy, ry+rh));
+    var dx = cx-nx, dy = cy-ny;
+    return dx*dx + dy*dy <= cr*cr;
+  }
+
+  // ===================== loop =====================
+  var scrollOffset = 0;
+  var lastTs = 0;
+  var parallelOn = false;
+  var mirrorHint = 0;
+  var comboBadge = document.getElementById("comboStat");
+  var comboNum = document.getElementById("comboNum");
+  var comboMult = document.getElementById("comboMult");
+  var distVal = document.getElementById("distVal");
+  var coinVal = document.getElementById("coinVal");
+  var gauge = document.getElementById("gauge");
+  var gaugeFill = document.getElementById("gaugeFill");
+  var gaugeNum = document.getElementById("gaugeNum");
+  var gaugeLabel = document.getElementById("gaugeLabel");
+  var coinMult = document.getElementById("coinMult");
+  var statsEl = document.querySelector(".stats");
+  var appEl = document.querySelector(".app");
+  var GAUGE_C = 2 * Math.PI * 27;
+  function resetComboStat(){ comboNum.textContent = "0"; comboMult.textContent = "×1"; }
+  var deadDist = document.getElementById("deadDist");
+  var deadCoins = document.getElementById("deadCoins");
+  var deadBest = document.getElementById("deadBest");
+  var deadLoop = document.getElementById("deadLoop");
+  var lastHud = 0;
+
+  function update(dt){
+    var lerp = reduceMotion ? 1 : Math.min(1, (state.follow/100) * dt * 60);
+
+    laneList().forEach(function(side){
+      var c = cursors[side];
+      var b = laneBounds(side);
+      c.tx = Math.max(b.x0 + DRAW_R, Math.min(b.x1 - DRAW_R, c.tx));
+      c.ty = Math.max(DRAW_R, Math.min(H - DRAW_R, c.ty));
+      c.x += (c.tx - c.x) * lerp;
+      c.y += (c.ty - c.y) * lerp;
+      if(dt > 0){
+        c.vx = Math.max(-1400, Math.min(1400, (c.x - c.px)/dt));
+        c.vy = Math.max(-1400, Math.min(1400, (c.y - c.py)/dt));
+      }
+      c.px = c.x; c.py = c.y;
+      if(game.phase === PHASE_RUN && c.active){
+        var dyT = c.ty - c.prevTy;
+        var dir = dyT > 1.5 ? 1 : (dyT < -1.5 ? -1 : 0);
+        if(dir !== 0 && dir !== c.strokeDir){
+          var amp = Math.abs(c.ty - c.strokeStart);
+          if(c.strokeDir !== 0 && amp >= STROKE_MIN) registerStroke(side, amp);
+          c.strokeDir = dir;
+          c.strokeStart = c.ty;
+        }
+      } else {
+        c.strokeDir = 0; c.strokeStart = c.ty;
+      }
+      c.prevTy = c.ty;
+      var maxTrail = Math.min(40, state.trailLength + (game.boost > 0 ? 14 : 0));
+      if(maxTrail > 0 && !reduceMotion){
+        c.trail.push({ x:c.x, y:c.y });
+        while(c.trail.length > maxTrail) c.trail.shift();
+      } else { c.trail.length = 0; }
+    });
+
+    // parallel detection: same relative position within each lane
+    var laneW = W/2;
+    var relL = (cursors[0].x - 0) / laneW;
+    var relR = (cursors[1].x - laneW) / laneW;
+    var dRel = Math.abs(relL - relR);
+    var dY = Math.abs(cursors[0].y - cursors[1].y) / H;
+    parallelOn = lanes() === 2 && game.phase === PHASE_RUN && cursors[0].active && cursors[1].active && dRel < 0.09 && dY < 0.09;
+    mirrorHint = (lanes() === 2 && cursors[0].active && cursors[1].active)
+      ? Math.max(0, 1 - Math.max(dRel, dY)/0.3)
+      : 0;
+
+    if(game.paused) return;
+    if(game.dying > 0){
+      game.dying -= dt;
+      if(game.dying <= 0){ game.dying = 0; finishDeath(); }
+    }
+    if(game.grace > 0) game.grace -= dt;
+    if(game.slowmo > 0) game.slowmo -= dt;
+
+    if(game.phase === PHASE_RUN){
+      // World time is scaled: slow motion while dying, held still during the
+      // post-tab-return grace, and eased in over the first second of a run.
+      // Feedback (sparks, text, rings) stays at full rate.
+      var wdt = dt * (game.dying > 0 ? 0.12 : (game.grace > 0 ? 0 : (game.slowmo > 0 ? 0.3 : 1)));
+      game.rampT += wdt;
+      if(game.boost > 0) game.litTime += wdt;
+      var ramp = Math.min(1, game.rampT/1.2); ramp = ramp*ramp*(3 - 2*ramp);
+      var d = difficulty();
+      game.runTime += wdt;
+      if(!state.taughtPump && !game.hinted && game.runTime > 3){
+        game.hinted = true;
+        game.texts.push({ x:W/2, y:H*0.8, text:"pump ↕ to charge", life:2.6, color:"#7dd3c0", size:12 });
+        while(game.texts.length > 4) game.texts.shift();
+      }
+      // Boost is a spendable tank: ignites at full, drains while lit, and
+      // pumping during it tops it back up so a good player can chain it.
+      if(game.boost > 0){
+        game.charge -= BOOST_DRAIN*wdt;
+        game.boostMult += (BOOST_SPEED - game.boostMult) * Math.min(1, dt*8);
+        if(game.charge <= 0){
+          game.charge = 0; game.boost = 0; game.wreck = 0; game.litTime = 0;
+          if(state.haptics && navigator.vibrate){ try{ navigator.vibrate(12); }catch(e){} }
+        }
+      } else {
+        game.boostMult += (1 - game.boostMult) * Math.min(1, dt*5);
+        game.charge = Math.max(0, game.charge - CHARGE_DECAY*dt);
+      }
+      game.speed = (200 + d*420) * game.boostMult * (0.25 + 0.75*ramp);
+      game.dist += game.speed * wdt / 10;
+      scrollOffset = (scrollOffset + game.speed*wdt) % 42;
+
+      game.spawnTimer -= wdt;
+      if(game.spawnTimer <= 0){
+        spawnRow();
+        game.spawnTimer = Math.max(0.42, 1.05 - d*0.5) * (0.85 + Math.random()*0.3);
+      }
+
+      for(var i=game.obstacles.length-1;i>=0;i--){
+        // A storm fired from shatter() can empty this array mid-loop.
+        if(i >= game.obstacles.length) continue;
+        var o = game.obstacles[i];
+        o.y += game.speed*wdt;
+        o.flash = Math.max(0, o.flash - dt*3.2);
+        if(o.y > H + 60){ game.obstacles.splice(i,1); continue; }
+        if(o.side >= lanes()) continue;
+        if(o.hard && !o.warned && o.y > -4){
+          o.warned = true;
+          if(game.boost > 0 && state.soundOn) blip(150, 0.12, "square", 0.12);
+        }
+        // While dying, the barrier that got you must neither hit again nor
+        // pay out as a pass.
+        if(game.dying > 0) continue;
+        var c = cursors[o.side];
+        var hit = false;
+        var inBand = o.y < c.y + HIT_R && o.y + o.h > c.y - HIT_R;
+        for(var r=0;r<o.rects.length;r++){
+          var rc = o.rects[r];
+          if(circleRectHit(c.x, c.y, HIT_R, rc.x, o.y, rc.w, o.h)){
+            // Boost breaks slate, not steel.
+            if(game.boost > 0 && !o.hard) shatter(o, c);
+            else die(c.x, c.y, (o.hard && game.boost > 0) ? "steel" : "");
+            hit = true;
+            break;
+          }
+          if(inBand){
+            // Horizontal clearance to this wall while level with it, for GRAZE.
+            var gz = c.x < rc.x ? rc.x - (c.x + HIT_R) : (c.x - HIT_R) - (rc.x + rc.w);
+            if(gz < o.minGraze) o.minGraze = gz;
+          }
+        }
+        if(!hit && !o.passed && o.y > c.y + HIT_R){
+          o.passed = true;
+          o.flash = 1;
+          threaded(o, c);
+        }
+      }
+
+      for(var j=game.pickups.length-1;j>=0;j--){
+        var p = game.pickups[j];
+        p.y += game.speed*wdt;
+        if(p.y > H + 40){ game.pickups.splice(j,1); continue; }
+        // Cue on entry. The reward-predictive signal is what carries the pull,
+        // more than the reward itself.
+        if(!p.cued && p.y > -4){
+          p.cued = true; p.glint = p.tier ? 1.6 : 1;
+          if(state.soundOn){
+            if(p.tier === 2) arp([880, 1320, 1760], 70, "sine", 0.08);
+            else if(p.tier === 1) arp([880, 1320], 70, "sine", 0.07);
+            else if(Math.random() < 0.5) blip(1320, 0.05, "sine", 0.035);
+          }
+        }
+        p.glint = Math.max(0, (p.glint || 0) - dt*2.2);
+        if(game.boost > 0){
+          for(var ms=0; ms<lanes(); ms++){
+            var mc = cursors[ms];
+            var mdx = mc.x - p.x, mdy = mc.y - p.y, md = Math.hypot(mdx, mdy);
+            if(md < MAGNET_R && md > 1){
+              var pull = (1 - md/MAGNET_R) * 900 * wdt;
+              p.x += mdx/md * pull; p.y += mdy/md * pull;
+            }
+          }
+        }
+        for(var s=0;s<lanes();s++){
+          var cc = cursors[s];
+          if(Math.hypot(cc.x-p.x, cc.y-p.y) < HIT_R + p.r + 3){
+            var gain = (p.val || 1) * (parallelOn ? 2 : 1);
+            game.coins += gain;
+            game.dist += gain * 2;
+            if(p.tier){ collectSpecial(p, gain); }
+            else {
+              world.perturb(p.x, p.y, 0.5, 1.1);
+              game.shake = Math.max(game.shake, 0.1);
+              if(state.soundOn){
+                blip(parallelOn ? 880 : 660, 0.16, "triangle", 0.12);
+                thump(220, 0.11, 0.32);
+              }
+              for(var k=0;k<7;k++){
+                var a = Math.random()*Math.PI*2, sp = 40 + Math.random()*140;
+                game.sparks.push({ x:p.x, y:p.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:1, color:"#f2c14e" });
+              }
+            }
+            game.pickups.splice(j,1);
+            break;
+          }
+        }
+      }
+    }
+
+    for(var q=game.sparks.length-1;q>=0;q--){
+      var sp2 = game.sparks[q];
+      sp2.x += sp2.vx*dt; sp2.y += sp2.vy*dt;
+      sp2.vx *= 0.92; sp2.vy *= 0.92;
+      sp2.life -= dt*1.7;
+      if(sp2.life <= 0) game.sparks.splice(q,1);
+    }
+
+    for(var ti=game.texts.length-1;ti>=0;ti--){
+      var ft = game.texts[ti];
+      ft.y -= dt*38;
+      ft.life -= dt*1.05;
+      if(ft.life <= 0) game.texts.splice(ti,1);
+    }
+    for(var ri=game.rings.length-1;ri>=0;ri--){
+      var rg = game.rings[ri];
+      rg.r += (rg.max - rg.r) * Math.min(1, dt*7);
+      rg.life -= dt*2.1;
+      if(rg.life <= 0) game.rings.splice(ri,1);
+    }
+    for(var di=game.debris.length-1;di>=0;di--){
+      var db = game.debris[di];
+      db.vy += 900*dt;
+      db.x += db.vx*dt;
+      db.y += db.vy*dt + game.speed*dt*0.6;
+      db.rot += db.vr*dt;
+      db.vx *= 0.985;
+      db.life -= dt*0.9;
+      if(db.life <= 0 || db.y > H + 60) game.debris.splice(di,1);
+    }
+    game.flash = Math.max(0, game.flash - dt*4);
+
+    game.shake = Math.max(0, game.shake - dt*2.4);
+
+    var tier = Math.min(1, Math.floor(game.combo/5) * 0.18);
+    var targetEntropy = game.phase === PHASE_RUN
+      ? Math.min(1, 0.2 + difficulty()*0.7 + (game.boost > 0 ? 0.3 : 0)) : 0.1;
+    var targetWarmth = game.boost > 0 ? 1
+      : (parallelOn ? 0.92 : (game.phase === PHASE_RUN ? 0.4 + game.charge*0.35 + tier*0.2 : 0.2));
+    targetWarmth = Math.min(1, targetWarmth);
+    world.tick(dt, targetEntropy, targetWarmth);
+    driveAudio();
+  }
+
+  function draw(){
+    ctx2d.clearRect(0,0,W,H);
+    ctx2d.save();
+    if(game.shake > 0 && !reduceMotion){
+      ctx2d.translate((Math.random()-0.5)*game.shake*14, (Math.random()-0.5)*game.shake*14);
+    }
+    // Camera sway grows with level: slow lateral drift plus a hint of lean, so
+    // the track starts to feel like it is curving under you. Draw-space only —
+    // collision runs in unswayed coordinates.
+    if(game.phase === PHASE_RUN && !reduceMotion){
+      var swayAmp = difficulty()*9 + (game.boost > 0 ? 4 : 0);
+      var swayX = Math.sin(world.time*0.85)*swayAmp;
+      ctx2d.translate(W/2, H/2);
+      ctx2d.rotate(swayX*0.0009);
+      ctx2d.translate(-W/2 + swayX, -H/2);
+    }
+
+    // lane grid, scrolling
+    if(state.grid){
+      ctx2d.strokeStyle = "rgba(255,255,255,0.055)";
+      ctx2d.lineWidth = 1;
+      ctx2d.beginPath();
+      // Horizontal only — the scrolling lines read as speed. Each line is a
+      // polyline so it can bow around a moving orb like a wake: vertical motion
+      // drags it, fast lateral motion bulges it outward.
+      var gstep = 22, R = 110, R2 = R*R;
+      for(var y = -42 + scrollOffset; y < H; y += 42){
+        var y0 = Math.round(y)+.5;
+        ctx2d.moveTo(0, y0);
+        for(var gx = gstep; gx <= W + gstep; gx += gstep){
+          var dy = 0;
+          if(!reduceMotion){
+            for(var ci=0; ci<lanes(); ci++){
+              var cc = cursors[ci];
+              var ddx = gx - cc.x, ddy = y0 - cc.y;
+              var d2 = ddx*ddx + ddy*ddy;
+              if(d2 < R2){
+                var f = 1 - Math.sqrt(d2)/R; f = f*f;
+                dy += (cc.vy*0.012 + (ddy < 0 ? -1 : 1)*Math.abs(cc.vx)*0.006) * f;
+              }
+            }
+            if(dy > 9) dy = 9; else if(dy < -9) dy = -9;
+          }
+          ctx2d.lineTo(Math.min(gx, W), y0 + dy);
+        }
+      }
+      ctx2d.stroke();
+    }
+
+    // spectrum bars along the bottom — audio driving visuals
+    if(state.fft && audio.analyser && audio.freqData){
+      audio.analyser.getByteFrequencyData(audio.freqData);
+      var bars = 40;
+      var bw = W / bars;
+      ctx2d.fillStyle = "rgba(125,211,192,0.085)";
+      for(var bi=0; bi<bars; bi++){
+        // Non-linear bin mapping: the drone lives in the first few bins, so a
+        // straight 1:1 map piled all the energy into the far-left corner.
+        var bin = 1 + Math.floor(Math.pow(bi/bars, 1.8) * 70);
+        var bh = (audio.freqData[bin] / 255) * H * 0.1;
+        ctx2d.fillRect(bi*bw, H - bh, bw - 1.5, bh);
+      }
+    }
+
+    // centre seam, brightened by world warmth (parallel play)
+    var seamA = 0.08 + world.warmth*0.5;
+    var grad = ctx2d.createLinearGradient(W/2-40,0,W/2+40,0);
+    grad.addColorStop(0,"rgba(255,255,255,0)");
+    grad.addColorStop(0.5,"rgba(255,255,255,"+seamA.toFixed(3)+")");
+    grad.addColorStop(1,"rgba(255,255,255,0)");
+    ctx2d.fillStyle = grad;
+    ctx2d.fillRect(W/2-40, 0, 80, H);
+
+    // The seam is the tank's fill column: charge rises up the centre line
+    // from the gauge, so filling is visible in peripheral vision instead of
+    // only as a number at the bottom. Gold while lit.
+    if(game.phase !== PHASE_DEAD && (game.charge > 0.01 || game.boost > 0)){
+      var colMax = H * 0.55, colBase = H * 0.86;
+      var colH = colMax * Math.max(0, Math.min(1, game.charge));
+      var lit = game.boost > 0;
+      var cr = lit ? "242,193,78" : "125,211,192";
+      var ca = lit ? 0.85 : (0.45 + game.charge*0.4);
+      // Halo as a gradient, not shadowBlur. Blurring a tall rect every frame
+      // is among the most expensive things mobile canvas can do.
+      var hg = ctx2d.createLinearGradient(W/2 - 14, 0, W/2 + 14, 0);
+      hg.addColorStop(0, "rgba(" + cr + ",0)");
+      hg.addColorStop(0.5, "rgba(" + cr + "," + (ca*0.35).toFixed(2) + ")");
+      hg.addColorStop(1, "rgba(" + cr + ",0)");
+      ctx2d.fillStyle = hg;
+      ctx2d.fillRect(W/2 - 14, colBase - colH, 28, colH);
+      ctx2d.fillStyle = "rgba(" + cr + "," + ca.toFixed(2) + ")";
+      ctx2d.fillRect(W/2 - 2.5, colBase - colH, 5, colH);
+    }
+    if(game.boost > 0 && !reduceMotion){
+      ctx2d.strokeStyle = "rgba(125,211,192,0.18)";
+      ctx2d.lineWidth = 1;
+      ctx2d.beginPath();
+      for(var sk=0; sk<14; sk++){
+        var sx = (sk*97 + world.time*40) % W;
+        var sy = ((sk*151 + world.time*game.speed*1.4) % (H+120)) - 60;
+        ctx2d.moveTo(sx, sy); ctx2d.lineTo(sx, sy + 46);
+      }
+      ctx2d.stroke();
+    }
+
+    // obstacles
+    game.obstacles.forEach(function(o){
+      // Solid cold slate. Ripple influence brightens the rim only — tinting the
+      // whole body turned every barrier muddy mauve.
+      var infl = Math.min(1, world.influenceAt(o.gapC, o.y, 300));
+      // While lit, a barrier coming into range turns gold: the cue arrives
+      // before the hit.
+      var inRange = !o.passed && (o.y + o.h) > cursors[o.side].y - 220;
+      var armed = game.boost > 0 && !o.hard && inRange;
+      var threat = game.boost > 0 && o.hard && inRange;
+      ctx2d.fillStyle = o.hard ? "#3a2026" : "#272d36";
+      ctx2d.strokeStyle = o.flash > 0
+        ? "rgba(125,211,192," + (0.25 + o.flash*0.75).toFixed(3) + ")"
+        : (threat ? "rgba(255,111,111," + (0.7 + 0.3*Math.sin(world.time*14)).toFixed(2) + ")"
+          : (o.hard ? "rgba(255,111,111,0.45)"
+            : (armed ? "rgba(242,193,78,0.55)" : "rgba(160,175,195," + (0.14 + infl*0.22).toFixed(3) + ")")));
+      ctx2d.lineWidth = (o.flash > 0 || armed) ? 2 : (threat ? 2.5 : 1);
+      o.rects.forEach(function(rc){
+        ctx2d.beginPath();
+        ctx2d.roundRect ? ctx2d.roundRect(rc.x, o.y, rc.w, o.h, 4) : ctx2d.rect(rc.x, o.y, rc.w, o.h);
+        ctx2d.fill(); ctx2d.stroke();
+        if(o.hard){
+          // Hatching so steel reads as steel from across the screen.
+          ctx2d.save();
+          ctx2d.beginPath(); ctx2d.rect(rc.x, o.y, rc.w, o.h); ctx2d.clip();
+          ctx2d.strokeStyle = "rgba(255,111,111,0.28)";
+          ctx2d.lineWidth = 1;
+          ctx2d.beginPath();
+          for(var hx = rc.x - o.h; hx < rc.x + rc.w; hx += 9){
+            ctx2d.moveTo(hx, o.y + o.h); ctx2d.lineTo(hx + o.h, o.y);
+          }
+          ctx2d.stroke();
+          ctx2d.restore();
+        }
+      });
+      if(o.flash > 0){
+        ctx2d.globalAlpha = o.flash;
+        ctx2d.strokeStyle = "rgba(125,211,192,0.85)";
+        ctx2d.lineWidth = 2;
+        ctx2d.beginPath();
+        ctx2d.moveTo(o.gapC - o.gapW/2, o.y + o.h/2);
+        ctx2d.lineTo(o.gapC + o.gapW/2, o.y + o.h/2);
+        ctx2d.stroke();
+        ctx2d.globalAlpha = 1;
+      }
+    });
+
+    game.debris.forEach(function(db){
+      ctx2d.save();
+      ctx2d.globalAlpha = Math.max(0, db.life);
+      ctx2d.translate(db.x + db.w/2, db.y + db.h/2);
+      ctx2d.rotate(db.rot);
+      ctx2d.fillStyle = "#2e3540";
+      ctx2d.strokeStyle = "rgba(200,210,225,0.35)";
+      ctx2d.lineWidth = 1;
+      ctx2d.fillRect(-db.w/2, -db.h/2, db.w, db.h);
+      ctx2d.strokeRect(-db.w/2, -db.h/2, db.w, db.h);
+      ctx2d.restore();
+    });
+
+    // pickups
+    game.pickups.forEach(function(p){
+      var gl = p.glint || 0;
+      var tier = p.tier || 0;
+      var rgb = tier === 2 ? "176,75,255" : (tier === 1 ? "61,123,255" : "242,193,78");
+      var hex = tier === 2 ? "#b04bff" : (tier === 1 ? "#3d7bff" : "#f2c14e");
+      var pulse = tier ? 0.5 + 0.5*Math.sin(world.time*5 + p.x) : 0;
+      ctx2d.beginPath(); ctx2d.arc(p.x, p.y, p.r + 5 + gl*6 + pulse*4, 0, Math.PI*2);
+      ctx2d.fillStyle = "rgba(" + rgb + "," + (0.14 + gl*0.3 + pulse*0.12).toFixed(2) + ")"; ctx2d.fill();
+      ctx2d.beginPath(); ctx2d.arc(p.x, p.y, p.r + gl*3, 0, Math.PI*2);
+      ctx2d.fillStyle = hex; ctx2d.fill();
+      ctx2d.beginPath(); ctx2d.arc(p.x, p.y, p.r*0.42, 0, Math.PI*2);
+      ctx2d.fillStyle = "rgba(11,13,17,.55)"; ctx2d.fill();
+      if(tier){
+        // Rotating four-point glint: visible from the top of the screen, which
+        // is the whole point of a rare coin.
+        var gr = p.r + 9 + pulse*3;
+        ctx2d.save();
+        ctx2d.translate(p.x, p.y); ctx2d.rotate(world.time*1.6);
+        ctx2d.strokeStyle = "rgba(255,255,255," + (0.5 + pulse*0.4).toFixed(2) + ")";
+        ctx2d.lineWidth = tier === 2 ? 2 : 1.5;
+        ctx2d.beginPath();
+        ctx2d.moveTo(-gr, 0); ctx2d.lineTo(gr, 0);
+        ctx2d.moveTo(0, -gr); ctx2d.lineTo(0, gr);
+        ctx2d.stroke();
+        ctx2d.restore();
+      }
+    });
+
+    // cursors + trails
+    laneList().forEach(function(side){
+      var c = cursors[side];
+      var slot = state.slots[side];
+      var b = laneBounds(side);
+
+      // Ticks live on the lane walls, where a thumb never covers them.
+      ctx2d.strokeStyle = slot.color;
+      ctx2d.globalAlpha = 0.34;
+      ctx2d.lineWidth = 2.5;
+      ctx2d.beginPath();
+      ctx2d.moveTo(b.x0, c.y); ctx2d.lineTo(b.x0 + 10, c.y);
+      ctx2d.moveTo(b.x1 - 10, c.y); ctx2d.lineTo(b.x1, c.y);
+      ctx2d.stroke();
+      ctx2d.globalAlpha = 1;
+
+      // The mirror ghost fades in only as the thumbs near symmetry, so it is an
+      // aiming aid at the moment it matters instead of permanent clutter.
+      if(mirrorHint > 0.01){
+        ctx2d.globalAlpha = mirrorHint * 0.3;
+        ctx2d.setLineDash([3,4]);
+        ctx2d.lineWidth = 1.5;
+        ctx2d.beginPath(); ctx2d.arc(W - c.x, c.y, DRAW_R*0.75, 0, Math.PI*2); ctx2d.stroke();
+        ctx2d.setLineDash([]);
+        ctx2d.globalAlpha = 1;
+      }
+
+      if(c.active && c.offset > 0){
+        ctx2d.globalAlpha = 0.32;
+        ctx2d.strokeStyle = slot.color;
+        ctx2d.lineWidth = 1.5;
+        ctx2d.setLineDash([2,5]);
+        ctx2d.beginPath();
+        ctx2d.moveTo(c.rawX, c.rawY); ctx2d.lineTo(c.x, c.y);
+        ctx2d.stroke();
+        ctx2d.setLineDash([]);
+        ctx2d.beginPath(); ctx2d.arc(c.rawX, c.rawY, 3, 0, Math.PI*2);
+        ctx2d.fillStyle = slot.color; ctx2d.fill();
+        ctx2d.globalAlpha = 1;
+      }
+
+      if(c.trail.length > 1){
+        for(var i=0;i<c.trail.length;i++){
+          var t = c.trail[i];
+          var age = i/c.trail.length;
+          ctx2d.globalAlpha = age*0.34;
+          ctx2d.beginPath();
+          ctx2d.arc(t.x, t.y, DRAW_R*0.55*age, 0, Math.PI*2);
+          ctx2d.fillStyle = slot.color; ctx2d.fill();
+        }
+        ctx2d.globalAlpha = 1;
+      }
+      // On the title screen each orb wears a slow-breathing dashed ring: the
+      // orb is the instruction, "thumb goes here". Ring drops the moment that
+      // side registers a touch.
+      if(game.phase === PHASE_READY && !c.active){
+        var pr = DRAW_R + 12 + (reduceMotion ? 0 : Math.sin(world.time*2.4 + side)*4);
+        ctx2d.globalAlpha = 0.34;
+        ctx2d.strokeStyle = slot.color;
+        ctx2d.lineWidth = 1.5;
+        ctx2d.setLineDash([4,5]);
+        ctx2d.beginPath(); ctx2d.arc(c.x, c.y, pr, 0, Math.PI*2); ctx2d.stroke();
+        ctx2d.setLineDash([]);
+        ctx2d.globalAlpha = 1;
+      }
+
+      // Static buzz: short jittering arcs regenerated each frame. It revs with
+      // charge, speed and boost, so it also reads the pump state.
+      if(!reduceMotion){
+        var spd = Math.min(1, Math.hypot(c.vx, c.vy) / 900);
+        var buzz = 0.3 + game.charge*0.9 + (game.boost > 0 ? 1.2 : 0) + spd*0.5;
+        var nb = Math.round(4 + buzz*5);
+        ctx2d.strokeStyle = slot.color;
+        ctx2d.lineWidth = 1;
+        ctx2d.globalAlpha = Math.min(0.5, 0.16 + buzz*0.12);
+        ctx2d.beginPath();
+        for(var bz=0; bz<nb; bz++){
+          var ba = Math.random()*Math.PI*2;
+          var br = DRAW_R + 3 + Math.random()*4;
+          var bl = 3 + Math.random()*(4 + buzz*5);
+          var bj = (Math.random()-0.5)*0.9;
+          ctx2d.moveTo(c.x + Math.cos(ba)*br, c.y + Math.sin(ba)*br);
+          ctx2d.lineTo(c.x + Math.cos(ba+bj)*(br+bl), c.y + Math.sin(ba+bj)*(br+bl));
+        }
+        ctx2d.stroke();
+        ctx2d.globalAlpha = 1;
+      }
+
+      ctx2d.save();
+      var glow = Math.min(34, state.glow + (parallelOn ? 16 : 0) + (game.boost > 0 ? 22 : game.charge*10));
+      if(glow > 0){ ctx2d.shadowColor = slot.color; ctx2d.shadowBlur = glow; }
+      ctx2d.globalAlpha = c.active ? 1 : 0.45;
+      if(slot.mode === "image") drawImageBlob(c.x, c.y, DRAW_R, ensureImage(slot));
+      else drawShape(slot.shape, c.x, c.y, DRAW_R, slot.color);
+      ctx2d.restore();
+      ctx2d.globalAlpha = 1;
+    });
+
+    // sparks
+    game.sparks.forEach(function(s){
+      ctx2d.globalAlpha = Math.max(0, s.life);
+      ctx2d.beginPath(); ctx2d.arc(s.x, s.y, 3, 0, Math.PI*2);
+      ctx2d.fillStyle = s.color; ctx2d.fill();
+    });
+    ctx2d.globalAlpha = 1;
+
+    game.rings.forEach(function(rg){
+      ctx2d.globalAlpha = Math.max(0, rg.life)*0.75;
+      ctx2d.strokeStyle = rg.special || (rg.surge ? "#f2c14e" : (rg.graze ? "#eef0f4" : (rg.clean ? "#7dd3c0" : "rgba(180,190,205,.9)")));
+      ctx2d.lineWidth = (rg.special || rg.surge) ? 3 : ((rg.clean || rg.graze) ? 2.5 : 1.5);
+      ctx2d.beginPath(); ctx2d.arc(rg.x, rg.y, rg.r, 0, Math.PI*2); ctx2d.stroke();
+    });
+    ctx2d.globalAlpha = 1;
+
+    ctx2d.textAlign = "center";
+    game.texts.forEach(function(ft){
+      ctx2d.globalAlpha = Math.max(0, Math.min(1, ft.life));
+      ctx2d.fillStyle = ft.color;
+      ctx2d.font = "600 " + ft.size + "px 'IBM Plex Mono', monospace";
+      ctx2d.fillText(ft.text, ft.x, ft.y);
+    });
+    ctx2d.globalAlpha = 1;
+    ctx2d.textAlign = "left";
+
+    if(game.flash > 0 && !reduceMotion){
+      ctx2d.fillStyle = "rgba(" + game.flashColor + "," + (game.flash*0.3).toFixed(3) + ")";
+      ctx2d.fillRect(-40, -40, W + 80, H + 80);
+    }
+
+    ctx2d.restore();
+  }
+
+  var errCount = 0, lastErr = "";
+  function frame(ts){
+    var dt = lastTs ? Math.min(0.05, (ts-lastTs)/1000) : 0;
+    lastTs = ts;
+    // The rAF re-arm is at the end of this function, so one thrown frame
+    // used to freeze the game for good. Contain it and keep going.
+    try{ update(dt); draw(); }
+    catch(e){
+      errCount++; lastErr = String((e && e.message) || e);
+      if(errCount < 4) console.error(e);
+    }
+    gaugeFill.style.strokeDashoffset = (GAUGE_C * (1 - Math.max(0, Math.min(1, game.charge)))).toFixed(1);
+    gaugeNum.textContent = Math.round(game.charge*100);
+    gauge.classList.toggle("hot", game.boost > 0);
+    gauge.classList.toggle("ready", game.boost === 0 && game.charge >= 0.85);
+    coinMult.hidden = !parallelOn;
+    gauge.hidden = game.phase === PHASE_DEAD;
+    statsEl.hidden = game.phase === PHASE_READY;
+    appEl.classList.toggle("playing", game.phase === PHASE_RUN);
+    gaugeLabel.textContent = game.boost > 0 ? "LIT" : (game.charge < 0.03 ? "PUMP ↕" : "BOOST");
+    if(ts - lastHud > 90){
+      distVal.textContent = Math.floor(game.dist);
+      coinVal.textContent = game.coins;
+      syncSoundBtn();
+      lastHud = ts;
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ===================== panel =====================
+  var panel = document.getElementById("panel");
+  var panelToggle = document.getElementById("panelToggle");
+  var scrim = document.getElementById("scrim");
+  var panelOpen = false;
+  // Opening settings mid-run pauses the run; closing gives a beat of grace.
+  function openPanel(){
+    panelOpen = true;
+    panel.hidden = false; scrim.hidden = false;
+    panelToggle.setAttribute("aria-expanded","true");
+    if(game.phase === PHASE_RUN) game.paused = true;
+  }
+  function closePanel(){
+    panelOpen = false;
+    panel.hidden = true; scrim.hidden = true;
+    panelToggle.setAttribute("aria-expanded","false");
+    if(game.paused && !document.hidden){ game.paused = false; game.grace = 0.8; lastTs = 0; }
+  }
+  document.getElementById("panelClose").addEventListener("click", closePanel);
+  scrim.addEventListener("click", closePanel);
+  panelToggle.addEventListener("click", function(){ panelOpen ? closePanel() : openPanel(); });
+
+  // Portrait only on phones. Desktop windows are landscape by nature, so the
+  // guard needs a touch screen and a short viewport, not just orientation.
+  var rotateOverlay = document.getElementById("rotateOverlay");
+  var landscapeMq = window.matchMedia("(orientation: landscape) and (max-height: 520px)");
+  function checkOrientation(){
+    var bad = landscapeMq.matches && ("ontouchstart" in window);
+    rotateOverlay.hidden = !bad;
+    if(bad && game.phase === PHASE_RUN) game.paused = true;
+    else if(!bad && game.paused && !panelOpen && !document.hidden){ game.paused = false; game.grace = 0.8; lastTs = 0; }
+  }
+  if(landscapeMq.addEventListener) landscapeMq.addEventListener("change", checkOrientation);
+  else if(landscapeMq.addListener) landscapeMq.addListener(checkOrientation);
+  checkOrientation();
+
+  var soundBtn = document.getElementById("soundBtn");
+  var waveOn = document.getElementById("waveOn");
+  var waveOff = document.getElementById("waveOff");
+  var audioStatus = document.getElementById("audioStatus");
+  var errStatus = document.getElementById("errStatus");
+  function syncSoundBtn(){
+    if(!soundBtn) return;
+    waveOn.style.display = state.soundOn ? "" : "none";
+    waveOff.style.display = state.soundOn ? "none" : "";
+    soundBtn.classList.toggle("muted", !state.soundOn);
+    soundBtn.classList.toggle("live", isAudioLive());
+    soundBtn.setAttribute("aria-label", state.soundOn ? "Mute sound" : "Unmute sound");
+    if(audioStatus){
+      audioStatus.textContent = state.soundOn ? audioStateName() : "muted";
+    }
+    if(errStatus){
+      errStatus.textContent = errCount
+        ? "· " + errCount + " frame error" + (errCount > 1 ? "s" : "") + ": " + lastErr
+        : "";
+    }
+  }
+  soundBtn.addEventListener("click", function(){
+    state.soundOn = !state.soundOn;
+    if(state.soundOn){
+      unlockMediaSession();
+      startBeds();
+      blip(660, 0.22, "triangle", 0.3);
+    }
+    if(audio.master && audio.ctx){
+      audio.master.gain.setTargetAtTime(state.soundOn ? state.volume : 0.0001, audio.ctx.currentTime, 0.05);
+    }
+    soundToggle.checked = state.soundOn;
+    syncSoundBtn();
+    saveState();
+  });
+
+  var slotList = document.getElementById("slotList");
+  function fileToDataUrl(file, cb){
+    var reader = new FileReader();
+    reader.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var size = 160;
+        var c = document.createElement("canvas");
+        c.width = size; c.height = size;
+        var cc = c.getContext("2d");
+        var scale = Math.max(size/img.naturalWidth, size/img.naturalHeight);
+        var dw = img.naturalWidth*scale, dh = img.naturalHeight*scale;
+        cc.drawImage(img, (size-dw)/2, (size-dh)/2, dw, dh);
+        cb(c.toDataURL("image/jpeg", 0.86));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  function renderSides(){
+    slotList.innerHTML = "";
+    state.slots.forEach(function(slot, idx){
+      if(state.oneHand && idx === 1) return;
+      var row = document.createElement("div"); row.className = "slot-row";
+      var top = document.createElement("div"); top.className = "slot-row-top";
+      var dot = document.createElement("div"); dot.className = "slot-dot";
+      dot.style.setProperty("--dot-color", slot.color);
+      dot.style.background = slot.mode === "image" ? "linear-gradient(135deg,#666,#333)" : slot.color;
+      var label = document.createElement("div"); label.className = "slot-label";
+      label.textContent = state.oneHand ? "THUMB" : ((idx === 0 ? "LEFT" : "RIGHT") + " THUMB");
+      top.appendChild(dot); top.appendChild(label);
+      row.appendChild(top);
+
+      var seg = document.createElement("div"); seg.className = "seg";
+      ["color","image"].forEach(function(mode){
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = mode === "color" ? "Color" : "Image";
+        if(slot.mode === mode) b.classList.add("active");
+        b.addEventListener("click", function(){ slot.mode = mode; saveState(); renderSides(); });
+        seg.appendChild(b);
+      });
+      row.appendChild(seg);
+
+      var line = document.createElement("div"); line.className = "row-line";
+      if(slot.mode === "color"){
+        var ci = document.createElement("input");
+        ci.type = "color"; ci.value = slot.color;
+        ci.addEventListener("input", function(){
+          slot.color = ci.value;
+          dot.style.setProperty("--dot-color", slot.color);
+          dot.style.background = slot.color;
+          saveState();
+        });
+        var ss = document.createElement("select");
+        [["circle","Circle"],["ring","Ring"],["star","Star"],["diamond","Diamond"]].forEach(function(o){
+          var opt = document.createElement("option");
+          opt.value = o[0]; opt.textContent = o[1];
+          if(slot.shape === o[0]) opt.selected = true;
+          ss.appendChild(opt);
+        });
+        ss.addEventListener("change", function(){ slot.shape = ss.value; saveState(); });
+        line.appendChild(ci); line.appendChild(ss);
+      } else {
+        var fw = document.createElement("div"); fw.className = "file-btn";
+        var fid = "file-" + slot.id;
+        var fl = document.createElement("label");
+        fl.setAttribute("for", fid);
+        fl.textContent = slot.image ? "Change image" : "Upload image";
+        var fi = document.createElement("input");
+        fi.type = "file"; fi.accept = "image/*"; fi.id = fid;
+        fi.addEventListener("change", function(){
+          if(!fi.files || !fi.files[0]) return;
+          fileToDataUrl(fi.files[0], function(url){
+            slot.image = url; imgCache[slot.id] = null; ensureImage(slot);
+            saveState(); renderSides();
+          });
+        });
+        fw.appendChild(fl); fw.appendChild(fi);
+        line.appendChild(fw);
+        if(slot.image){
+          var th = document.createElement("img");
+          th.className = "thumb"; th.src = slot.image; th.alt = "";
+          line.appendChild(th);
+        }
+      }
+      row.appendChild(line);
+      slotList.appendChild(row);
+    });
+  }
+
+  var soundToggle = document.getElementById("soundToggle");
+  var volumeRange = document.getElementById("volumeRange");
+  var volumeVal = document.getElementById("volumeVal");
+  var impactRange = document.getElementById("impactRange");
+  var impactVal = document.getElementById("impactVal");
+  var trailRange = document.getElementById("trailRange");
+  var trailVal = document.getElementById("trailVal");
+  var glowRange = document.getElementById("glowRange");
+  var glowVal = document.getElementById("glowVal");
+  var followRange = document.getElementById("followRange");
+  var followVal = document.getElementById("followVal");
+  var gridToggle = document.getElementById("gridToggle");
+  var fftToggle = document.getElementById("fftToggle");
+  var hapticToggle = document.getElementById("hapticToggle");
+
+  function syncControls(){
+    soundToggle.checked = state.soundOn;
+    volumeRange.value = Math.round(state.volume*100);
+    volumeVal.textContent = Math.round(state.volume*100) + "%";
+    impactRange.value = Math.round(state.impact*100);
+    impactVal.textContent = Math.round(state.impact*100) + "%";
+    trailRange.value = state.trailLength; trailVal.textContent = state.trailLength;
+    glowRange.value = state.glow; glowVal.textContent = state.glow;
+    followRange.value = state.follow; followVal.textContent = state.follow;
+    gridToggle.checked = state.grid;
+    fftToggle.checked = state.fft;
+    hapticToggle.checked = state.haptics;
+    syncSoundBtn();
+  }
+  soundToggle.addEventListener("change", function(){
+    state.soundOn = soundToggle.checked;
+    if(state.soundOn) startBeds();
+    if(audio.master && audio.ctx){
+      audio.master.gain.setTargetAtTime(state.soundOn ? state.volume : 0.0001, audio.ctx.currentTime, 0.05);
+    }
+    syncSoundBtn();
+    saveState();
+  });
+  volumeRange.addEventListener("input", function(){
+    state.volume = parseInt(volumeRange.value,10)/100;
+    volumeVal.textContent = Math.round(state.volume*100) + "%";
+    if(audio.master && audio.ctx && state.soundOn){
+      audio.master.gain.setTargetAtTime(state.volume, audio.ctx.currentTime, 0.05);
+    }
+    saveState();
+  });
+  impactRange.addEventListener("input", function(){
+    state.impact = parseInt(impactRange.value,10)/100;
+    impactVal.textContent = Math.round(state.impact*100) + "%";
+    saveState();
+  });
+  impactRange.addEventListener("change", function(){ thump(220, 0.11, 0.32); });
+  trailRange.addEventListener("input", function(){
+    state.trailLength = parseInt(trailRange.value,10);
+    trailVal.textContent = state.trailLength; saveState();
+  });
+  glowRange.addEventListener("input", function(){
+    state.glow = parseInt(glowRange.value,10);
+    glowVal.textContent = state.glow; saveState();
+  });
+  followRange.addEventListener("input", function(){
+    state.follow = parseInt(followRange.value,10);
+    followVal.textContent = state.follow; saveState();
+  });
+  gridToggle.addEventListener("change", function(){ state.grid = gridToggle.checked; saveState(); });
+  fftToggle.addEventListener("change", function(){ state.fft = fftToggle.checked; saveState(); });
+  hapticToggle.addEventListener("change", function(){ state.haptics = hapticToggle.checked; saveState(); });
+
+  // Two taps to reset, and the high score is earned so it survives.
+  var resetBtn = document.getElementById("resetBtn");
+  var resetArmed = 0;
+  function disarmReset(){
+    if(resetArmed){ clearTimeout(resetArmed); resetArmed = 0; }
+    resetBtn.classList.remove("armed");
+    resetBtn.textContent = "reset settings";
+  }
+  resetBtn.addEventListener("click", function(){
+    if(!resetArmed){
+      resetBtn.classList.add("armed");
+      resetBtn.textContent = "tap again to reset";
+      resetArmed = setTimeout(disarmReset, 3000);
+      return;
+    }
+    disarmReset();
+    var keepBest = state.best;
+    state = defaultState();
+    state.best = keepBest;
+    imgCache = {};
+    saveState();
+    renderSides(); syncControls(); syncOneHand();
+  });
+
+  var modeSeg = document.getElementById("modeSeg");
+  var oneHandToggle = document.getElementById("oneHandToggle");
+  var readyCta = document.getElementById("readyCta");
+  var deadCta = document.getElementById("deadCta");
+  function syncOneHand(){
+    modeSeg.querySelectorAll("button").forEach(function(b){
+      b.classList.toggle("active", (b.dataset.mode === "one") === state.oneHand);
+    });
+    oneHandToggle.checked = state.oneHand;
+    readyCta.textContent = state.oneHand
+      ? (isMouseDevice ? "click to start" : "thumb down")
+      : "both thumbs down";
+    deadCta.textContent = state.oneHand
+      ? (isMouseDevice ? "click to run again" : "thumb down to run again")
+      : "both thumbs to run again";
+    var twoBtn = modeSeg.querySelector('[data-mode="two"]');
+    if(twoBtn) twoBtn.title = isMouseDevice ? "needs a touchscreen" : "";
+    renderSides();
+  }
+  function setOneHand(on){
+    state.oneHand = !!on;
+    saveState();
+    sidePointer[1] = null;
+    cursors[1].active = false;
+    if(game.phase !== PHASE_RUN) resetCursors();
+    syncOneHand();
+  }
+  modeSeg.querySelectorAll("button").forEach(function(b){
+    b.addEventListener("click", function(){ setOneHand(b.dataset.mode === "one"); });
+  });
+  oneHandToggle.addEventListener("change", function(){ setOneHand(oneHandToggle.checked); });
+
+  renderSides();
+  syncControls();
+  syncOneHand();
+})();
+</script>
+</body>
+</html>
