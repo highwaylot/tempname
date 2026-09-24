@@ -1,0 +1,42 @@
+{
+  "game": {
+    "name": "Bell Theory",
+    "genre": "two-thumb endless runner, hybrid-casual",
+    "core_loop": "Each thumb steers one orb down its own lane. Thread gaps in falling barriers, pump the thumbs up and down to fill a boost tank, smash barriers while boosted. One crash on either side ends the run.",
+    "modes": ["two thumbs", "one thumb (also the desktop version)"],
+    "customization": "Each orb can be any colour, shape or uploaded image.",
+    "status": "Pre-launch. No store release, no player data yet.",
+    "monetization_plan": "Free. Opt-in rewarded video on the crash card, a capped interstitial every 3-4 crashes, and a $2.99 remove-ads purchase. No banners."
+  },
+  "marketing_idea": {
+    "name": "Country vs country",
+    "concept": "Each orb wears a national flag. Whichever side hits a wall first loses. Short vertical videos of real runs, captioned '<Country A> vs <Country B>. Who hits the wall first?', ending on the winner and 'comment the next matchup'. Comments pick the next video.",
+    "ad_length_seconds": "8-15 for prospecting, with a 6-8 and a 15-20 cut as tests",
+    "hook": "Both flags and 'vs' on screen in the first second, before anything moves.",
+    "footage": "Real gameplay recorded from the app, driven by a script.",
+    "matchup_rule": "Sports rivalries only. No pairings of countries in an active war or territorial dispute."
+  },
+  "product_gap": {
+    "versus_mode_exists": false,
+    "flag_skins_exist": false,
+    "result_card_names_winner": false,
+    "note": "Today a crash on either side ends the run and no winner is named. Flags can only be added by uploading an image per orb."
+  },
+  "phases": [
+    {"phase": "build", "work": "Versus mode, flag pack, clip capture script, analytics, Android build"},
+    {"phase": "organic", "work": "One matchup video a day on TikTok, Reels and Shorts for 3-4 weeks", "cost_usd": 0},
+    {"phase": "paid_test", "work": "Soft launch in 1-2 countries; top organic clips as ads", "cost_usd": "200-500"},
+    {"phase": "decide", "work": "Pitch publishers, keep and scale, or fix the first session and retest"}
+  ],
+  "targets": {
+    "d1_retention": "35%+ (publisher bar)",
+    "cpi_usd": "under 0.40 on US Android (publisher bar)",
+    "d7_retention": "about 10%+"
+  },
+  "constraints": {
+    "founder_budget": "small; a few hundred dollars for the first test",
+    "team": "solo founder plus an AI coding assistant",
+    "no_mac": true,
+    "platform_first": "Android"
+  }
+}

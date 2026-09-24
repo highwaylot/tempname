@@ -1,0 +1,154 @@
+{
+  "state": {
+    "game": {
+      "name": "Bell Theory",
+      "genre": "two-thumb endless runner, hybrid-casual",
+      "core_loop": "Each thumb steers one orb down its own lane. Thread gaps in falling barriers, pump the thumbs up and down to fill a boost tank, smash barriers while boosted. One crash on either side ends the run.",
+      "modes": [
+        "two thumbs",
+        "one thumb (also the desktop version)"
+      ],
+      "customization": "Each orb can be any colour, shape or uploaded image.",
+      "status": "Pre-launch. No store release, no player data yet.",
+      "monetization_plan": "Free. Opt-in rewarded video on the crash card, a capped interstitial every 3-4 crashes, and a $2.99 remove-ads purchase. No banners."
+    },
+    "marketing_idea": {
+      "name": "Country vs country",
+      "concept": "Each orb wears a national flag. Whichever side hits a wall first loses. Short vertical videos of real runs, captioned '<Country A> vs <Country B>. Who hits the wall first?', ending on the winner and 'comment the next matchup'. Comments pick the next video.",
+      "ad_length_seconds": "8-15 for prospecting, with a 6-8 and a 15-20 cut as tests",
+      "hook": "Both flags and 'vs' on screen in the first second, before anything moves.",
+      "footage": "Real gameplay recorded from the app, driven by a script.",
+      "matchup_rule": "Sports rivalries only. No pairings of countries in an active war or territorial dispute."
+    },
+    "product_gap": {
+      "versus_mode_exists": false,
+      "flag_skins_exist": false,
+      "result_card_names_winner": false,
+      "note": "Today a crash on either side ends the run and no winner is named. Flags can only be added by uploading an image per orb."
+    },
+    "phases": [
+      {
+        "phase": "build",
+        "work": "Versus mode, flag pack, clip capture script, analytics, Android build"
+      },
+      {
+        "phase": "organic",
+        "work": "One matchup video a day on TikTok, Reels and Shorts for 3-4 weeks",
+        "cost_usd": 0
+      },
+      {
+        "phase": "paid_test",
+        "work": "Soft launch in 1-2 countries; top organic clips as ads",
+        "cost_usd": "200-500"
+      },
+      {
+        "phase": "decide",
+        "work": "Pitch publishers, keep and scale, or fix the first session and retest"
+      }
+    ],
+    "targets": {
+      "d1_retention": "35%+ (publisher bar)",
+      "cpi_usd": "under 0.40 on US Android (publisher bar)",
+      "d7_retention": "about 10%+"
+    },
+    "constraints": {
+      "founder_budget": "small; a few hundred dollars for the first test",
+      "team": "solo founder plus an AI coding assistant",
+      "no_mac": true,
+      "platform_first": "Android"
+    }
+  },
+  "model": "jev-latest",
+  "questions": {
+    "hook_reads_in_one_second": {
+      "type": "noul",
+      "instructions": "A muted viewer scrolling past understands the `marketing_idea.hook` (two flags and 'vs') as a competition within the first second of the video."
+    },
+    "comments_drive_the_loop": {
+      "type": "noul",
+      "instructions": "Asking viewers to 'comment the next matchup' in `marketing_idea.concept` produces enough comments per video to keep choosing the next matchup from them."
+    },
+    "ad_matches_app_today": {
+      "type": "noul",
+      "instructions": "The country-vs-country video in `marketing_idea` accurately represents what a player can do in the app as described in `product_gap`.",
+      "criteria": {
+        "true": "A player who installs from the ad can play a flag-vs-flag match and see a winner named, as the ad shows.",
+        "false": "The ad shows flags or a named winner that the app does not offer."
+      }
+    },
+    "versus_before_paid": {
+      "type": "noul",
+      "instructions": "Versus mode with flag skins and a winner card should ship in the app before any paid ad from `marketing_idea` runs."
+    },
+    "two_player_one_phone_is_the_hook": {
+      "type": "noul",
+      "instructions": "Letting two people share one phone, one lane each, makes the country-vs-country framing stronger than one person playing both flags."
+    },
+    "policy_risk": {
+      "type": "score",
+      "instructions": "How likely ads built on `marketing_idea`, following `marketing_idea.matchup_rule`, are to be rejected by Meta or TikTok ad review.",
+      "criteria": [
+        "Approved like any ordinary game ad",
+        "Occasional rejections on specific matchups, fixed by swapping the pair",
+        "Frequent rejections that force a change of concept"
+      ]
+    },
+    "best_first_channel": {
+      "type": "choice",
+      "instructions": "Which channel the founder in `constraints` should start `marketing_idea` on.",
+      "criteria": {
+        "tiktok_organic": "Free posts on a TikTok account",
+        "reels_organic": "Free posts on Instagram Reels",
+        "shorts_organic": "Free posts on YouTube Shorts",
+        "all_three_organic": "The same clip posted to all three free channels",
+        "paid_meta": "Paid ads on Facebook and Instagram from day one",
+        "paid_tiktok": "Paid ads on TikTok from day one",
+        "other": "Something not listed"
+      }
+    },
+    "best_ad_length": {
+      "type": "choice",
+      "instructions": "Which video length gives `marketing_idea` the best install rate for a first paid test.",
+      "criteria": {
+        "six_to_eight": "6-8 seconds: one short run and the crash",
+        "eight_to_fifteen": "8-15 seconds: a run with a boost or near miss, then the crash",
+        "fifteen_to_thirty": "15-30 seconds: a longer match with several moments",
+        "other": "Something not listed"
+      }
+    },
+    "first_soft_launch_market": {
+      "type": "choice",
+      "instructions": "Which market to soft-launch in first, given `game.monetization_plan` and `constraints`.",
+      "criteria": {
+        "canada": "Canada: behaves like the US, higher install costs",
+        "australia": "Australia: standard soft-launch market, behaves like the US",
+        "philippines": "Philippines: cheap installs, common for ad-funded games",
+        "canada_and_philippines": "One of each to compare",
+        "other": "Something not listed"
+      }
+    },
+    "creative_style": {
+      "type": "choice",
+      "instructions": "Which video style best suits `marketing_idea` for this solo founder.",
+      "criteria": {
+        "pure_gameplay": "Screen recording with captions only",
+        "gameplay_with_voice": "Screen recording with the founder's voice calling the match",
+        "creator_reaction": "The founder or a creator on camera reacting to the match",
+        "other": "Something not listed"
+      }
+    },
+    "fit_with_game": {
+      "type": "score",
+      "instructions": "How well `marketing_idea` shows off what is actually fun about the game in `game.core_loop`.",
+      "criteria": [
+        "Hides the core loop; the flags carry the whole video",
+        "Shows the loop, but the flags are doing most of the work",
+        "The loop and the flags reinforce each other: threading and crashing are the drama"
+      ]
+    },
+    "d1_bar_reachable": {
+      "type": "noul",
+      "instructions": "Players acquired through `marketing_idea` reach the day-1 retention target in `targets.d1_retention`."
+    }
+  }
+}

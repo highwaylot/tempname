@@ -1,0 +1,92 @@
+{
+  "hook_reads_in_one_second": {
+    "type": "noul",
+    "instructions": "A muted viewer scrolling past understands the `marketing_idea.hook` (two flags and 'vs') as a competition within the first second of the video."
+  },
+  "comments_drive_the_loop": {
+    "type": "noul",
+    "instructions": "Asking viewers to 'comment the next matchup' in `marketing_idea.concept` produces enough comments per video to keep choosing the next matchup from them."
+  },
+  "ad_matches_app_today": {
+    "type": "noul",
+    "instructions": "The country-vs-country video in `marketing_idea` accurately represents what a player can do in the app as described in `product_gap`.",
+    "criteria": {
+      "true": "A player who installs from the ad can play a flag-vs-flag match and see a winner named, as the ad shows.",
+      "false": "The ad shows flags or a named winner that the app does not offer."
+    }
+  },
+  "versus_before_paid": {
+    "type": "noul",
+    "instructions": "Versus mode with flag skins and a winner card should ship in the app before any paid ad from `marketing_idea` runs."
+  },
+  "two_player_one_phone_is_the_hook": {
+    "type": "noul",
+    "instructions": "Letting two people share one phone, one lane each, makes the country-vs-country framing stronger than one person playing both flags."
+  },
+  "policy_risk": {
+    "type": "score",
+    "instructions": "How likely ads built on `marketing_idea`, following `marketing_idea.matchup_rule`, are to be rejected by Meta or TikTok ad review.",
+    "criteria": [
+      "Approved like any ordinary game ad",
+      "Occasional rejections on specific matchups, fixed by swapping the pair",
+      "Frequent rejections that force a change of concept"
+    ]
+  },
+  "best_first_channel": {
+    "type": "choice",
+    "instructions": "Which channel the founder in `constraints` should start `marketing_idea` on.",
+    "criteria": {
+      "tiktok_organic": "Free posts on a TikTok account",
+      "reels_organic": "Free posts on Instagram Reels",
+      "shorts_organic": "Free posts on YouTube Shorts",
+      "all_three_organic": "The same clip posted to all three free channels",
+      "paid_meta": "Paid ads on Facebook and Instagram from day one",
+      "paid_tiktok": "Paid ads on TikTok from day one",
+      "other": "Something not listed"
+    }
+  },
+  "best_ad_length": {
+    "type": "choice",
+    "instructions": "Which video length gives `marketing_idea` the best install rate for a first paid test.",
+    "criteria": {
+      "six_to_eight": "6-8 seconds: one short run and the crash",
+      "eight_to_fifteen": "8-15 seconds: a run with a boost or near miss, then the crash",
+      "fifteen_to_thirty": "15-30 seconds: a longer match with several moments",
+      "other": "Something not listed"
+    }
+  },
+  "first_soft_launch_market": {
+    "type": "choice",
+    "instructions": "Which market to soft-launch in first, given `game.monetization_plan` and `constraints`.",
+    "criteria": {
+      "canada": "Canada: behaves like the US, higher install costs",
+      "australia": "Australia: standard soft-launch market, behaves like the US",
+      "philippines": "Philippines: cheap installs, common for ad-funded games",
+      "canada_and_philippines": "One of each to compare",
+      "other": "Something not listed"
+    }
+  },
+  "creative_style": {
+    "type": "choice",
+    "instructions": "Which video style best suits `marketing_idea` for this solo founder.",
+    "criteria": {
+      "pure_gameplay": "Screen recording with captions only",
+      "gameplay_with_voice": "Screen recording with the founder's voice calling the match",
+      "creator_reaction": "The founder or a creator on camera reacting to the match",
+      "other": "Something not listed"
+    }
+  },
+  "fit_with_game": {
+    "type": "score",
+    "instructions": "How well `marketing_idea` shows off what is actually fun about the game in `game.core_loop`.",
+    "criteria": [
+      "Hides the core loop; the flags carry the whole video",
+      "Shows the loop, but the flags are doing most of the work",
+      "The loop and the flags reinforce each other: threading and crashing are the drama"
+    ]
+  },
+  "d1_bar_reachable": {
+    "type": "noul",
+    "instructions": "Players acquired through `marketing_idea` reach the day-1 retention target in `targets.d1_retention`."
+  }
+}

@@ -1,0 +1,467 @@
+<title>Bell Theory Marketing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#eef1f4; --surface:#ffffff; --raised:#f6f8fa; --ink:#12151b; --dim:#5a6371; --faint:#8a929e;
+    --line:#dce1e7; --accent:#17806d; --accent-ink:#ffffff; --coin:#a8780a; --left:#c9711c; --right:#1f7fc4;
+    --good:#1c7c4a; --warn:#a8780a; --bad:#c43d3d; --chip:#e7ecf0;
+    --mono:'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+    --sans:'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b0d11; --surface:#141820; --raised:#1a1f28; --ink:#eef0f4; --dim:#8b93a3; --faint:#5d6574;
+      --line:rgba(255,255,255,.09); --accent:#7dd3c0; --accent-ink:#0a0d11; --coin:#f2c14e; --left:#ffb454; --right:#5ec8ff;
+      --good:#6fd39a; --warn:#f2c14e; --bad:#ff7a7a; --chip:#222834; color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b0d11; --surface:#141820; --raised:#1a1f28; --ink:#eef0f4; --dim:#8b93a3; --faint:#5d6574;
+    --line:rgba(255,255,255,.09); --accent:#7dd3c0; --accent-ink:#0a0d11; --coin:#f2c14e; --left:#ffb454; --right:#5ec8ff;
+    --good:#6fd39a; --warn:#f2c14e; --bad:#ff7a7a; --chip:#222834; color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.55; margin:0}
+  .wrap{max-width:980px; margin:0 auto; padding-inline:16px; padding-block:20px 60px}
+  h1,h2,h3{text-wrap:balance; margin:0}
+  button,input,select,textarea{font:inherit; color:inherit}
+  button{cursor:pointer}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  /* Masthead: the two orbs and the seam are the game's own mark. */
+  .mast{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px}
+  .brand{display:flex; align-items:center; gap:14px}
+  .orbs{display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; letter-spacing:.16em; color:var(--faint)}
+  .orb{width:16px; height:16px; border-radius:50%}
+  .orb.l{background:var(--left); box-shadow:0 0 12px var(--left)}
+  .orb.r{background:var(--right); box-shadow:0 0 12px var(--right)}
+  .brand h1{font-family:var(--mono); font-weight:500; font-size:18px; letter-spacing:.28em; text-transform:uppercase}
+  .brand p{margin:2px 0 0; color:var(--dim); font-size:12.5px}
+  .status{display:flex; flex-direction:column; align-items:flex-end; gap:6px; min-width:220px}
+  .pill{font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; padding:4px 10px; border-radius:99px; border:1px solid var(--line); background:var(--surface)}
+  .pill.draft{color:var(--warn); border-color:color-mix(in srgb, var(--warn) 45%, transparent)}
+  .pill.final{color:var(--good); border-color:color-mix(in srgb, var(--good) 45%, transparent)}
+  .meter{width:220px; max-width:100%; height:6px; border-radius:3px; background:var(--chip); overflow:hidden}
+  .meter i{display:block; height:100%; background:var(--accent); transition:width .3s}
+  .status small{color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums}
+
+  .tabs{display:flex; gap:4px; overflow-x:auto; border-bottom:1px solid var(--line); margin-bottom:18px}
+  .tabs button{background:none; border:none; padding:10px 12px; color:var(--dim); font-size:13px; border-bottom:2px solid transparent; white-space:nowrap; min-height:44px}
+  .tabs button[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent); font-weight:600}
+  .tabs .count{font-family:var(--mono); font-size:11px; color:var(--faint); margin-left:4px}
+
+  .panel{display:flex; flex-direction:column; gap:12px}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px}
+  .row{display:flex; flex-wrap:wrap; align-items:center; gap:8px}
+  .spread{justify-content:space-between}
+  .eyebrow{font-family:var(--mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
+  .sec h3{font-size:15px}
+  .sec .body{white-space:pre-wrap; color:var(--dim); margin-top:8px; font-size:13.5px; max-width:72ch}
+  .sec.locked{border-color:color-mix(in srgb, var(--good) 40%, var(--line))}
+  textarea{width:100%; min-height:140px; resize:vertical; background:var(--raised); border:1px solid var(--line); border-radius:8px; padding:10px; font-size:13px; line-height:1.5}
+  input,select{background:var(--raised); border:1px solid var(--line); border-radius:8px; padding:0 10px; min-height:40px; min-width:0}
+  .btn{background:var(--raised); border:1px solid var(--line); border-radius:8px; padding:0 12px; min-height:36px; font-size:12.5px}
+  .btn.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:600}
+  .btn.ghost{background:none}
+  .chip{font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; padding:3px 8px; border-radius:99px; background:var(--chip); color:var(--dim)}
+  .chip.good{color:var(--good)} .chip.warn{color:var(--warn)} .chip.bad{color:var(--bad)} .chip.accent{color:var(--accent)}
+  .muted{color:var(--dim)} .small{font-size:12px}
+
+  .dec .q{font-weight:600}
+  .dec .rec{font-size:12.5px; color:var(--dim)}
+  .dec .rec b{color:var(--accent); font-weight:600}
+
+  .board{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px}
+  @media (max-width:820px){ .board{grid-template-columns:repeat(2, minmax(0,1fr))} }
+  @media (max-width:480px){ .board{grid-template-columns:minmax(0,1fr)} }
+  .col{display:flex; flex-direction:column; gap:8px; align-content:start}
+  .col h3{font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); font-weight:500; padding:4px 2px}
+  .task{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:8px}
+  .task.done .t{text-decoration:line-through; color:var(--faint)}
+  .task .t{font-size:13px}
+
+  .tablewrap{overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:10px}
+  table{border-collapse:collapse; width:100%; font-size:12.5px}
+  th,td{padding:8px 10px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap}
+  th{font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); font-weight:500}
+  td.num{font-family:var(--mono); font-variant-numeric:tabular-nums; text-align:right}
+  td.good{color:var(--good)} td.bad{color:var(--bad)}
+  form.add{display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; align-items:end}
+  form.add label{display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--dim)}
+  .vs{display:flex; align-items:center; gap:10px; font-weight:600}
+  .vs .dot{width:10px; height:10px; border-radius:50%}
+  .vs .l{background:var(--left)} .vs .r{background:var(--right)}
+  .vs em{font-style:normal; font-family:var(--mono); font-size:11px; color:var(--faint); letter-spacing:.14em}
+  .banned .vs span{text-decoration:line-through; color:var(--faint)}
+
+  .jq{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; align-items:start}
+  .jq .ans{font-family:var(--mono); font-size:13px; text-align:right; font-variant-numeric:tabular-nums}
+  .bar{grid-column:1 / -1; height:4px; border-radius:2px; background:var(--chip); overflow:hidden}
+  .bar i{display:block; height:100%; background:var(--accent)}
+  .note{font-size:12.5px; color:var(--dim); max-width:72ch}
+  .banner{border:1px dashed var(--line); border-radius:10px; padding:12px 14px; color:var(--dim); font-size:13px}
+  @media (prefers-reduced-motion: reduce){ .meter i{transition:none} }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="brand">
+      <div class="orbs" aria-hidden="true"><span class="orb l"></span>VS<span class="orb r"></span></div>
+      <div>
+        <h1>Bell Theory</h1>
+        <p>Marketing plan and tracker · country vs country</p>
+      </div>
+    </div>
+    <div class="status">
+      <span class="pill draft" id="planPill">Draft</span>
+      <div class="meter" aria-hidden="true"><i id="planMeter" style="width:0%"></i></div>
+      <small id="planCount">Loading the plan…</small>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="plan" aria-selected="true">Plan<span class="count" id="c-plan"></span></button>
+    <button role="tab" data-tab="decisions" aria-selected="false">Decisions<span class="count" id="c-decisions"></span></button>
+    <button role="tab" data-tab="tasks" aria-selected="false">Tasks<span class="count" id="c-tasks"></span></button>
+    <button role="tab" data-tab="tests" aria-selected="false">Test results<span class="count" id="c-tests"></span></button>
+    <button role="tab" data-tab="matchups" aria-selected="false">Matchups<span class="count" id="c-matchups"></span></button>
+    <button role="tab" data-tab="jev" aria-selected="false">Jev<span class="count" id="c-jev"></span></button>
+  </nav>
+
+  <div id="notice" class="banner" hidden></div>
+
+  <section class="panel" data-panel="plan"></section>
+  <section class="panel" data-panel="decisions" hidden></section>
+  <section class="panel" data-panel="tasks" hidden></section>
+  <section class="panel" data-panel="tests" hidden></section>
+  <section class="panel" data-panel="matchups" hidden></section>
+  <section class="panel" data-panel="jev" hidden></section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var db = null;
+  var S = { sections:[], decisions:[], tasks:[], tests:[], matchups:[], jev:[], jevq:null };
+  var editing = {};           // section id -> true while its textarea is open
+  var PHASES = [["build","Build"],["organic","Organic"],["paid","Paid test"],["decide","Decide"]];
+  var TARGET = { cpi:0.40, d1:35 };
+
+  function $(sel, root){ return (root||document).querySelector(sel); }
+  function el(tag, attrs, kids){
+    var n = document.createElement(tag);
+    if(attrs) Object.keys(attrs).forEach(function(k){
+      if(k === "text") n.textContent = attrs[k];
+      else if(k === "class") n.className = attrs[k];
+      else if(k.slice(0,2) === "on") n.addEventListener(k.slice(2), attrs[k]);
+      else if(attrs[k] != null) n.setAttribute(k, attrs[k]);
+    });
+    (kids||[]).forEach(function(c){ if(c != null) n.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function notice(msg){ var n = $("#notice"); n.textContent = msg || ""; n.hidden = !msg; }
+  function byOrder(a, b){ return (a.order||0) - (b.order||0) || String(a.id).localeCompare(String(b.id)); }
+  function num(v){ var x = parseFloat(v); return isFinite(x) ? x : null; }
+  function fail(e){
+    var code = e && e.code;
+    if(code === "invalid_argument") notice("You can view this tracker but not change it. Ask the owner for Contributor access.");
+    else if(code === "quota_exceeded") notice("The tracker is full. Delete old test rows or matchups to add more.");
+    else notice("That change did not save. Try again in a moment.");
+  }
+  function write(p){ return p.then(function(){ notice(""); }, fail); }
+
+  // ---------- tabs ----------
+  var tabKey = "plan";
+  try{ tabKey = localStorage.getItem("bt-mkt-tab") || "plan"; }catch(e){}
+  function showTab(k){
+    tabKey = k;
+    document.querySelectorAll("#tabs button").forEach(function(b){ b.setAttribute("aria-selected", String(b.dataset.tab === k)); });
+    document.querySelectorAll("[data-panel]").forEach(function(p){ p.hidden = p.dataset.panel !== k; });
+    try{ localStorage.setItem("bt-mkt-tab", k); }catch(e){}
+  }
+  document.querySelectorAll("#tabs button").forEach(function(b){ b.addEventListener("click", function(){ showTab(b.dataset.tab); }); });
+  if(location.hash && $('[data-tab="' + location.hash.slice(1) + '"]')) tabKey = location.hash.slice(1);
+  showTab(tabKey);
+
+  // ---------- status: the plan is final only when everything is locked and decided ----------
+  function renderStatus(){
+    var secs = S.sections, decs = S.decisions;
+    var locked = secs.filter(function(s){ return s.status === "locked"; }).length;
+    var decided = decs.filter(function(d){ return d.status === "decided"; }).length;
+    var total = secs.length + decs.length, done = locked + decided;
+    var final = total > 0 && done === total;
+    var pill = $("#planPill");
+    pill.textContent = final ? "Final" : "Draft";
+    pill.className = "pill " + (final ? "final" : "draft");
+    $("#planMeter").style.width = (total ? Math.round(done/total*100) : 0) + "%";
+    $("#planCount").textContent = secs.length
+      ? locked + " of " + secs.length + " sections locked · " + decided + " of " + decs.length + " decisions made"
+      : "No plan sections yet";
+    $("#c-plan").textContent = locked + "/" + secs.length;
+    $("#c-decisions").textContent = decided + "/" + decs.length;
+    $("#c-tasks").textContent = S.tasks.filter(function(t){ return t.status === "done"; }).length + "/" + S.tasks.length;
+    $("#c-tests").textContent = S.tests.length || "";
+    $("#c-matchups").textContent = S.matchups.length || "";
+    $("#c-jev").textContent = S.jev.length || "";
+  }
+
+  // ---------- plan ----------
+  function renderPlan(){
+    var p = $('[data-panel="plan"]'); p.textContent = "";
+    p.appendChild(el("p", { class:"note", text:"Each section stays a draft until you lock it. The plan turns Final when every section is locked and every decision is made." }));
+    S.sections.slice().sort(byOrder).forEach(function(s){
+      var locked = s.status === "locked";
+      var card = el("article", { class:"card sec" + (locked ? " locked" : "") });
+      var head = el("div", { class:"row spread" }, [
+        el("div", {}, [ el("div", { class:"eyebrow", text:"Section " + (s.order||"") }), el("h3", { text:s.title||"Untitled" }) ]),
+        el("div", { class:"row" }, [
+          el("span", { class:"chip " + (locked ? "good" : "warn"), text: locked ? "Locked" : "Draft" }),
+          locked ? null : el("button", { class:"btn ghost", text: editing[s.id] ? "Cancel" : "Edit", onclick:function(){ editing[s.id] = !editing[s.id]; renderPlan(); } }),
+          el("button", { class:"btn" + (locked ? "" : " primary"), text: locked ? "Unlock" : "Lock",
+            onclick:function(){ editing[s.id] = false; write(db.doc("sections/" + s.id).update({ status: locked ? "draft" : "locked" })); } })
+        ])
+      ]);
+      card.appendChild(head);
+      if(editing[s.id] && !locked){
+        var ta = el("textarea", { id:"sec-" + s.id, "aria-label":"Edit " + (s.title||"section") }); ta.value = s.body || "";
+        card.appendChild(el("div", { style:"margin-top:10px" }, [ ta ]));
+        card.appendChild(el("div", { class:"row", style:"margin-top:8px" }, [
+          el("button", { class:"btn primary", text:"Save", onclick:function(){
+            editing[s.id] = false;
+            write(db.doc("sections/" + s.id).update({ body: ta.value }));
+          } })
+        ]));
+      } else {
+        card.appendChild(el("div", { class:"body", text:s.body || "" }));
+      }
+      p.appendChild(card);
+    });
+  }
+
+  // ---------- decisions ----------
+  function renderDecisions(){
+    var p = $('[data-panel="decisions"]'); p.textContent = "";
+    p.appendChild(el("p", { class:"note", text:"Pick an answer and mark it decided. The recommendation is the plan's current lean, not a choice made for you." }));
+    S.decisions.slice().sort(byOrder).forEach(function(d){
+      var decided = d.status === "decided";
+      var sel = el("select", { id:"dec-" + d.id, "aria-label":d.question });
+      sel.appendChild(el("option", { value:"", text:"Choose…" }));
+      (d.options||[]).forEach(function(o){ var op = el("option", { value:o, text:o }); if(d.answer === o) op.selected = true; sel.appendChild(op); });
+      sel.disabled = decided;
+      sel.addEventListener("change", function(){ write(db.doc("decisions/" + d.id).update({ answer: sel.value })); });
+      p.appendChild(el("article", { class:"card dec" }, [
+        el("div", { class:"row spread" }, [
+          el("div", { class:"q", text:d.question }),
+          el("span", { class:"chip " + (decided ? "good" : "warn"), text: decided ? "Decided" : "Open" })
+        ]),
+        d.recommendation ? el("div", { class:"rec" }, [ "Lean: ", el("b", { text:d.recommendation }), d.why ? " · " + d.why : "" ]) : null,
+        el("div", { class:"row", style:"margin-top:10px" }, [
+          sel,
+          el("button", { class:"btn" + (decided ? "" : " primary"), text: decided ? "Reopen" : "Mark decided",
+            onclick:function(){
+              if(!decided && !sel.value){ notice("Choose an answer before marking it decided."); return; }
+              write(db.doc("decisions/" + d.id).update({ status: decided ? "open" : "decided" }));
+            } })
+        ])
+      ]));
+    });
+  }
+
+  // ---------- tasks ----------
+  var NEXT = { todo:"doing", doing:"done", done:"todo" };
+  function renderTasks(){
+    var p = $('[data-panel="tasks"]'); p.textContent = "";
+    var board = el("div", { class:"board" });
+    PHASES.forEach(function(ph){
+      var col = el("div", { class:"col" }, [ el("h3", { text:ph[1] }) ]);
+      S.tasks.filter(function(t){ return t.phase === ph[0]; }).sort(byOrder).forEach(function(t){
+        var st = t.status || "todo";
+        col.appendChild(el("div", { class:"task" + (st === "done" ? " done" : "") }, [
+          el("div", { class:"t", text:t.title }),
+          el("div", { class:"row spread" }, [
+            el("span", { class:"chip" + (t.owner === "claude" ? " accent" : ""), text: t.owner === "claude" ? "Claude" : "You" }),
+            el("div", { class:"row" }, [
+              el("button", { class:"btn", text: st === "todo" ? "To do" : (st === "doing" ? "Doing" : "Done"),
+                "aria-label":"Status: " + st + ". Advance.",
+                onclick:function(){ write(db.doc("tasks/" + t.id).update({ status: NEXT[st] })); } }),
+              el("button", { class:"btn ghost", text:"Remove", onclick:function(){ write(db.doc("tasks/" + t.id).delete()); } })
+            ])
+          ])
+        ]));
+      });
+      board.appendChild(col);
+    });
+    p.appendChild(board);
+    var f = el("form", { class:"add card" });
+    var title = el("input", { id:"task-title", placeholder:"New task", required:"" });
+    var phase = el("select", { id:"task-phase" }); PHASES.forEach(function(ph){ phase.appendChild(el("option", { value:ph[0], text:ph[1] })); });
+    var owner = el("select", { id:"task-owner" }, [ el("option", { value:"you", text:"You" }), el("option", { value:"claude", text:"Claude" }) ]);
+    f.appendChild(el("label", {}, [ "Task", title ]));
+    f.appendChild(el("label", {}, [ "Phase", phase ]));
+    f.appendChild(el("label", {}, [ "Owner", owner ]));
+    f.appendChild(el("button", { class:"btn primary", type:"submit", text:"Add task" }));
+    f.addEventListener("submit", function(e){
+      e.preventDefault(); if(!title.value.trim()) return;
+      write(db.collection("tasks").add({ title:title.value.trim(), phase:phase.value, owner:owner.value, status:"todo", order:Date.now() }));
+      title.value = "";
+    });
+    p.appendChild(f);
+  }
+
+  // ---------- test results ----------
+  function renderTests(){
+    var p = $('[data-panel="tests"]'); p.textContent = "";
+    p.appendChild(el("p", { class:"note", text:"Log each campaign or organic batch. CTR, installs per 1,000 impressions and cost per install are worked out for you. Targets: CPI under $" + TARGET.cpi.toFixed(2) + ", day-1 retention " + TARGET.d1 + "% or more." }));
+    var rows = S.tests.slice().sort(function(a,b){ return String(b.date||"").localeCompare(String(a.date||"")); });
+    var wrap = el("div", { class:"tablewrap" });
+    var t = el("table");
+    t.appendChild(el("thead", {}, [ el("tr", {}, ["Date","Channel","Creative","Spend","Impr.","Clicks","Installs","CTR","IPM","CPI","D1",""].map(function(h){ return el("th", { text:h }); })) ]));
+    var tb = el("tbody");
+    if(!rows.length) tb.appendChild(el("tr", {}, [ el("td", { colspan:"12", class:"muted", text:"No results yet. Add the first batch below." }) ]));
+    rows.forEach(function(r){
+      var sp = num(r.spend), im = num(r.impressions), cl = num(r.clicks), ins = num(r.installs), d1 = num(r.d1);
+      var ctr = im && cl != null ? cl/im*100 : null, ipm = im && ins != null ? ins/im*1000 : null, cpi = ins && sp != null ? sp/ins : null;
+      tb.appendChild(el("tr", {}, [
+        el("td", { text:r.date||"" }), el("td", { text:r.channel||"" }), el("td", { text:r.creative||"" }),
+        el("td", { class:"num", text: sp != null ? "$" + sp.toFixed(2) : "" }),
+        el("td", { class:"num", text: im != null ? im.toLocaleString() : "" }),
+        el("td", { class:"num", text: cl != null ? cl.toLocaleString() : "" }),
+        el("td", { class:"num", text: ins != null ? ins.toLocaleString() : "" }),
+        el("td", { class:"num", text: ctr != null ? ctr.toFixed(2) + "%" : "" }),
+        el("td", { class:"num", text: ipm != null ? ipm.toFixed(1) : "" }),
+        el("td", { class:"num " + (cpi == null ? "" : (cpi <= TARGET.cpi ? "good" : "bad")), text: cpi != null ? "$" + cpi.toFixed(2) : "" }),
+        el("td", { class:"num " + (d1 == null ? "" : (d1 >= TARGET.d1 ? "good" : "bad")), text: d1 != null ? d1 + "%" : "" }),
+        el("td", {}, [ el("button", { class:"btn ghost", text:"Remove", onclick:function(){ write(db.doc("tests/" + r.id).delete()); } }) ])
+      ]));
+    });
+    t.appendChild(tb); wrap.appendChild(t); p.appendChild(wrap);
+
+    var f = el("form", { class:"add card" });
+    var fields = [["date","Date","date"],["channel","Channel","text"],["creative","Creative","text"],["spend","Spend ($)","number"],["impressions","Impressions","number"],["clicks","Clicks","number"],["installs","Installs","number"],["d1","Day-1 %","number"]];
+    var inputs = {};
+    fields.forEach(function(fd){
+      var i = el("input", { id:"test-" + fd[0], type:fd[2], step: fd[2] === "number" ? "any" : null, placeholder: fd[0] === "channel" ? "TikTok paid" : (fd[0] === "creative" ? "BRA v ARG 12s" : null) });
+      inputs[fd[0]] = i; f.appendChild(el("label", {}, [ fd[1], i ]));
+    });
+    f.appendChild(el("button", { class:"btn primary", type:"submit", text:"Add result" }));
+    f.addEventListener("submit", function(e){
+      e.preventDefault();
+      var row = {};
+      fields.forEach(function(fd){ var v = inputs[fd[0]].value.trim(); row[fd[0]] = fd[2] === "number" ? (v === "" ? null : Number(v)) : v; });
+      if(!row.date && !row.channel){ notice("Add at least a date or a channel."); return; }
+      write(db.collection("tests").add(row));
+      fields.forEach(function(fd){ inputs[fd[0]].value = ""; });
+    });
+    p.appendChild(f);
+  }
+
+  // ---------- matchups ----------
+  var MSTAT = ["idea","filmed","posted","banned"];
+  function renderMatchups(){
+    var p = $('[data-panel="matchups"]'); p.textContent = "";
+    p.appendChild(el("p", { class:"note", text:"Sports rivalries only. Mark a pair Banned if it touches an active war or territorial dispute; banned pairs never get filmed." }));
+    var order = { posted:0, filmed:1, idea:2, banned:3 };
+    S.matchups.slice().sort(function(a,b){ return (order[a.status]||0) - (order[b.status]||0) || byOrder(a,b); }).forEach(function(m){
+      var st = el("select", { id:"m-st-" + m.id, "aria-label":"Status" });
+      MSTAT.forEach(function(s){ var o = el("option", { value:s, text:s.charAt(0).toUpperCase() + s.slice(1) }); if(m.status === s) o.selected = true; st.appendChild(o); });
+      st.addEventListener("change", function(){ write(db.doc("matchups/" + m.id).update({ status: st.value })); });
+      var views = el("input", { id:"m-v-" + m.id, type:"number", min:"0", placeholder:"Views", "aria-label":"Views", style:"width:110px" }); if(m.views != null) views.value = m.views;
+      var comments = el("input", { id:"m-c-" + m.id, type:"number", min:"0", placeholder:"Comments", "aria-label":"Comments", style:"width:110px" }); if(m.comments != null) comments.value = m.comments;
+      function saveNums(){
+        var v = views.value === "" ? null : Number(views.value), c = comments.value === "" ? null : Number(comments.value);
+        if(v !== (m.views == null ? null : m.views) || c !== (m.comments == null ? null : m.comments)) write(db.doc("matchups/" + m.id).update({ views:v, comments:c }));
+      }
+      views.addEventListener("change", saveNums); comments.addEventListener("change", saveNums);
+      var per1k = (m.views && m.comments != null) ? (m.comments / m.views * 1000).toFixed(1) + " comments per 1k views" : "";
+      p.appendChild(el("article", { class:"card" + (m.status === "banned" ? " banned" : "") }, [
+        el("div", { class:"row spread" }, [
+          el("div", { class:"vs" }, [ el("i", { class:"dot l" }), el("span", { text:m.left||"?" }), el("em", { text:"VS" }), el("i", { class:"dot r" }), el("span", { text:m.right||"?" }) ]),
+          el("div", { class:"row" }, [ st, el("button", { class:"btn ghost", text:"Remove", onclick:function(){ write(db.doc("matchups/" + m.id).delete()); } }) ])
+        ]),
+        m.note ? el("div", { class:"small muted", style:"margin-top:6px", text:m.note }) : null,
+        m.status === "posted" ? el("div", { class:"row", style:"margin-top:8px" }, [ views, comments, el("span", { class:"small muted", text:per1k }) ]) : null
+      ]));
+    });
+    var f = el("form", { class:"add card" });
+    var l = el("input", { id:"m-left", placeholder:"Brazil", required:"" }), r = el("input", { id:"m-right", placeholder:"Argentina", required:"" }), n = el("input", { id:"m-note", placeholder:"Why this pair" });
+    f.appendChild(el("label", {}, [ "Left lane", l ])); f.appendChild(el("label", {}, [ "Right lane", r ])); f.appendChild(el("label", {}, [ "Note", n ]));
+    f.appendChild(el("button", { class:"btn primary", type:"submit", text:"Add matchup" }));
+    f.addEventListener("submit", function(e){
+      e.preventDefault(); if(!l.value.trim() || !r.value.trim()) return;
+      write(db.collection("matchups").add({ left:l.value.trim(), right:r.value.trim(), note:n.value.trim(), status:"idea", views:null, comments:null, order:Date.now() }));
+      l.value = r.value = n.value = "";
+    });
+    p.appendChild(f);
+  }
+
+  // ---------- jev ----------
+  function answersOf(obj){
+    if(!obj || typeof obj !== "object") return null;
+    var cand = obj.answers || obj.results || obj.outputs || obj;
+    var keys = Object.keys(cand).filter(function(k){ return cand[k] && typeof cand[k] === "object" && cand[k].type; });
+    return keys.length ? cand : null;
+  }
+  function renderJev(){
+    var p = $('[data-panel="jev"]'); p.textContent = "";
+    p.appendChild(el("p", { class:"note", text:"Run the payload from docs/marketing in the jev Playground (State box: jev-state.json, Questions box: jev-questions.json), then paste the answer here. A choice or score with confidence under 0.5 is shown as inconclusive." }));
+    var ta = el("textarea", { id:"jev-paste", placeholder:"Paste the jev response JSON", "aria-label":"Jev response JSON" });
+    var label = el("input", { id:"jev-label", placeholder:"Run name, e.g. first pass" });
+    var f = el("form", { class:"card", style:"display:flex; flex-direction:column; gap:8px" }, [ ta, el("div", { class:"row" }, [ label, el("button", { class:"btn primary", type:"submit", text:"Save result" }) ]) ]);
+    f.addEventListener("submit", function(e){
+      e.preventDefault();
+      var parsed; try{ parsed = JSON.parse(ta.value); }catch(err){ notice("That is not valid JSON. Paste the whole response, braces included."); return; }
+      var a = answersOf(parsed); if(!a){ notice("No answers found. Each answer needs a type field (noul, choice or score)."); return; }
+      write(db.collection("jev").add({ label: label.value.trim() || "Run", at: new Date().toISOString(), answers: a }));
+      ta.value = ""; label.value = "";
+    });
+    p.appendChild(f);
+
+    var qs = (S.jevq && S.jevq.questions) || {};
+    S.jev.slice().sort(function(a,b){ return String(b.at||"").localeCompare(String(a.at||"")); }).forEach(function(run){
+      var card = el("article", { class:"card", style:"display:flex; flex-direction:column; gap:12px" }, [
+        el("div", { class:"row spread" }, [ el("h3", { style:"font-size:15px", text:run.label || "Run" }), el("div", { class:"row" }, [
+          el("span", { class:"small muted", text:(run.at||"").slice(0,10) }),
+          el("button", { class:"btn ghost", text:"Remove", onclick:function(){ write(db.doc("jev/" + run.id).delete()); } }) ]) ])
+      ]);
+      Object.keys(run.answers||{}).forEach(function(k){
+        var a = run.answers[k], q = qs[k] || {};
+        var ans = "", frac = null, low = false;
+        if(a.type === "noul"){ frac = +a.noul; ans = Math.round(frac*100) + "% true"; }
+        else if(a.type === "choice"){ low = a.confidence != null && a.confidence < 0.5; ans = String(a.choice) + (a.confidence != null ? " · conf " + (+a.confidence).toFixed(2) : ""); frac = a.probabilities && a.probabilities[a.choice] != null ? +a.probabilities[a.choice] : null; }
+        else if(a.type === "score"){ low = a.confidence != null && a.confidence < 0.5; var levels = Array.isArray(q.criteria) ? q.criteria.length : null;
+          ans = (+a.score).toFixed(2) + (levels ? " of " + (levels-1) : "") + (a.confidence != null ? " · conf " + (+a.confidence).toFixed(2) : ""); frac = levels ? (+a.score)/(levels-1) : null; }
+        card.appendChild(el("div", { class:"jq" }, [
+          el("div", {}, [ el("div", { class:"eyebrow", text:k.replace(/_/g," ") + " · " + a.type }), el("div", { class:"small muted", text:q.instructions || "" }) ]),
+          el("div", { class:"ans" }, [ ans, low ? el("div", {}, [ el("span", { class:"chip warn", text:"Inconclusive" }) ]) : null ]),
+          frac != null ? el("div", { class:"bar" }, [ el("i", { style:"width:" + Math.max(0, Math.min(100, frac*100)) + "%" }) ]) : null
+        ]));
+      });
+      p.appendChild(card);
+    });
+  }
+
+  var RENDER = { sections:[renderPlan], decisions:[renderDecisions], tasks:[renderTasks], tests:[renderTests], matchups:[renderMatchups], jev:[renderJev] };
+  function renderAll(){ renderPlan(); renderDecisions(); renderTasks(); renderTests(); renderMatchups(); renderJev(); renderStatus(); }
+
+  function start(){
+    var use = window.claude && window.claude.use ? window.claude.use("db") : Promise.resolve(null);
+    use.then(function(d){
+      if(!d){ notice("The tracker's shared data is not available in this view. Open it from claude.ai while signed in."); $("#planCount").textContent = "Data unavailable"; return; }
+      db = d;
+      Object.keys(RENDER).forEach(function(col){
+        db.collection(col).onSnapshot(function(snap){
+          S[col] = snap.docs.map(function(x){ var o = Object.assign({}, x.data()); o.id = x.id; return o; });
+          // Don't wipe an open editor when someone else saves another section.
+          if(col === "sections" && Object.keys(editing).some(function(k){ return editing[k]; })){ renderStatus(); return; }
+          RENDER[col].forEach(function(fn){ fn(); }); renderStatus();
+        }, function(){ notice("Live updates stopped. Reload the page to reconnect."); });
+      });
+      db.doc("meta/jev").onSnapshot(function(s){ S.jevq = s.exists ? s.data() : null; renderJev(); }, function(){});
+    });
+  }
+  renderAll();
+  start();
+})();
+</script>
