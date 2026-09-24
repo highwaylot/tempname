@@ -2,7 +2,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>
+<style id="bt-style">
   :root{
     --bg:#eef1f4; --surface:#ffffff; --raised:#f6f8fa; --ink:#12151b; --dim:#5a6371; --faint:#8a929e;
     --line:#dce1e7; --accent:#17806d; --accent-ink:#ffffff; --coin:#a8780a; --left:#c9711c; --right:#1f7fc4;
@@ -102,52 +102,36 @@
   .bar i{display:block; height:100%; background:var(--accent)}
   .note{font-size:12.5px; color:var(--dim); max-width:72ch}
   .banner{border:1px dashed var(--line); border-radius:10px; padding:12px 14px; color:var(--dim); font-size:13px}
+  .foot{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:24px; padding-top:14px; border-top:1px solid var(--line)}
+  .foot textarea{flex-basis:100%; min-height:120px; font-family:var(--mono); font-size:11.5px}
+  html{height:auto} body{padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px)}
+  [hidden]{display:none !important}
   @media (prefers-reduced-motion: reduce){ .meter i{transition:none} }
 </style>
-
-<div class="wrap">
-  <header class="mast">
-    <div class="brand">
-      <div class="orbs" aria-hidden="true"><span class="orb l"></span>VS<span class="orb r"></span></div>
-      <div>
-        <h1>Bell Theory</h1>
-        <p>Marketing plan and tracker · country vs country</p>
-      </div>
-    </div>
-    <div class="status">
-      <span class="pill draft" id="planPill">Draft</span>
-      <div class="meter" aria-hidden="true"><i id="planMeter" style="width:0%"></i></div>
-      <small id="planCount">Loading the plan…</small>
-    </div>
-  </header>
-
-  <nav class="tabs" role="tablist" id="tabs">
-    <button role="tab" data-tab="plan" aria-selected="true">Plan<span class="count" id="c-plan"></span></button>
-    <button role="tab" data-tab="decisions" aria-selected="false">Decisions<span class="count" id="c-decisions"></span></button>
-    <button role="tab" data-tab="tasks" aria-selected="false">Tasks<span class="count" id="c-tasks"></span></button>
-    <button role="tab" data-tab="tests" aria-selected="false">Test results<span class="count" id="c-tests"></span></button>
-    <button role="tab" data-tab="matchups" aria-selected="false">Matchups<span class="count" id="c-matchups"></span></button>
-    <button role="tab" data-tab="jev" aria-selected="false">Jev<span class="count" id="c-jev"></span></button>
-  </nav>
-
-  <div id="notice" class="banner" hidden></div>
-
-  <section class="panel" data-panel="plan"></section>
-  <section class="panel" data-panel="decisions" hidden></section>
-  <section class="panel" data-panel="tasks" hidden></section>
-  <section class="panel" data-panel="tests" hidden></section>
-  <section class="panel" data-panel="matchups" hidden></section>
-  <section class="panel" data-panel="jev" hidden></section>
-</div>
-
-<script>
+<script type="application/json" id="bt-state">{"rev":1,"sections":[{"id":"idea","order":1,"title":"The idea: country vs country","body":"The two orbs already take any colour or image. Dress one as a flag and the other as a rival flag, and every run becomes a match: whichever side hits a wall first loses.\n\n• Left lane Brazil, right lane Argentina. Caption on frame one: \"Brazil vs Argentina. Who hits the wall first?\"\n• 8–15 seconds of real play. The crash is the punchline.\n• End card: \"Argentina wins. Comment the next matchup.\"\n• The comments pick the next video. The audience writes the calendar, and national pride makes people comment.","status":"draft"},{"id":"jev","order":8,"title":"Jev check","body":"The payload lives in docs/marketing: jev-state.json goes in the State box, jev-questions.json in the Questions box, and jev-request.json is the full API request. Twelve questions: hook clarity, comment loop, ad-to-app match, Versus before paid, two-player hook, policy risk, first channel, ad length, first market, video style, fit with the game, and whether day-1 retention clears 35%. Paste the answer in the Jev tab. Choice and score answers under 0.5 confidence count as inconclusive.","status":"draft"},{"id":"metrics","order":7,"title":"What we measure","body":"• Organic: average watch time, comments per 1,000 views, follows. Targets set after the first 10 posts; there is no reliable benchmark for this format.\n• Paid: click-through rate, installs per 1,000 impressions, cost per install. Target CPI under $0.40 (publisher bar, US Android).\n• Product: day-1 retention 35% or more (publisher bar); day-7 about 10% or more.","status":"draft"},{"id":"phases","order":6,"title":"Phases","body":"0. Build: Versus mode, flag pack, clip capture, analytics, Android build. Cost: $25 Play account. Done when a matchup clip can be produced from the real app.\n1. Organic: one matchup a day on TikTok, Reels and Shorts for 3–4 weeks. Cost: $0. Done at 20+ posts with the top 3 by watch time and comments known.\n2. Paid test: soft launch in 1–2 countries, run the top organic clips as ads. Cost: $200–500. Done at 500+ installs with CPI, CTR and day-1 retention measured.\n3. Decide: pitch publishers, keep and scale, or fix the first session and retest. Done when the decision is logged.","status":"draft"},{"id":"product","order":5,"title":"Product work the plan needs","body":"Bookmarked, not built:\n• Versus mode: pick two flags; the side that crashes loses; a result card names the winner.\n• Two players, one phone: each person takes one lane. The two-thumb mode already reads two separate touches.\n• Flag pack: about 50 flags to start, the biggest markets plus the big sports rivals.\n• Clip capture: a script that plays a matchup and records a vertical clip.\n• Analytics: needed to measure day-1 retention at all. Rewrite the privacy docs together with the ads change.","status":"draft"},{"id":"rules","order":3,"title":"Rules and risks","body":"• The ad must match the app. TikTok bans ads that mislead about the product, so Versus mode (flag skins and a winner card) ships before any paid ad runs.\n• Sports rivalries yes, conflicts no. Never pair countries in an active war or territorial dispute. Meta rejects ads that exploit crises or controversial events.\n• Use a permissively licensed SVG flag set, not emoji flags (they render differently on every phone and not at all on Windows).\n• Script-driven runs are real engine footage. Never edit a result the game did not produce.","status":"draft"},{"id":"spec","order":4,"title":"Ad spec","body":"• 9:16 vertical, 1080×1920, captions burned in, readable muted.\n• Hook in the first second: both flags and \"vs\" on screen before anything moves.\n• 8–15 s for prospecting. Test one 6–8 s cut and one 15–20 s cut against it.\n• Variants per matchup: clean-thread finish, boost-wreck finish, near miss, purple-coin moment.\n• End card, 1.5 s: winner, game name, \"comment the next matchup\".","status":"draft"},{"id":"why","order":2,"title":"Why it fits","body":"• It is the game's real mechanic: two lanes, two orbs, one crash decides it. Nothing is faked.\n• Two flags and \"vs\" read in one second with the sound off. Short-form ads live or die in the first 1–3 seconds.\n• \"Comment your country\" gives viewers a reason to comment, and comments push organic reach.\n• It is cheap: a script can play the game and record it, so one matchup is minutes of work.","status":"draft"}],"decisions":[{"id":"ads_personal","order":9,"question":"Personalized or non-personalized ads?","options":["Non-personalized","Personalized"],"recommendation":"Non-personalized","why":"no tracking popup on first launch","answer":"","status":"open"},{"id":"analytics","order":8,"question":"Analytics tool?","options":["GameAnalytics","Firebase"],"recommendation":"GameAnalytics","why":"publishers already read it","answer":"","status":"open"},{"id":"budget","order":7,"question":"Paid test budget cap?","options":["$200","$300","$500"],"recommendation":"$300","why":"","answer":"","status":"open"},{"id":"first_matchups","order":5,"question":"First 10 matchups agreed, plus the banned list?","options":["Agreed","Needs changes"],"recommendation":"","why":"","answer":"","status":"open"},{"id":"market","order":4,"question":"First soft-launch country?","options":["Canada","Australia","Philippines","Canada + Philippines"],"recommendation":"Philippines","why":"cheapest installs, standard for ad-funded games","answer":"","status":"open"},{"id":"mode_name","order":3,"question":"What is the mode called?","options":["Versus","Flag Duel","Country Clash","Other"],"recommendation":"","why":"","answer":"","status":"open"},{"id":"two_player","order":2,"question":"Two players on one phone: at launch or after?","options":["At launch","After launch"],"recommendation":"At launch","why":"it makes \"who hits the wall\" literally true","answer":"","status":"open"},{"id":"versus_real","order":1,"question":"Versus: a real in-game mode, or flag skins only?","options":["Real Versus mode","Flag skins only"],"recommendation":"Real Versus mode","why":"the ad has to match the app","answer":"","status":"open"},{"id":"voice","order":6,"question":"Who posts, and in what style?","options":["Pure gameplay + captions","Gameplay + my voice","Me on camera reacting"],"recommendation":"Gameplay + my voice","why":"creator-style ads wear out slower than studio ads","answer":"","status":"open"}],"tasks":[{"id":"t01","order":1,"phase":"build","title":"Answer the open decisions","owner":"you","status":"todo"},{"id":"t02","order":2,"phase":"build","title":"Open the Google Play developer account ($25)","owner":"you","status":"todo"},{"id":"t03","order":3,"phase":"build","title":"Versus mode: flag picker, loser = side that crashes, winner card","owner":"claude","status":"todo"},{"id":"t04","order":4,"phase":"build","title":"Two players, one phone","owner":"claude","status":"todo"},{"id":"t05","order":5,"phase":"build","title":"Flag pack (SVG, permissive licence)","owner":"claude","status":"todo"},{"id":"t06","order":6,"phase":"build","title":"Clip capture script: play a matchup, record 9:16 video","owner":"claude","status":"todo"},{"id":"t07","order":7,"phase":"build","title":"Analytics hookup + privacy doc rewrite","owner":"claude","status":"todo"},{"id":"t08","order":8,"phase":"build","title":"Android cloud build + store listing","owner":"claude","status":"todo"},{"id":"t09","order":9,"phase":"organic","title":"Create TikTok, Instagram and YouTube accounts","owner":"you","status":"todo"},{"id":"t10","order":10,"phase":"organic","title":"Post one matchup a day for 3–4 weeks","owner":"you","status":"todo"},{"id":"t11","order":11,"phase":"organic","title":"Log views and comments per matchup here","owner":"you","status":"todo"},{"id":"t12","order":12,"phase":"paid","title":"Soft launch in the chosen country","owner":"you","status":"todo"},{"id":"t13","order":13,"phase":"paid","title":"Run the top 3 organic clips as paid ads","owner":"you","status":"todo"},{"id":"t14","order":14,"phase":"paid","title":"Log spend, installs and day-1 retention in Test results","owner":"you","status":"todo"},{"id":"t15","order":15,"phase":"decide","title":"Compare results with the targets","owner":"claude","status":"todo"},{"id":"t16","order":16,"phase":"decide","title":"Decide: pitch, scale, or fix and retest","owner":"you","status":"todo"}],"tests":[],"matchups":[{"id":"m01","order":1,"left":"Brazil","right":"Argentina","note":"The classic football rivalry","status":"idea","views":null,"comments":null},{"id":"m02","order":2,"left":"USA","right":"Mexico","note":"Biggest rivalry in North American football","status":"idea","views":null,"comments":null},{"id":"m03","order":3,"left":"England","right":"Germany","note":"Decades of tournament history","status":"idea","views":null,"comments":null},{"id":"m04","order":4,"left":"Spain","right":"Portugal","note":"Neighbour rivalry","status":"idea","views":null,"comments":null},{"id":"m05","order":5,"left":"France","right":"Italy","note":"World Cup final history","status":"idea","views":null,"comments":null},{"id":"m06","order":6,"left":"Australia","right":"New Zealand","note":"Rugby and cricket rivalry","status":"idea","views":null,"comments":null},{"id":"m07","order":7,"left":"Canada","right":"USA","note":"Hockey rivalry","status":"idea","views":null,"comments":null},{"id":"m08","order":8,"left":"Japan","right":"South Korea","note":"Football rivalry; keep it about sport","status":"idea","views":null,"comments":null}],"jev":[],"jevq":{"questions":{"hook_reads_in_one_second":{"type":"noul","instructions":"A muted viewer scrolling past understands the `marketing_idea.hook` (two flags and 'vs') as a competition within the first second of the video."},"comments_drive_the_loop":{"type":"noul","instructions":"Asking viewers to 'comment the next matchup' in `marketing_idea.concept` produces enough comments per video to keep choosing the next matchup from them."},"ad_matches_app_today":{"type":"noul","instructions":"The country-vs-country video in `marketing_idea` accurately represents what a player can do in the app as described in `product_gap`.","criteria":{"true":"A player who installs from the ad can play a flag-vs-flag match and see a winner named, as the ad shows.","false":"The ad shows flags or a named winner that the app does not offer."}},"versus_before_paid":{"type":"noul","instructions":"Versus mode with flag skins and a winner card should ship in the app before any paid ad from `marketing_idea` runs."},"two_player_one_phone_is_the_hook":{"type":"noul","instructions":"Letting two people share one phone, one lane each, makes the country-vs-country framing stronger than one person playing both flags."},"policy_risk":{"type":"score","instructions":"How likely ads built on `marketing_idea`, following `marketing_idea.matchup_rule`, are to be rejected by Meta or TikTok ad review.","criteria":["Approved like any ordinary game ad","Occasional rejections on specific matchups, fixed by swapping the pair","Frequent rejections that force a change of concept"]},"best_first_channel":{"type":"choice","instructions":"Which channel the founder in `constraints` should start `marketing_idea` on.","criteria":{"tiktok_organic":"Free posts on a TikTok account","reels_organic":"Free posts on Instagram Reels","shorts_organic":"Free posts on YouTube Shorts","all_three_organic":"The same clip posted to all three free channels","paid_meta":"Paid ads on Facebook and Instagram from day one","paid_tiktok":"Paid ads on TikTok from day one","other":"Something not listed"}},"best_ad_length":{"type":"choice","instructions":"Which video length gives `marketing_idea` the best install rate for a first paid test.","criteria":{"six_to_eight":"6-8 seconds: one short run and the crash","eight_to_fifteen":"8-15 seconds: a run with a boost or near miss, then the crash","fifteen_to_thirty":"15-30 seconds: a longer match with several moments","other":"Something not listed"}},"first_soft_launch_market":{"type":"choice","instructions":"Which market to soft-launch in first, given `game.monetization_plan` and `constraints`.","criteria":{"canada":"Canada: behaves like the US, higher install costs","australia":"Australia: standard soft-launch market, behaves like the US","philippines":"Philippines: cheap installs, common for ad-funded games","canada_and_philippines":"One of each to compare","other":"Something not listed"}},"creative_style":{"type":"choice","instructions":"Which video style best suits `marketing_idea` for this solo founder.","criteria":{"pure_gameplay":"Screen recording with captions only","gameplay_with_voice":"Screen recording with the founder's voice calling the match","creator_reaction":"The founder or a creator on camera reacting to the match","other":"Something not listed"}},"fit_with_game":{"type":"score","instructions":"How well `marketing_idea` shows off what is actually fun about the game in `game.core_loop`.","criteria":["Hides the core loop; the flags carry the whole video","Shows the loop, but the flags are doing most of the work","The loop and the flags reinforce each other: threading and crashing are the drama"]},"d1_bar_reachable":{"type":"noul","instructions":"Players acquired through `marketing_idea` reach the day-1 retention target in `targets.d1_retention`."}}}}</script>
+<script id="bt-app">
 (function(){
   "use strict";
-  var db = null;
-  var S = { sections:[], decisions:[], tasks:[], tests:[], matchups:[], jev:[], jevq:null };
-  var editing = {};           // section id -> true while its textarea is open
+  // The page is its own record: the plan lives in the #bt-state block above,
+  // and saving publishes a new version of this page with the updated block.
+  // Where publishing isn't available, changes are kept in this browser.
+  var MARKUP = "<div class=\"wrap\">\n  <header class=\"mast\">\n    <div class=\"brand\">\n      <div class=\"orbs\" aria-hidden=\"true\"><span class=\"orb l\"><\/span>VS<span class=\"orb r\"><\/span><\/div>\n      <div>\n        <h1>Bell Theory<\/h1>\n        <p>Marketing plan and tracker \u00b7 country vs country<\/p>\n      <\/div>\n    <\/div>\n    <div class=\"status\">\n      <span class=\"pill draft\" id=\"planPill\">Draft<\/span>\n      <div class=\"meter\" aria-hidden=\"true\"><i id=\"planMeter\" style=\"width:0%\"><\/i><\/div>\n      <small id=\"planCount\">Loading the plan\u2026<\/small>\n    <\/div>\n  <\/header>\n\n  <nav class=\"tabs\" role=\"tablist\" id=\"tabs\">\n    <button role=\"tab\" data-tab=\"plan\" aria-selected=\"true\">Plan<span class=\"count\" id=\"c-plan\"><\/span><\/button>\n    <button role=\"tab\" data-tab=\"decisions\" aria-selected=\"false\">Decisions<span class=\"count\" id=\"c-decisions\"><\/span><\/button>\n    <button role=\"tab\" data-tab=\"tasks\" aria-selected=\"false\">Tasks<span class=\"count\" id=\"c-tasks\"><\/span><\/button>\n    <button role=\"tab\" data-tab=\"tests\" aria-selected=\"false\">Test results<span class=\"count\" id=\"c-tests\"><\/span><\/button>\n    <button role=\"tab\" data-tab=\"matchups\" aria-selected=\"false\">Matchups<span class=\"count\" id=\"c-matchups\"><\/span><\/button>\n    <button role=\"tab\" data-tab=\"jev\" aria-selected=\"false\">Jev<span class=\"count\" id=\"c-jev\"><\/span><\/button>\n  <\/nav>\n\n  <div id=\"notice\" class=\"banner\" hidden><\/div>\n\n  <section class=\"panel\" data-panel=\"plan\"><\/section>\n  <section class=\"panel\" data-panel=\"decisions\" hidden><\/section>\n  <section class=\"panel\" data-panel=\"tasks\" hidden><\/section>\n  <section class=\"panel\" data-panel=\"tests\" hidden><\/section>\n  <section class=\"panel\" data-panel=\"matchups\" hidden><\/section>\n  <section class=\"panel\" data-panel=\"jev\" hidden><\/section>\n  <footer class=\"foot\">\n    <span id=\"saveState\" class=\"small muted\"><\/span>\n    <button type=\"button\" class=\"btn\" id=\"copyData\">Copy data<\/button>\n    <textarea id=\"rawData\" aria-label=\"Tracker data\" hidden readonly><\/textarea>\n  <\/footer>\n<\/div>";
+  var LS_KEY = "bt-mkt-state";
+  var S = JSON.parse(document.getElementById("bt-state").textContent);
+  var APP_SRC = document.getElementById("bt-app").textContent;
+  var STYLE_SRC = document.getElementById("bt-style").textContent;
+  var art = null, mode = "loading";   // "publish" | "local" | "readonly"
+  var editing = {};
   var PHASES = [["build","Build"],["organic","Organic"],["paid","Paid test"],["decide","Decide"]];
   var TARGET = { cpi:0.40, d1:35 };
+
+  var host = document.createElement("div"); host.innerHTML = MARKUP; (document.body || document.documentElement).appendChild(host.firstElementChild);
+
+  // A newer copy saved in this browser (from a view that couldn't publish) wins over the page's copy.
+  try{
+    var local = JSON.parse(localStorage.getItem(LS_KEY) || "null");
+    if(local && local.rev > S.rev) S = local;
+  }catch(e){}
 
   function $(sel, root){ return (root||document).querySelector(sel); }
   function el(tag, attrs, kids){
@@ -164,13 +148,53 @@
   function notice(msg){ var n = $("#notice"); n.textContent = msg || ""; n.hidden = !msg; }
   function byOrder(a, b){ return (a.order||0) - (b.order||0) || String(a.id).localeCompare(String(b.id)); }
   function num(v){ var x = parseFloat(v); return isFinite(x) ? x : null; }
-  function fail(e){
-    var code = e && e.code;
-    if(code === "invalid_argument") notice("You can view this tracker but not change it. Ask the owner for Contributor access.");
-    else if(code === "quota_exceeded") notice("The tracker is full. Delete old test rows or matchups to add more.");
-    else notice("That change did not save. Try again in a moment.");
+  function uid(){ return Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36); }
+  function find(col, id){ for(var i=0;i<S[col].length;i++) if(S[col][i].id === id) return S[col][i]; return null; }
+
+  // ---------- saving ----------
+  function esc(json){ return json.replace(/</g, "\\u003c"); }
+  function pageSource(){
+    return '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+      + '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
+      + '<title>Bell Theory Marketing</title>'
+      + '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+      + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">'
+      + '<style id="bt-style">' + STYLE_SRC + '</style></head><body>'
+      + '<script type="application/json" id="bt-state">' + esc(JSON.stringify(S)) + '<\/script>'
+      + '<script id="bt-app">' + APP_SRC + '<\/script></body></html>';
   }
-  function write(p){ return p.then(function(){ notice(""); }, fail); }
+  var saveTimer = null;
+  function commit(){
+    S.rev = (S.rev || 0) + 1;
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){}
+    renderAll();
+    if(mode !== "publish") return;
+    clearTimeout(saveTimer);
+    $("#saveState").textContent = "Saving…";
+    saveTimer = setTimeout(function(){
+      if(Object.keys(editing).some(function(k){ return editing[k]; })){ commit(); return; }
+      art.publish(pageSource()).then(function(){
+        try{ localStorage.removeItem(LS_KEY); }catch(e){}
+      }, function(e){
+        var code = e && e.code;
+        if(code === "conflict") return;          // the view reloads to the newer version on its own
+        if(code === "not_writer" || code === "not_granted" || code === "not_declared" || code === "capability_disabled" || code === "consent_required"){
+          setMode("local"); return;
+        }
+        $("#saveState").textContent = code === "rate_limited" ? "Saving paused, too many saves. Your change is kept here." : "Not saved yet. Your change is kept in this browser.";
+      });
+    }, 900);
+  }
+  function upd(col, id, patch){ var o = find(col, id); if(!o) return; Object.keys(patch).forEach(function(k){ o[k] = patch[k]; }); commit(); }
+  function add(col, obj){ obj.id = uid(); S[col].push(obj); commit(); }
+  function del(col, id){ S[col] = S[col].filter(function(o){ return o.id !== id; }); commit(); }
+
+  function setMode(m){
+    mode = m;
+    var s = $("#saveState");
+    if(m === "publish") s.textContent = "Changes save to this page for everyone who opens it.";
+    else s.textContent = "Changes save in this browser only. Use Copy data to send them to Claude.";
+  }
 
   // ---------- tabs ----------
   var tabKey = "plan";
@@ -185,7 +209,16 @@
   if(location.hash && $('[data-tab="' + location.hash.slice(1) + '"]')) tabKey = location.hash.slice(1);
   showTab(tabKey);
 
-  // ---------- status: the plan is final only when everything is locked and decided ----------
+  $("#copyData").addEventListener("click", function(){
+    var txt = JSON.stringify(S, null, 2), btn = $("#copyData");
+    function done(){ btn.textContent = "Copied"; setTimeout(function(){ btn.textContent = "Copy data"; }, 1600); }
+    try{
+      navigator.clipboard.writeText(txt).then(done, function(){ showRaw(txt); });
+    }catch(e){ showRaw(txt); }
+  });
+  function showRaw(txt){ var t = $("#rawData"); t.hidden = false; t.value = txt; t.focus(); t.select(); }
+
+  // ---------- status ----------
   function renderStatus(){
     var secs = S.sections, decs = S.decisions;
     var locked = secs.filter(function(s){ return s.status === "locked"; }).length;
@@ -196,9 +229,7 @@
     pill.textContent = final ? "Final" : "Draft";
     pill.className = "pill " + (final ? "final" : "draft");
     $("#planMeter").style.width = (total ? Math.round(done/total*100) : 0) + "%";
-    $("#planCount").textContent = secs.length
-      ? locked + " of " + secs.length + " sections locked · " + decided + " of " + decs.length + " decisions made"
-      : "No plan sections yet";
+    $("#planCount").textContent = locked + " of " + secs.length + " sections locked · " + decided + " of " + decs.length + " decisions made";
     $("#c-plan").textContent = locked + "/" + secs.length;
     $("#c-decisions").textContent = decided + "/" + decs.length;
     $("#c-tasks").textContent = S.tasks.filter(function(t){ return t.status === "done"; }).length + "/" + S.tasks.length;
@@ -214,28 +245,22 @@
     S.sections.slice().sort(byOrder).forEach(function(s){
       var locked = s.status === "locked";
       var card = el("article", { class:"card sec" + (locked ? " locked" : "") });
-      var head = el("div", { class:"row spread" }, [
+      card.appendChild(el("div", { class:"row spread" }, [
         el("div", {}, [ el("div", { class:"eyebrow", text:"Section " + (s.order||"") }), el("h3", { text:s.title||"Untitled" }) ]),
         el("div", { class:"row" }, [
           el("span", { class:"chip " + (locked ? "good" : "warn"), text: locked ? "Locked" : "Draft" }),
           locked ? null : el("button", { class:"btn ghost", text: editing[s.id] ? "Cancel" : "Edit", onclick:function(){ editing[s.id] = !editing[s.id]; renderPlan(); } }),
           el("button", { class:"btn" + (locked ? "" : " primary"), text: locked ? "Unlock" : "Lock",
-            onclick:function(){ editing[s.id] = false; write(db.doc("sections/" + s.id).update({ status: locked ? "draft" : "locked" })); } })
+            onclick:function(){ editing[s.id] = false; upd("sections", s.id, { status: locked ? "draft" : "locked" }); } })
         ])
-      ]);
-      card.appendChild(head);
+      ]));
       if(editing[s.id] && !locked){
         var ta = el("textarea", { id:"sec-" + s.id, "aria-label":"Edit " + (s.title||"section") }); ta.value = s.body || "";
         card.appendChild(el("div", { style:"margin-top:10px" }, [ ta ]));
         card.appendChild(el("div", { class:"row", style:"margin-top:8px" }, [
-          el("button", { class:"btn primary", text:"Save", onclick:function(){
-            editing[s.id] = false;
-            write(db.doc("sections/" + s.id).update({ body: ta.value }));
-          } })
+          el("button", { class:"btn primary", text:"Save", onclick:function(){ editing[s.id] = false; upd("sections", s.id, { body: ta.value }); } })
         ]));
-      } else {
-        card.appendChild(el("div", { class:"body", text:s.body || "" }));
-      }
+      } else card.appendChild(el("div", { class:"body", text:s.body || "" }));
       p.appendChild(card);
     });
   }
@@ -243,26 +268,23 @@
   // ---------- decisions ----------
   function renderDecisions(){
     var p = $('[data-panel="decisions"]'); p.textContent = "";
-    p.appendChild(el("p", { class:"note", text:"Pick an answer and mark it decided. The recommendation is the plan's current lean, not a choice made for you." }));
+    p.appendChild(el("p", { class:"note", text:"Pick an answer and mark it decided. The lean is the plan's current recommendation, not a choice made for you." }));
     S.decisions.slice().sort(byOrder).forEach(function(d){
       var decided = d.status === "decided";
       var sel = el("select", { id:"dec-" + d.id, "aria-label":d.question });
       sel.appendChild(el("option", { value:"", text:"Choose…" }));
       (d.options||[]).forEach(function(o){ var op = el("option", { value:o, text:o }); if(d.answer === o) op.selected = true; sel.appendChild(op); });
       sel.disabled = decided;
-      sel.addEventListener("change", function(){ write(db.doc("decisions/" + d.id).update({ answer: sel.value })); });
+      sel.addEventListener("change", function(){ upd("decisions", d.id, { answer: sel.value }); });
       p.appendChild(el("article", { class:"card dec" }, [
-        el("div", { class:"row spread" }, [
-          el("div", { class:"q", text:d.question }),
-          el("span", { class:"chip " + (decided ? "good" : "warn"), text: decided ? "Decided" : "Open" })
-        ]),
+        el("div", { class:"row spread" }, [ el("div", { class:"q", text:d.question }), el("span", { class:"chip " + (decided ? "good" : "warn"), text: decided ? "Decided" : "Open" }) ]),
         d.recommendation ? el("div", { class:"rec" }, [ "Lean: ", el("b", { text:d.recommendation }), d.why ? " · " + d.why : "" ]) : null,
         el("div", { class:"row", style:"margin-top:10px" }, [
           sel,
           el("button", { class:"btn" + (decided ? "" : " primary"), text: decided ? "Reopen" : "Mark decided",
             onclick:function(){
               if(!decided && !sel.value){ notice("Choose an answer before marking it decided."); return; }
-              write(db.doc("decisions/" + d.id).update({ status: decided ? "open" : "decided" }));
+              notice(""); upd("decisions", d.id, { status: decided ? "open" : "decided" });
             } })
         ])
       ]));
@@ -283,10 +305,9 @@
           el("div", { class:"row spread" }, [
             el("span", { class:"chip" + (t.owner === "claude" ? " accent" : ""), text: t.owner === "claude" ? "Claude" : "You" }),
             el("div", { class:"row" }, [
-              el("button", { class:"btn", text: st === "todo" ? "To do" : (st === "doing" ? "Doing" : "Done"),
-                "aria-label":"Status: " + st + ". Advance.",
-                onclick:function(){ write(db.doc("tasks/" + t.id).update({ status: NEXT[st] })); } }),
-              el("button", { class:"btn ghost", text:"Remove", onclick:function(){ write(db.doc("tasks/" + t.id).delete()); } })
+              el("button", { class:"btn", text: st === "todo" ? "To do" : (st === "doing" ? "Doing" : "Done"), "aria-label":"Status: " + st + ". Advance.",
+                onclick:function(){ upd("tasks", t.id, { status: NEXT[st] }); } }),
+              el("button", { class:"btn ghost", text:"Remove", onclick:function(){ del("tasks", t.id); } })
             ])
           ])
         ]));
@@ -298,14 +319,11 @@
     var title = el("input", { id:"task-title", placeholder:"New task", required:"" });
     var phase = el("select", { id:"task-phase" }); PHASES.forEach(function(ph){ phase.appendChild(el("option", { value:ph[0], text:ph[1] })); });
     var owner = el("select", { id:"task-owner" }, [ el("option", { value:"you", text:"You" }), el("option", { value:"claude", text:"Claude" }) ]);
-    f.appendChild(el("label", {}, [ "Task", title ]));
-    f.appendChild(el("label", {}, [ "Phase", phase ]));
-    f.appendChild(el("label", {}, [ "Owner", owner ]));
+    f.appendChild(el("label", {}, [ "Task", title ])); f.appendChild(el("label", {}, [ "Phase", phase ])); f.appendChild(el("label", {}, [ "Owner", owner ]));
     f.appendChild(el("button", { class:"btn primary", type:"submit", text:"Add task" }));
     f.addEventListener("submit", function(e){
       e.preventDefault(); if(!title.value.trim()) return;
-      write(db.collection("tasks").add({ title:title.value.trim(), phase:phase.value, owner:owner.value, status:"todo", order:Date.now() }));
-      title.value = "";
+      add("tasks", { title:title.value.trim(), phase:phase.value, owner:owner.value, status:"todo", order:Date.now() });
     });
     p.appendChild(f);
   }
@@ -315,7 +333,6 @@
     var p = $('[data-panel="tests"]'); p.textContent = "";
     p.appendChild(el("p", { class:"note", text:"Log each campaign or organic batch. CTR, installs per 1,000 impressions and cost per install are worked out for you. Targets: CPI under $" + TARGET.cpi.toFixed(2) + ", day-1 retention " + TARGET.d1 + "% or more." }));
     var rows = S.tests.slice().sort(function(a,b){ return String(b.date||"").localeCompare(String(a.date||"")); });
-    var wrap = el("div", { class:"tablewrap" });
     var t = el("table");
     t.appendChild(el("thead", {}, [ el("tr", {}, ["Date","Channel","Creative","Spend","Impr.","Clicks","Installs","CTR","IPM","CPI","D1",""].map(function(h){ return el("th", { text:h }); })) ]));
     var tb = el("tbody");
@@ -333,11 +350,10 @@
         el("td", { class:"num", text: ipm != null ? ipm.toFixed(1) : "" }),
         el("td", { class:"num " + (cpi == null ? "" : (cpi <= TARGET.cpi ? "good" : "bad")), text: cpi != null ? "$" + cpi.toFixed(2) : "" }),
         el("td", { class:"num " + (d1 == null ? "" : (d1 >= TARGET.d1 ? "good" : "bad")), text: d1 != null ? d1 + "%" : "" }),
-        el("td", {}, [ el("button", { class:"btn ghost", text:"Remove", onclick:function(){ write(db.doc("tests/" + r.id).delete()); } }) ])
+        el("td", {}, [ el("button", { class:"btn ghost", text:"Remove", onclick:function(){ del("tests", r.id); } }) ])
       ]));
     });
-    t.appendChild(tb); wrap.appendChild(t); p.appendChild(wrap);
-
+    t.appendChild(tb); p.appendChild(el("div", { class:"tablewrap" }, [ t ]));
     var f = el("form", { class:"add card" });
     var fields = [["date","Date","date"],["channel","Channel","text"],["creative","Creative","text"],["spend","Spend ($)","number"],["impressions","Impressions","number"],["clicks","Clicks","number"],["installs","Installs","number"],["d1","Day-1 %","number"]];
     var inputs = {};
@@ -351,8 +367,7 @@
       var row = {};
       fields.forEach(function(fd){ var v = inputs[fd[0]].value.trim(); row[fd[0]] = fd[2] === "number" ? (v === "" ? null : Number(v)) : v; });
       if(!row.date && !row.channel){ notice("Add at least a date or a channel."); return; }
-      write(db.collection("tests").add(row));
-      fields.forEach(function(fd){ inputs[fd[0]].value = ""; });
+      notice(""); add("tests", row);
     });
     p.appendChild(f);
   }
@@ -366,19 +381,16 @@
     S.matchups.slice().sort(function(a,b){ return (order[a.status]||0) - (order[b.status]||0) || byOrder(a,b); }).forEach(function(m){
       var st = el("select", { id:"m-st-" + m.id, "aria-label":"Status" });
       MSTAT.forEach(function(s){ var o = el("option", { value:s, text:s.charAt(0).toUpperCase() + s.slice(1) }); if(m.status === s) o.selected = true; st.appendChild(o); });
-      st.addEventListener("change", function(){ write(db.doc("matchups/" + m.id).update({ status: st.value })); });
+      st.addEventListener("change", function(){ upd("matchups", m.id, { status: st.value }); });
       var views = el("input", { id:"m-v-" + m.id, type:"number", min:"0", placeholder:"Views", "aria-label":"Views", style:"width:110px" }); if(m.views != null) views.value = m.views;
       var comments = el("input", { id:"m-c-" + m.id, type:"number", min:"0", placeholder:"Comments", "aria-label":"Comments", style:"width:110px" }); if(m.comments != null) comments.value = m.comments;
-      function saveNums(){
-        var v = views.value === "" ? null : Number(views.value), c = comments.value === "" ? null : Number(comments.value);
-        if(v !== (m.views == null ? null : m.views) || c !== (m.comments == null ? null : m.comments)) write(db.doc("matchups/" + m.id).update({ views:v, comments:c }));
-      }
+      function saveNums(){ upd("matchups", m.id, { views: views.value === "" ? null : Number(views.value), comments: comments.value === "" ? null : Number(comments.value) }); }
       views.addEventListener("change", saveNums); comments.addEventListener("change", saveNums);
       var per1k = (m.views && m.comments != null) ? (m.comments / m.views * 1000).toFixed(1) + " comments per 1k views" : "";
       p.appendChild(el("article", { class:"card" + (m.status === "banned" ? " banned" : "") }, [
         el("div", { class:"row spread" }, [
           el("div", { class:"vs" }, [ el("i", { class:"dot l" }), el("span", { text:m.left||"?" }), el("em", { text:"VS" }), el("i", { class:"dot r" }), el("span", { text:m.right||"?" }) ]),
-          el("div", { class:"row" }, [ st, el("button", { class:"btn ghost", text:"Remove", onclick:function(){ write(db.doc("matchups/" + m.id).delete()); } }) ])
+          el("div", { class:"row" }, [ st, el("button", { class:"btn ghost", text:"Remove", onclick:function(){ del("matchups", m.id); } }) ])
         ]),
         m.note ? el("div", { class:"small muted", style:"margin-top:6px", text:m.note }) : null,
         m.status === "posted" ? el("div", { class:"row", style:"margin-top:8px" }, [ views, comments, el("span", { class:"small muted", text:per1k }) ]) : null
@@ -390,8 +402,7 @@
     f.appendChild(el("button", { class:"btn primary", type:"submit", text:"Add matchup" }));
     f.addEventListener("submit", function(e){
       e.preventDefault(); if(!l.value.trim() || !r.value.trim()) return;
-      write(db.collection("matchups").add({ left:l.value.trim(), right:r.value.trim(), note:n.value.trim(), status:"idea", views:null, comments:null, order:Date.now() }));
-      l.value = r.value = n.value = "";
+      add("matchups", { left:l.value.trim(), right:r.value.trim(), note:n.value.trim(), status:"idea", views:null, comments:null, order:Date.now() });
     });
     p.appendChild(f);
   }
@@ -405,7 +416,7 @@
   }
   function renderJev(){
     var p = $('[data-panel="jev"]'); p.textContent = "";
-    p.appendChild(el("p", { class:"note", text:"Run the payload from docs/marketing in the jev Playground (State box: jev-state.json, Questions box: jev-questions.json), then paste the answer here. A choice or score with confidence under 0.5 is shown as inconclusive." }));
+    p.appendChild(el("p", { class:"note", text:"Run the payload in docs/marketing in the jev Playground (State box: jev-state.json, Questions box: jev-questions.json), then paste the answer here. A choice or score with confidence under 0.5 is marked inconclusive." }));
     var ta = el("textarea", { id:"jev-paste", placeholder:"Paste the jev response JSON", "aria-label":"Jev response JSON" });
     var label = el("input", { id:"jev-label", placeholder:"Run name, e.g. first pass" });
     var f = el("form", { class:"card", style:"display:flex; flex-direction:column; gap:8px" }, [ ta, el("div", { class:"row" }, [ label, el("button", { class:"btn primary", type:"submit", text:"Save result" }) ]) ]);
@@ -413,21 +424,18 @@
       e.preventDefault();
       var parsed; try{ parsed = JSON.parse(ta.value); }catch(err){ notice("That is not valid JSON. Paste the whole response, braces included."); return; }
       var a = answersOf(parsed); if(!a){ notice("No answers found. Each answer needs a type field (noul, choice or score)."); return; }
-      write(db.collection("jev").add({ label: label.value.trim() || "Run", at: new Date().toISOString(), answers: a }));
-      ta.value = ""; label.value = "";
+      notice(""); add("jev", { label: label.value.trim() || "Run", at: new Date().toISOString(), answers: a });
     });
     p.appendChild(f);
-
     var qs = (S.jevq && S.jevq.questions) || {};
     S.jev.slice().sort(function(a,b){ return String(b.at||"").localeCompare(String(a.at||"")); }).forEach(function(run){
       var card = el("article", { class:"card", style:"display:flex; flex-direction:column; gap:12px" }, [
         el("div", { class:"row spread" }, [ el("h3", { style:"font-size:15px", text:run.label || "Run" }), el("div", { class:"row" }, [
           el("span", { class:"small muted", text:(run.at||"").slice(0,10) }),
-          el("button", { class:"btn ghost", text:"Remove", onclick:function(){ write(db.doc("jev/" + run.id).delete()); } }) ]) ])
+          el("button", { class:"btn ghost", text:"Remove", onclick:function(){ del("jev", run.id); } }) ]) ])
       ]);
       Object.keys(run.answers||{}).forEach(function(k){
-        var a = run.answers[k], q = qs[k] || {};
-        var ans = "", frac = null, low = false;
+        var a = run.answers[k], q = qs[k] || {}, ans = "", frac = null, low = false;
         if(a.type === "noul"){ frac = +a.noul; ans = Math.round(frac*100) + "% true"; }
         else if(a.type === "choice"){ low = a.confidence != null && a.confidence < 0.5; ans = String(a.choice) + (a.confidence != null ? " · conf " + (+a.confidence).toFixed(2) : ""); frac = a.probabilities && a.probabilities[a.choice] != null ? +a.probabilities[a.choice] : null; }
         else if(a.type === "score"){ low = a.confidence != null && a.confidence < 0.5; var levels = Array.isArray(q.criteria) ? q.criteria.length : null;
@@ -442,26 +450,10 @@
     });
   }
 
-  var RENDER = { sections:[renderPlan], decisions:[renderDecisions], tasks:[renderTasks], tests:[renderTests], matchups:[renderMatchups], jev:[renderJev] };
   function renderAll(){ renderPlan(); renderDecisions(); renderTasks(); renderTests(); renderMatchups(); renderJev(); renderStatus(); }
-
-  function start(){
-    var use = window.claude && window.claude.use ? window.claude.use("db") : Promise.resolve(null);
-    use.then(function(d){
-      if(!d){ notice("The tracker's shared data is not available in this view. Open it from claude.ai while signed in."); $("#planCount").textContent = "Data unavailable"; return; }
-      db = d;
-      Object.keys(RENDER).forEach(function(col){
-        db.collection(col).onSnapshot(function(snap){
-          S[col] = snap.docs.map(function(x){ var o = Object.assign({}, x.data()); o.id = x.id; return o; });
-          // Don't wipe an open editor when someone else saves another section.
-          if(col === "sections" && Object.keys(editing).some(function(k){ return editing[k]; })){ renderStatus(); return; }
-          RENDER[col].forEach(function(fn){ fn(); }); renderStatus();
-        }, function(){ notice("Live updates stopped. Reload the page to reconnect."); });
-      });
-      db.doc("meta/jev").onSnapshot(function(s){ S.jevq = s.exists ? s.data() : null; renderJev(); }, function(){});
-    });
-  }
   renderAll();
-  start();
+  setMode("local");
+  var use = window.claude && window.claude.use ? window.claude.use("artifact") : Promise.resolve(null);
+  use.then(function(a){ if(a){ art = a; setMode("publish"); } }, function(){});
 })();
 </script>
