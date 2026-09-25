@@ -29,7 +29,8 @@ var P = {
   mean: +(q.get("mean") || 5),
   maxLen: +(q.get("maxLen") || 24),
   hook: q.get("hook") || "Who hits the wall first?",
-  fps: +(q.get("fps") || 30)
+  fps: +(q.get("fps") || 30),
+  clean: q.get("clean") === "1"   // no flags, no banners: the game as players see it
 };
 var rng = window.__adBotRng;
 function gamma2(mean){ return -(mean/2) * Math.log((1 - rng()) * (1 - rng())); } // Erlang k=2
@@ -193,10 +194,13 @@ window.AD = {
   NAMES.us = "USA"; NAMES.gb = "UK"; NAMES["gb-eng"] = "England"; NAMES.kr = "South Korea"; NAMES.kp = "North Korea";
   // Wait for the game to boot (it queues its first frame when ready).
   while(!(view.canvas && window.__adQueued() > 0)) await new Promise(function(r){ setTimeout(r, 20); });
-  var imgs = await Promise.all([rasterFlag(P.left), rasterFlag(P.right)]);
-  [0,1].forEach(function(s){ if(imgs[s]){ state.slots[s].mode = "image"; state.slots[s].image = imgs[s]; } });
-  clearImageCache(); clearHaloCache();
+  if(!P.clean){
+    var imgs = await Promise.all([rasterFlag(P.left), rasterFlag(P.right)]);
+    [0,1].forEach(function(s){ if(imgs[s]){ state.slots[s].mode = "image"; state.slots[s].image = imgs[s]; } });
+    clearImageCache(); clearHaloCache();
+  }
   buildLayer();
+  if(P.clean) layer.style.display = "none";
   // Two frames on the title so the orbs settle, then both thumbs down.
   window.__adStepFrame(1000 / P.fps); window.__adStepFrame(1000 / P.fps);
   var H = view.H;

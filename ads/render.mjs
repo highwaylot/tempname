@@ -109,10 +109,11 @@ try{
     for(let seed = seed0; seed < seed0 + count; seed++){
       const params = { ...common, seed: String(seed), left, right };
       if(opt('--hook')) params.hook = opt('--hook');
+      if(argv.includes('--clean')) params.clean = '1';
       if(opt('--leftName')) params.leftName = opt('--leftName');
       if(opt('--rightName')) params.rightName = opt('--rightName');
       const { page, errors } = await openVersus(browser, params);
-      const file = path.join(here, 'out', `${left}-vs-${right}-s${seed}.mp4`);
+      const file = path.join(here, 'out', argv.includes('--clean') ? `clean-s${seed}.mp4` : `${left}-vs-${right}-s${seed}.mp4`);
       const enc = encoder(file, +common.fps);
       let st, frames = 0;
       do {
@@ -155,6 +156,45 @@ try{
     }
     await (await openVersus(browser, { ...common, seed: '0' }, 1)).page.close();
     await Promise.all(Array.from({ length: jobs }, worker));
+  }
+
+  else if(cmd === 'brand'){
+    // Logo set, launch post and story, and the coming-soon reel.
+    //   --clean ads/out/clean-s7.mp4 --from 2.5   gameplay for the reel's first 5 s
+    //   --vs ads/out/br-vs-ar-s101.mp4 --crash 11.3   rivalry moment around the crash
+    const { execFileSync } = await import('node:child_process');
+    const ff = (args) => execFileSync(ffmpegPath, ['-y', '-loglevel', 'error', ...args], { stdio: ['ignore', 'inherit', 'inherit'] });
+    const out = path.join(here, 'brand'); fs.mkdirSync(out, { recursive: true });
+    const tmp = path.join(here, 'out', 'brand-tmp'); fs.mkdirSync(tmp, { recursive: true });
+    const clean = path.resolve(root, opt('--clean', 'ads/out/clean-s7.mp4')), from = +opt('--from', 2.5);
+    const vs = path.resolve(root, opt('--vs', 'ads/out/br-vs-ar-s101.mp4')), crash = +opt('--crash', 11.3);
+    ff(['-ss', String(from + 2.0), '-i', clean, '-frames:v', '1', path.join(here, 'out', 'shot.png')]);
+    const page = await browser.newPage({ viewport: { width: 540, height: 960 }, deviceScaleFactor: 2 });
+    await page.goto(`http://localhost:${PORT}/ads/brand.html`);
+    await page.waitForFunction(() => window.BK && window.BK.ready, null, { timeout: 30000 });
+    const names = await page.evaluate(() => window.BK.names);
+    for(const n of names){
+      const b64 = await page.evaluate((k) => window.BK.still(k), n);
+      fs.writeFileSync(path.join(n.startsWith('reel-') ? tmp : out, n + '.png'), Buffer.from(b64, 'base64'));
+    }
+    const fps = 30, enc = encoder(path.join(tmp, 'outro.mp4'), fps);
+    for(let i = 0; i <= 4.5 * fps; i++) await enc.write(Buffer.from(await page.evaluate((tt) => window.BK.outro(tt), i / fps), 'base64'));
+    await enc.end();
+    fs.copyFileSync(path.join(tmp, 'outro.mp4'), path.join(out, 'logo-reveal.mp4'));
+    // Segment A: clean gameplay with the two hook lines.
+    ff(['-ss', String(from), '-t', '5', '-i', clean, '-loop', '1', '-t', '5', '-i', path.join(tmp, 'reel-hook-1.png'), '-loop', '1', '-t', '5', '-i', path.join(tmp, 'reel-hook-2.png'),
+      '-filter_complex', "[1]format=rgba,fade=t=in:st=0:d=0.15:alpha=1,fade=t=out:st=2.3:d=0.15:alpha=1[h1];[2]format=rgba,fade=t=in:st=2.5:d=0.15:alpha=1[h2];[0][h1]overlay[a];[a][h2]overlay=enable='gte(t,2.45)',format=yuv420p",
+      '-r', String(fps), '-c:v', 'libx264', '-crf', '18', '-an', path.join(tmp, 'a.mp4')]);
+    // Segment B: the rivalry moment, crash and winner card, with the pivot line.
+    ff(['-ss', String(crash - 1.5), '-t', '3.6', '-i', vs, '-loop', '1', '-t', '3.6', '-i', path.join(tmp, 'reel-hook-3.png'),
+      '-filter_complex', "[1]format=rgba,fade=t=in:st=0.1:d=0.2:alpha=1[h];[0][h]overlay,format=yuv420p",
+      '-r', String(fps), '-c:v', 'libx264', '-crf', '18', '-an', path.join(tmp, 'b.mp4')]);
+    // A -> B -> outro with short crossfades.
+    ff(['-i', path.join(tmp, 'a.mp4'), '-i', path.join(tmp, 'b.mp4'), '-i', path.join(tmp, 'outro.mp4'),
+      '-filter_complex', "[0][1]xfade=transition=fade:duration=0.25:offset=4.75[ab];[ab][2]xfade=transition=fadeblack:duration=0.35:offset=7.95,format=yuv420p",
+      '-r', String(fps), '-c:v', 'libx264', '-crf', '18', '-movflags', '+faststart', '-an', path.join(out, 'launch-reel.mp4')]);
+    await page.close();
+    console.log(JSON.stringify({ wrote: fs.readdirSync(out) }));
   }
 
   else if(cmd === 'endcards'){

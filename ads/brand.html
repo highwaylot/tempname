@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Bell Theory brand kit</title>
+<style>
+  @font-face{ font-family:'Sora'; font-weight:100 800; src:url(/src/fonts/sora-latin-wght.woff2) format('woff2-variations'); }
+  @font-face{ font-family:'IBM Plex Mono'; font-weight:500; src:url(/src/fonts/ibm-plex-mono-latin-500.woff2) format('woff2'); }
+  html,body{ margin:0; background:#000; }
+</style></head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// Brand kit renderer: the logo in every shape a launch needs, the launch
+// post and story, and the reel's text overlays and outro. One visual
+// language with the end cards: deep space, the amber and sky orbs, the teal
+// seam between them (the icon's mark), Sora 800 for words.
+(function(){
+  var cv = document.getElementById("c"), g = cv.getContext("2d");
+  var AMBER = "#ffb454", SKY = "#5ec8ff", TEAL = "#7dd3c0", GOLD = "#f2c14e", INK = "#eef0f4";
+  function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function clamp(x){ return Math.max(0, Math.min(1, x)); }
+  function easeOut(x){ x = clamp(x); return 1 - Math.pow(1 - x, 3); }
+  function back(x){ x = clamp(x); var c1 = 1.70158, c3 = c1 + 1; return 1 + c3*Math.pow(x-1,3) + c1*Math.pow(x-1,2); }
+  function size(w, h){ cv.width = w; cv.height = h; g = cv.getContext("2d"); }
+
+  // ---------- space ----------
+  var STARS = (function(){ var r = mulberry32(7), a = []; for(var i=0;i<700;i++) a.push({ x:r(), y:r(), z:0.2 + r()*0.8, ph:r()*6.28, hue:r() }); return a; })();
+  function space(W, H, t){
+    var bg = g.createRadialGradient(W/2, H*0.43, 60, W/2, H*0.47, Math.max(W, H)*0.66);
+    bg.addColorStop(0, "#161b3f"); bg.addColorStop(0.45, "#0a0c1c"); bg.addColorStop(1, "#030409");
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    [[0.28, 0.30, 0.48, "107,60,255", 0.20, 0.7], [0.78, 0.55, 0.55, "31,199,176", 0.13, -0.5], [0.5, 0.82, 0.45, "255,180,84", 0.08, 0.35]].forEach(function(n){
+      var cx = n[0]*W + Math.sin(t*0.3*n[5])*40, cy = n[1]*H + Math.cos(t*0.25*n[5])*30, R = n[2]*Math.max(W,H);
+      var ng = g.createRadialGradient(cx, cy, 0, cx, cy, R);
+      ng.addColorStop(0, "rgba(" + n[3] + "," + n[4] + ")"); ng.addColorStop(1, "rgba(" + n[3] + ",0)");
+      g.fillStyle = ng; g.fillRect(0, 0, W, H);
+    });
+    STARS.forEach(function(s){
+      var x = s.x * W, y = (s.y * H + t * 14 * s.z) % H;
+      var tw = 0.55 + 0.45 * Math.sin(t * (1.5 + s.z*2) + s.ph);
+      g.globalAlpha = (0.25 + 0.75 * s.z) * tw;
+      g.fillStyle = s.hue < 0.15 ? "#ffd6a0" : (s.hue < 0.3 ? "#aad2ff" : "#ebf0ff");
+      g.beginPath(); g.arc(x, y, (0.8 + s.z * 2.2) * W / 1080, 0, Math.PI*2); g.fill();
+    });
+    g.globalAlpha = 1;
+  }
+
+  // ---------- the mark: two orbs split by the seam ----------
+  // cx, cy centre; u = orb radius. split 0..1 pulls the orbs apart from the seam.
+  function mark(cx, cy, u, opts){
+    opts = opts || {};
+    var gap = u * (0.09 + (opts.split || 0) * 1.4), seamA = opts.seam == null ? 1 : opts.seam, t = opts.t || 0;
+    var lx = cx - u - gap, rx = cx + u + gap;
+    // seam halo + core
+    if(seamA > 0){
+      var sh = u * 2.35, top = cy - sh/2 - u*0.28, bot = cy + sh/2 + u*0.12, w = u * 0.19;
+      g.save(); g.globalAlpha = seamA; g.fillStyle = TEAL;
+      if(opts.glow !== false){ g.shadowColor = "rgba(125,211,192,.8)"; g.shadowBlur = u * 0.45; }
+      g.beginPath(); if(g.roundRect) g.roundRect(cx - w/2, top, w, bot - top, w/2); else g.rect(cx - w/2, top, w, bot - top); g.fill();
+      g.restore();
+      if(opts.glow !== false){
+        var tip = g.createRadialGradient(cx, top + w*0.4, 0, cx, top + w*0.4, u*0.7);
+        tip.addColorStop(0, "rgba(238,240,244,.95)"); tip.addColorStop(0.3, "rgba(125,211,192,.5)"); tip.addColorStop(1, "rgba(125,211,192,0)");
+        g.globalAlpha = seamA; g.fillStyle = tip; g.beginPath(); g.arc(cx, top + w*0.4, u*0.7, 0, Math.PI*2); g.fill(); g.globalAlpha = 1;
+      }
+    }
+    [[lx, AMBER, "255,180,84", 1], [rx, SKY, "94,200,255", 2]].forEach(function(o){
+      if(opts.glow !== false){
+        var hg = g.createRadialGradient(o[0], cy, u*0.6, o[0], cy, u*1.9);
+        hg.addColorStop(0, "rgba(" + o[2] + ",.35)"); hg.addColorStop(1, "rgba(" + o[2] + ",0)");
+        g.fillStyle = hg; g.beginPath(); g.arc(o[0], cy, u*1.9, 0, Math.PI*2); g.fill();
+      }
+      // the buzz: short strokes around each orb, the game's static
+      if(opts.buzz !== false){
+        var r = mulberry32(o[3] * 101 + Math.floor(t * 12));
+        g.strokeStyle = o[1]; g.lineWidth = Math.max(1.5, u*0.035); g.globalAlpha = 0.55;
+        g.beginPath();
+        for(var i=0;i<12;i++){
+          var a = r()*6.283, br = u*1.14 + r()*u*0.12, bl = u*(0.12 + r()*0.22), bj = (r()-0.5)*0.5;
+          g.moveTo(o[0] + Math.cos(a)*br, cy + Math.sin(a)*br);
+          g.lineTo(o[0] + Math.cos(a+bj)*(br+bl), cy + Math.sin(a+bj)*(br+bl));
+        }
+        g.stroke(); g.globalAlpha = 1;
+      }
+      g.fillStyle = o[1]; g.beginPath(); g.arc(o[0], cy, u, 0, Math.PI*2); g.fill();
+      g.fillStyle = "rgba(255,255,255,.35)"; g.beginPath(); g.arc(o[0] - u*0.32, cy - u*0.34, u*0.26, 0, Math.PI*2); g.fill();
+    });
+  }
+  function wordmark(x, y, px, align, color, spacing){
+    g.font = "800 " + px + "px Sora"; g.textBaseline = "middle"; g.fillStyle = color || INK;
+    if(g.letterSpacing !== undefined) g.letterSpacing = Math.round(px * (spacing == null ? 0.16 : spacing)) + "px";
+    var w = g.measureText("BELL THEORY").width;
+    var sx = align === "center" ? x - w/2 + px*0.08 : x;
+    g.textAlign = "left"; g.fillText("BELL THEORY", sx, y);
+    if(g.letterSpacing !== undefined) g.letterSpacing = "0px";
+    return w;
+  }
+  function mono(text, x, y, px, color, spacing, alpha){
+    g.font = "500 " + px + "px 'IBM Plex Mono'"; g.textAlign = "center"; g.textBaseline = "middle";
+    if(g.letterSpacing !== undefined) g.letterSpacing = Math.round(px * (spacing || 0.2)) + "px";
+    g.globalAlpha = alpha == null ? 1 : alpha; g.fillStyle = color || INK; g.fillText(text, x + px*(spacing||0.2)/2, y);
+    g.globalAlpha = 1; if(g.letterSpacing !== undefined) g.letterSpacing = "0px";
+  }
+  function big(lines, cx, cy, px, hot, glow){
+    g.font = "800 " + px + "px Sora"; g.textBaseline = "middle";
+    lines.forEach(function(line, i){
+      var y = cy + (i - (lines.length-1)/2) * px * 1.02, w = g.measureText(line).width;
+      var parts = hot && line.indexOf(hot) >= 0 ? [line.slice(0, line.indexOf(hot)), hot, line.slice(line.indexOf(hot) + hot.length)] : [line, "", ""];
+      var x = cx - w/2; g.textAlign = "left";
+      parts.forEach(function(p, j){
+        if(!p) return;
+        g.shadowColor = j === 1 ? "rgba(242,193,78,.7)" : "rgba(125,211,192,.5)"; g.shadowBlur = glow == null ? px*0.24 : glow;
+        g.fillStyle = j === 1 ? GOLD : "#ffffff"; g.fillText(p, x, y); g.shadowBlur = 0;
+        x += g.measureText(p).width;
+      });
+    });
+  }
+  function pill(text, cx, cy, px){
+    g.font = "500 " + px + "px 'IBM Plex Mono'"; if(g.letterSpacing !== undefined) g.letterSpacing = Math.round(px*0.15) + "px";
+    var w = g.measureText(text).width + px*2.2, h = px*2.3;
+    g.fillStyle = "rgba(125,211,192,.12)"; g.strokeStyle = "rgba(125,211,192,.65)"; g.lineWidth = 2;
+    g.beginPath(); if(g.roundRect) g.roundRect(cx - w/2, cy - h/2, w, h, h/2); else g.rect(cx - w/2, cy - h/2, w, h); g.fill(); g.stroke();
+    g.fillStyle = "#bff3e7"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, cx + px*0.075, cy + 1);
+    if(g.letterSpacing !== undefined) g.letterSpacing = "0px";
+  }
+  function phoneShot(img, cx, cy, w){
+    // A gameplay still in a rounded phone-shaped frame with a teal rim.
+    var h = w * 16/9, x = cx - w/2, y = cy - h/2, r = w*0.09;
+    g.save();
+    g.shadowColor = "rgba(125,211,192,.35)"; g.shadowBlur = 70;
+    g.fillStyle = "#0b0d11"; g.beginPath(); g.roundRect(x - 10, y - 10, w + 20, h + 20, r + 8); g.fill();
+    g.shadowBlur = 0;
+    g.beginPath(); g.roundRect(x, y, w, h, r); g.clip();
+    if(img) g.drawImage(img, x, y, w, h);
+    g.restore();
+    g.strokeStyle = "rgba(125,211,192,.55)"; g.lineWidth = 3;
+    g.beginPath(); g.roundRect(x - 10, y - 10, w + 20, h + 20, r + 8); g.stroke();
+  }
+
+  var IMGS = {};
+  function load(name, src){ return new Promise(function(res){ var i = new Image(); i.onload = function(){ IMGS[name] = i; res(); }; i.onerror = function(){ res(); }; i.src = src; }); }
+
+  // ---------- products ----------
+  var R = {
+    // Logo mark alone on transparent.
+    "logo-mark": { w:1024, h:1024, draw:function(){ mark(512, 520, 150, {}); } },
+    // Profile picture: circle-safe (everything inside the centre 80 %).
+    "profile": { w:1080, h:1080, draw:function(){ space(1080, 1080, 0); mark(540, 548, 150, {}); } },
+    // Horizontal lockup, transparent, light text for dark backgrounds.
+    "logo-horizontal-dark": { w:2900, h:720, draw:function(){ mark(430, 372, 150, {}); wordmark(900, 372, 190, "left", INK); } },
+    // Same for light backgrounds.
+    "logo-horizontal-light": { w:2900, h:720, draw:function(){ mark(430, 372, 150, { buzz:false, glow:false }); wordmark(900, 372, 190, "left", "#12151b"); } },
+    // Stacked lockup on space, square.
+    "logo-stacked": { w:1080, h:1080, draw:function(){ space(1080, 1080, 0); mark(540, 450, 120, {}); wordmark(540, 790, 96, "center", INK); mono("THREAD IT · OR WRECK IT", 540, 890, 30, TEAL, 0.22, 0.9); } },
+    // Launch post, 4:5 feed.
+    "launch-post": { w:1080, h:1350, draw:function(){
+      space(1080, 1350, 0);
+      mark(540, 150, 44, {}); wordmark(540, 262, 54, "center", INK);
+      phoneShot(IMGS.shot, 540, 700, 330);
+      big(["COMING SOON"], 540, 1082, 118, "SOON");
+      mono("iOS · ANDROID · FOLLOW FOR LAUNCH DAY", 540, 1182, 26, "#bff3e7", 0.16, 0.95);
+    } },
+    // Launch story, 9:16 (text kept inside the story safe zone).
+    "launch-story": { w:1080, h:1920, draw:function(){
+      space(1080, 1920, 0);
+      mark(540, 390, 60, {}); wordmark(540, 540, 72, "center", INK);
+      phoneShot(IMGS.shot, 540, 1030, 380);
+      big(["COMING", "SOON"], 540, 1510, 150, "SOON");
+      mono("FOLLOW FOR LAUNCH DAY", 540, 1680, 30, "#bff3e7", 0.18, 0.95);
+    } },
+    // Reel overlays (transparent 1080x1920): the hook over gameplay.
+    "reel-hook-1": { w:1080, h:1920, draw:function(){ big(["CAN YOUR BRAIN", "SPLIT IN TWO?"], 540, 520, 104, "TWO?", 36); } },
+    "reel-hook-2": { w:1080, h:1920, draw:function(){ big(["THREAD IT.", "OR WRECK IT."], 540, 520, 118, "WRECK", 36); } },
+    "reel-hook-3": { w:1080, h:1920, draw:function(){ big(["NOW IT'S", "COUNTRY VS COUNTRY"], 540, 500, 84, "COUNTRY VS COUNTRY", 30); } }
+  };
+
+  // Reel outro, animated: orbs fly in from the lanes and lock onto the seam,
+  // the name lands, then COMING SOON. 4.5 s, holds from 3.2 s.
+  function outro(t){
+    var W = 1080, H = 1920; size(W, H);
+    space(W, H, t);
+    var k = easeOut(t / 0.9);
+    var split = 1 - k;
+    g.globalAlpha = clamp(t / 0.25);
+    mark(W/2, 700, 120 * (0.7 + 0.3 * back(t / 0.9)), { split: split * 2.2, seam: easeOut((t - 0.6) / 0.4), t: t });
+    g.globalAlpha = 1;
+    var n = easeOut((t - 0.9) / 0.4);
+    if(n > 0){ g.globalAlpha = n; wordmark(W/2, 1010 + (1 - n) * 30, 104, "center", INK); g.globalAlpha = 1; }
+    var c = (t - 1.5) / 0.45;
+    if(c > 0){
+      g.save(); g.globalAlpha = easeOut(c); g.translate(W/2, 1220); var sc = 1.16 - 0.16 * back(c); g.scale(sc, sc);
+      big(["COMING SOON"], 0, 0, 132, "SOON"); g.restore(); g.globalAlpha = 1;
+    }
+    var f = easeOut((t - 2.1) / 0.4);
+    if(f > 0){ g.globalAlpha = f; pill("FOLLOW FOR LAUNCH DAY", W/2, 1370, 36); mono("iOS · ANDROID", W/2, 1470, 30, INK, 0.3, 0.8 * f); g.globalAlpha = 1; }
+    var fade = 1 - easeOut(t / 0.3);
+    if(fade > 0){ g.fillStyle = "rgba(0,0,0," + fade + ")"; g.fillRect(0, 0, W, H); }
+  }
+
+  window.BK = {
+    ready: false, names: Object.keys(R),
+    still: function(name){ var r = R[name]; size(r.w, r.h); g.clearRect(0, 0, r.w, r.h); r.draw(); return cv.toDataURL("image/png").split(",")[1]; },
+    outro: function(t){ outro(t); return cv.toDataURL("image/png").split(",")[1]; },
+    svgMark: null
+  };
+  var shot = new URLSearchParams(location.search).get("shot") || "/ads/out/shot.png";
+  Promise.all([document.fonts.load("800 100px Sora"), document.fonts.load("500 40px 'IBM Plex Mono'"), load("shot", shot)]).then(function(){ window.BK.ready = true; });
+})();
+</script>
+</body></html>
