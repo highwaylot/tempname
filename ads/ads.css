@@ -19,3 +19,6 @@
 
 /* The centre seam glows for play; in a video it pulls the eye off the flags. */
 #seamClip{ opacity:.35; }
+
+/* Zen (long-form ambient): no HUD at all. */
+.zen .gauge{ display:none !important; }

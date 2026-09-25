@@ -197,6 +197,58 @@ try{
     console.log(JSON.stringify({ wrote: fs.readdirSync(out) }));
   }
 
+  else if(cmd === 'longform'){
+    // 1920x1080 ambient video: the game in a centre column over a looping
+    // space background, an original soundtrack driven by the run's events.
+    //   --minutes 10 --seed 3
+    const { execFileSync } = await import('node:child_process');
+    const minutes = +opt('--minutes', 10), seed = opt('--seed', '3'), fps = 30, len = minutes * 60;
+    const outDir = path.join(here, 'out'); fs.mkdirSync(outDir, { recursive: true });
+    const bgFile = path.join(outDir, 'bg-loop.mp4');
+    if(!fs.existsSync(bgFile)){
+      const bp = await browser.newPage({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
+      await bp.goto(`http://localhost:${PORT}/ads/brand.html`);
+      await bp.waitForFunction(() => window.BK && window.BK.ready, null, { timeout: 30000 });
+      const ff = spawn(ffmpegPath, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-i', '-', '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', bgFile], { stdio: ['pipe', 'inherit', 'inherit'] });
+      const done = new Promise((res) => ff.on('close', res));
+      for(let i = 0; i < 60 * fps; i++){
+        const b = Buffer.from(await bp.evaluate((tt) => window.BK.bg(tt), i / fps), 'base64');
+        if(!ff.stdin.write(b)) await new Promise(r => ff.stdin.once('drain', r));
+      }
+      ff.stdin.end(); await done; await bp.close();
+      console.log('background loop ready');
+    }
+    const page = await browser.newPage({ viewport: { width: 540, height: 1080 }, deviceScaleFactor: 1 });
+    for(let attempt = 0; ; attempt++){
+      await page.goto(`http://localhost:${PORT}/ads/versus.html?fx=full&zen=1&len=${len}&seed=${seed}&fps=${fps}`);
+      try{ await page.waitForFunction(() => window.AD && window.AD.ready, null, { timeout: 45000 }); break; }
+      catch(e){ if(attempt >= 2) throw e; }
+    }
+    const base = path.join(outDir, `zen-${minutes}min-s${seed}`);
+    const vid = spawn(ffmpegPath, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-i', '-',
+      '-stream_loop', '-1', '-i', bgFile, '-filter_complex', '[1][0]overlay=690:0:shortest=1,format=yuv420p',
+      '-r', String(fps), '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', base + '.video.mp4'], { stdio: ['pipe', 'inherit', 'inherit'] });
+    const vdone = new Promise((res, rej) => vid.on('close', c => c === 0 ? res() : rej(new Error('ffmpeg ' + c))));
+    const total = len * fps, t0 = Date.now();
+    let st;
+    for(let i = 0; i < total; i++){
+      const shot = await page.screenshot({ type: 'jpeg', quality: 90 });
+      if(!vid.stdin.write(shot)) await new Promise(r => vid.stdin.once('drain', r));
+      st = await page.evaluate(() => window.AD.step(1));
+      if(i % 1800 === 0 && i){ const el = (Date.now() - t0) / 1000; console.log(`${(i / fps / 60).toFixed(1)} of ${minutes} min rendered, ${(el / 60).toFixed(1)} min elapsed, about ${((total - i) * el / i / 60).toFixed(0)} min to go, crashes so far ${st.crashes}`); }
+    }
+    vid.stdin.end(); await vdone;
+    const events = await page.evaluate(() => window.AD.events());
+    fs.writeFileSync(base + '.events.json', JSON.stringify(events));
+    await page.close();
+    execFileSync('node', [path.join(here, 'ambient.mjs'), '--seconds', String(len), '--events', base + '.events.json', '--out', base + '.wav', '--seed', seed], { stdio: 'inherit' });
+    execFileSync(ffmpegPath, ['-y', '-loglevel', 'error', '-i', base + '.video.mp4', '-i', base + '.wav', '-c:v', 'copy',
+      '-af', 'loudnorm=I=-18:TP=-2:LRA=11', '-ar', '48000', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', base + '.mp4'], { stdio: 'inherit' });
+    fs.rmSync(base + '.video.mp4'); fs.rmSync(base + '.wav');
+    const counts = events.reduce((a, e) => (a[e.type] = (a[e.type] || 0) + 1, a), {});
+    console.log(JSON.stringify({ file: path.relative(root, base + '.mp4'), minutes, crashes: st.crashes, events: counts, renderMinutes: +((Date.now() - t0) / 60000).toFixed(1) }));
+  }
+
   else if(cmd === 'endcards'){
     const fps = +opt('--fps', 30);
     const page = await browser.newPage({ viewport: { width: 540, height: 960 }, deviceScaleFactor: 2 });

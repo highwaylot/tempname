@@ -173,6 +173,57 @@
     "reel-hook-3": { w:1080, h:1920, draw:function(){ big(["NOW IT'S", "COUNTRY VS COUNTRY"], 540, 500, 84, "COUNTRY VS COUNTRY", 30); } }
   };
 
+  // Long-form background, 1920x1080, a seamless 60-second loop: every motion
+  // is periodic in 60 s (stars drift exactly one or two screen heights, the
+  // nebula and the side glows breathe on whole-number cycles). The game
+  // column (540x1080) is composited over the centre by ffmpeg.
+  var LOOP = 60;
+  function bgLoop(t){
+    var W = 1920, H = 1080, w = 2 * Math.PI / LOOP; size(W, H);
+    var bg = g.createRadialGradient(W/2, H*0.45, 80, W/2, H*0.5, W*0.62);
+    bg.addColorStop(0, "#141a3c"); bg.addColorStop(0.5, "#090b19"); bg.addColorStop(1, "#030409");
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    [[0.18, 0.35, 700, "107,60,255", 0.22, 1], [0.84, 0.62, 760, "31,199,176", 0.15, 2], [0.5, 0.95, 620, "255,180,84", 0.07, 3]].forEach(function(n){
+      var cx = n[0]*W + Math.sin(t*w*n[5])*60, cy = n[1]*H + Math.cos(t*w*n[5])*40;
+      var ng = g.createRadialGradient(cx, cy, 0, cx, cy, n[2]);
+      ng.addColorStop(0, "rgba(" + n[3] + "," + n[4] + ")"); ng.addColorStop(1, "rgba(" + n[3] + ",0)");
+      g.fillStyle = ng; g.fillRect(0, 0, W, H);
+    });
+    // The two orbs, huge and soft, breathing on either side of the column.
+    [[W*0.2, "255,180,84", 0], [W*0.8, "94,200,255", Math.PI]].forEach(function(o){
+      var a = 0.14 + 0.06 * Math.sin(t*w*2 + o[2]), cy = H*0.5 + Math.sin(t*w + o[2]) * 40;
+      var og = g.createRadialGradient(o[0], cy, 0, o[0], cy, 420);
+      og.addColorStop(0, "rgba(" + o[1] + "," + a + ")"); og.addColorStop(1, "rgba(" + o[1] + ",0)");
+      g.fillStyle = og; g.fillRect(0, 0, W, H);
+    });
+    STARS.forEach(function(s, i){
+      var k = s.z > 0.6 ? 2 : 1;
+      var x = s.x * W, y = (s.y * H + t * k * H / LOOP) % H;
+      var tw = 0.55 + 0.45 * Math.sin(t * w * (1 + (i % 5)) + s.ph);
+      g.globalAlpha = (0.25 + 0.75 * s.z) * tw;
+      g.fillStyle = s.hue < 0.15 ? "#ffd6a0" : (s.hue < 0.3 ? "#aad2ff" : "#ebf0ff");
+      g.beginPath(); g.arc(x, y, 0.7 + s.z * 1.8, 0, Math.PI*2); g.fill();
+    });
+    g.globalAlpha = 1;
+    // A soft teal frame around where the game column sits.
+    g.save(); g.shadowColor = "rgba(125,211,192,.45)"; g.shadowBlur = 60; g.fillStyle = "#0b0d11";
+    g.fillRect(W/2 - 270, 0, 540, H); g.restore();
+    g.strokeStyle = "rgba(125,211,192,.35)"; g.lineWidth = 2; g.strokeRect(W/2 - 271, -2, 542, H + 4);
+    // Quiet brand marks on the sides.
+    g.globalAlpha = 0.55; mark(W*0.2, H*0.86, 22, { buzz:false }); g.globalAlpha = 1;
+    mono("BELL THEORY", W*0.8, H*0.86, 22, INK, 0.35, 0.5);
+  }
+  // YouTube thumbnail, 1280x720.
+  function thumb(minutes){
+    var W = 1280, H = 720; size(W, H); space(W, H, 0);
+    phoneShot(IMGS.shot, 1010, 360, 330 * 0.62);
+    mark(250, 190, 56, {});
+    g.font = "800 150px Sora"; g.textAlign = "left"; g.textBaseline = "alphabetic";
+    g.shadowColor = "rgba(242,193,78,.6)"; g.shadowBlur = 40; g.fillStyle = GOLD; g.fillText(minutes + " MIN", 90, 440); g.shadowBlur = 0;
+    g.font = "800 64px Sora"; g.fillStyle = "#ffffff"; g.shadowColor = "rgba(125,211,192,.5)"; g.shadowBlur = 24;
+    g.fillText("SPACE ASMR", 94, 530); g.shadowBlur = 0;
+    mono("CALM TWO-ORB GAMEPLAY · AMBIENT", 94 + 330, 600, 24, "#bff3e7", 0.14, 0.95);
+  }
   // Reel outro, animated: orbs fly in from the lanes and lock onto the seam,
   // the name lands, then COMING SOON. 4.5 s, holds from 3.2 s.
   function outro(t){
@@ -200,6 +251,8 @@
     ready: false, names: Object.keys(R),
     still: function(name){ var r = R[name]; size(r.w, r.h); g.clearRect(0, 0, r.w, r.h); r.draw(); return cv.toDataURL("image/png").split(",")[1]; },
     outro: function(t){ outro(t); return cv.toDataURL("image/png").split(",")[1]; },
+    bg: function(t){ bgLoop(t); return cv.toDataURL("image/jpeg", 0.92).split(",")[1]; },
+    thumb: function(m){ thumb(m); return cv.toDataURL("image/png").split(",")[1]; },
     svgMark: null
   };
   var shot = new URLSearchParams(location.search).get("shot") || "/ads/out/shot.png";

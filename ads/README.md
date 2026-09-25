@@ -108,3 +108,29 @@ These rounds are real gameplay played by bots, so label them as AI vs AI
 (the hook line or the post caption). A paid ad must also show what the app
 can do: ship Versus mode before running these as paid ads (see
 `docs/MARKETING.md`, section 3).
+
+## Long-form ambient videos
+
+```
+node ads/render.mjs longform --minutes 30 --seed 31
+```
+
+Writes `ads/out/zen-30min-s31.mp4`: 1920×1080, 30 fps, AAC stereo at
+-18 LUFS. The game plays in a centre column over a looping space background
+(`bg-loop.mp4`, rendered once and reused). Rendering takes about 1.3 minutes
+per minute of video on this machine; run several with different `--port`
+values in parallel.
+
+**Zen mode** (what the long videos use): no scheduled crashes; difficulty
+drifts between calm and a little busier over 5-minute swells; the bots pump
+for a boost every 45–95 s so there's the occasional smash; if a bot slips
+by accident the run restarts quietly after 1.6 s. No HUD.
+
+**Soundtrack** (`ads/ambient.mjs`, original, generated, safe from copyright
+claims): a slow pad cycling Dmaj9, Bm11, Gmaj9, A6add9 (20 s each with long
+crossfades), a soft sub on the root, "space wind" (band-passed brown noise),
+far-off bells every 5–13 s, and quiet sounds tied to what happens on screen:
+a glassy tink per coin, a swell on boost, a muffled thump per smash. The mix
+step normalises to -18 LUFS with peaks under -2 dBFS. It was checked by
+loudness and spectrum, not by ear: listen to the first minute before
+uploading.

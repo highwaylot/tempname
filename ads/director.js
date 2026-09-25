@@ -30,16 +30,22 @@ var P = {
   maxLen: +(q.get("maxLen") || 24),
   hook: q.get("hook") || "Who hits the wall first?",
   fps: +(q.get("fps") || 30),
-  clean: q.get("clean") === "1"   // no flags, no banners: the game as players see it
+  clean: q.get("clean") === "1" || q.get("zen") === "1",   // no flags, no banners: the game as players see it
+  // Zen: long-form ambient footage. No scheduled crash, calm difficulty that
+  // breathes over minutes, a boost now and then, and a quiet restart if a bot
+  // slips by accident. `len` is the length in seconds.
+  zen: q.get("zen") === "1",
+  len: +(q.get("len") || 600)
 };
 var rng = window.__adBotRng;
 function gamma2(mean){ return -(mean/2) * Math.log((1 - rng()) * (1 - rng())); } // Erlang k=2
 
-var failAt = [0, 1].map(function(){
+var failAt = P.zen ? [Infinity, Infinity] : [0, 1].map(function(){
   if(rng() < P.early) return 0.8 + rng() * (P.safe - 0.8);
   return P.safe + 0.8 + gamma2(P.mean);
 });
 
+var zenPumpUntil = -1, zenNextPump = 25 + rng() * 30, restartAt = -1, events = [], seenPass = new WeakSet(), lastCoins = 0, lastWreck = 0, lastBoost = 0, crashes = 0;
 var t = 0, started = false, deathT = -1, loser = -1, smashPick = new WeakMap(), failDir = new WeakMap();
 var pumpPh = [rng() * 6.28, rng() * 6.28], wob = [rng() * 6.28, rng() * 6.28];
 
@@ -99,7 +105,7 @@ function sideTarget(s, dt){
   // and the orb is still travelling sideways.
   var ty = baseY;
   var closeBy = next && (c.y - (next.y + next.h)) < 150 && Math.abs(c.x - tx) > 10;
-  if(!lit && !closeBy && !inBand && !failing){ pumpPh[s] += dt * 6.28 * 2.9; ty = baseY + Math.sin(pumpPh[s]) * PUMP; }
+  if(!lit && !closeBy && !inBand && !failing && (!P.zen || t < zenPumpUntil)){ pumpPh[s] += dt * 6.28 * 2.9; ty = baseY + Math.sin(pumpPh[s]) * PUMP; }
   else if(inBand){ ty = baseY; }
   return { tx: Math.max(b.x0 + DRAW_R, Math.min(b.x1 - DRAW_R, tx)), ty: ty };
 }
@@ -170,13 +176,31 @@ function rasterFlag(code){
 
 function step(){
   var dt = 1 / P.fps;
+  if(P.zen && started){
+    // Calm pacing: difficulty drifts between ~0.12 and ~0.34 over 5-minute swells.
+    var dT = 0.23 + 0.11 * Math.sin(t * 2 * Math.PI / 300);
+    game.diffAdj = dT - game.dist / 2600;
+    if(t >= zenNextPump){ zenPumpUntil = t + 6; zenNextPump = t + 45 + rng() * 50; }
+    if(game.boost > 0) zenPumpUntil = -1;
+  }
   if(started && game.phase === PHASE_RUN && game.dying === 0){
     [0,1].forEach(function(s){ var g = sideTarget(s, dt); cursors[s].tx = g.tx; cursors[s].ty = g.ty; cursors[s].active = true; });
   }
   window.__adStepFrame(1000 / P.fps);
   if(started){
     t += dt;
-    if(deathT < 0 && (game.dying > 0 || game.phase === PHASE_DEAD)){ deathT = t; loser = loserSide(); crown(); }
+    if(P.zen){
+      // Event log for the soundtrack: what happened, and when.
+      if(game.coins > lastCoins) events.push({ t: +t.toFixed(3), type: "coin", n: game.coins - lastCoins });
+      lastCoins = game.coins;
+      if(game.boost > 0 && lastBoost === 0) events.push({ t: +t.toFixed(3), type: "boost" });
+      lastBoost = game.boost;
+      if(game.wreck > lastWreck) events.push({ t: +t.toFixed(3), type: "smash" });
+      lastWreck = game.wreck;
+      game.obstacles.forEach(function(o){ if(o.passed && !seenPass.has(o)){ seenPass.add(o); events.push({ t: +t.toFixed(3), type: "pass", side: o.side }); } });
+      if(restartAt < 0 && (game.dying > 0 || game.phase === PHASE_DEAD)){ crashes++; events.push({ t: +t.toFixed(3), type: "crash" }); restartAt = t + 1.6; }
+      if(restartAt >= 0 && t >= restartAt && game.phase === PHASE_DEAD){ restartAt = -1; lastCoins = 0; lastWreck = 0; startRun(); }
+    } else if(deathT < 0 && (game.dying > 0 || game.phase === PHASE_DEAD)){ deathT = t; loser = loserSide(); crown(); }
   }
   paintLayer();
 }
@@ -185,7 +209,8 @@ window.AD = {
   params: P, failAt: failAt, _g: { game: game, cursors: cursors, view: view },
   ready: false,
   step: function(n){ for(var i=0;i<(n||1);i++) step(); return window.AD.status(); },
-  status: function(){ return { t: +t.toFixed(3), deathT: deathT, loser: loser, phase: game.phase, dist: Math.floor(game.dist), done: deathT >= 0 && t - deathT >= 1.9 || t >= P.maxLen }; }
+  status: function(){ return { t: +t.toFixed(3), deathT: deathT, loser: loser, phase: game.phase, dist: Math.floor(game.dist), crashes: crashes, done: P.zen ? t >= P.len : (deathT >= 0 && t - deathT >= 1.9 || t >= P.maxLen) }; },
+  events: function(){ return events; }
 };
 
 (async function(){
@@ -201,6 +226,7 @@ window.AD = {
   }
   buildLayer();
   if(P.clean) layer.style.display = "none";
+  if(P.zen) document.documentElement.classList.add("zen");
   // Two frames on the title so the orbs settle, then both thumbs down.
   window.__adStepFrame(1000 / P.fps); window.__adStepFrame(1000 / P.fps);
   var H = view.H;
