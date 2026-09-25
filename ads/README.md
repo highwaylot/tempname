@@ -11,7 +11,9 @@ node ads/render.mjs versus --left br --right ar --seed 7
 ```
 
 That records one round to `ads/out/br-vs-ar-s7.mp4`: 1080×1920, 30 fps,
-H.264, **no sound** (add sound in the edit). Each side is a bot playing one
+H.264, with **the game's own sound** (coin dings, pump ticks, boosts,
+smashes, the crash), captured frame-exact and levelled to -14 LUFS. Lay
+music under it in the edit if you want. Each side is a bot playing one
 lane of the real game with its country's flag on the orb. The side that hits
 a wall first loses, and the clip ends on a "<country> wins" card about 1.9 s
 after the crash.
@@ -34,16 +36,19 @@ predict which. Before the safe window a crash needs a one-in-100-million
 roll (`--early 1e-8`). Bots boost, smash slate and graze walls on the way,
 all real engine behaviour.
 
-**How the bots play.** Ads use the "hype" style: they dart for coins
-whenever there's time to get back into the gap (and stay on a coin once
-they've picked it), skim a wall for GRAZE on about 4 in 10 barriers, and
-smash most slate while lit. Motion goes through a virtual thumb on a damped
-spring, stiff only when a wall is under half a second away, with a pump that
-drifts in tempo (2.4–3.4 strokes/s) and reach from stroke to stroke, so the
-orbs move like a hand, not a servo. Long-form uses the "calm" style: same
-motion, wider coin margins, no skimming. `sim` prints per-round coins,
-grazes, smashes and two smoothness numbers (`jerk`, `flipsPerSec`: lower is
-smoother).
+**How the bots play.** Ads use the "hype" style, a good player showing off.
+The round opens mid-run (difficulty 0.36, climbing 0.02/s;
+the real game reaches 0.36 around distance 940) instead of on the slow
+opening seconds. Bots pump in quick 3.4–4.6 Hz strokes almost nonstop, in
+the free half of their reach when a wall blocks the other, so the first
+boost lands around 2 s; about 4 in 10 boosts are chained by pumping through
+them. Coins come first: any coin the thumb can reach and still get back into
+the gap from, kept until taken. They skim a wall for GRAZE on ~4 in 10
+barriers and smash most slate while lit. Movement is flicks between resting
+spots through a damped spring (stiff near walls), not a sway. Long-form
+uses "calm": the same brain at half the energy. `sim` prints per-round
+coins, coins/s, missed coins, boosts, time lit, speed, grazes, smashes and
+two smoothness numbers.
 
 **Every rivalry at once:**
 

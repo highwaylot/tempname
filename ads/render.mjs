@@ -11,7 +11,7 @@
 //       Records every end-card variant to ads/endcards/<id>.mp4 plus a
 //       transparent PNG of its final frame.
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -43,6 +43,19 @@ function encoder(file, fps){
     { stdio: ['pipe', 'inherit', 'inherit'] });
   const done = new Promise((res, rej) => ff.on('close', c => c === 0 ? res() : rej(new Error('ffmpeg exited ' + c))));
   return { write: (buf) => new Promise(r => ff.stdin.write(buf) ? r() : ff.stdin.once('drain', r)), end: async () => { ff.stdin.end(); await done; } };
+}
+// The game's own sound for the round, rendered offline in the page on the
+// stepped clock, muxed in as AAC. Levels are the game's; loudnorm brings the
+// clip to -14 LUFS (short-form norm) with -1 dBTP headroom.
+async function addAudio(page, file, seconds){
+  const b64 = await page.evaluate(s => window.AD.audio(s), seconds);
+  if(!b64) return;
+  const wav = file.replace(/\.mp4$/, '.wav'), tmp = file.replace(/\.mp4$/, '.silent.mp4');
+  fs.writeFileSync(wav, Buffer.from(b64, 'base64'));
+  fs.renameSync(file, tmp);
+  execFileSync(ffmpegPath, ['-y', '-loglevel', 'error', '-i', tmp, '-i', wav, '-c:v', 'copy',
+    '-af', 'loudnorm=I=-14:TP=-1:LRA=11', '-ar', '48000', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', file], { stdio: 'inherit' });
+  fs.rmSync(tmp); fs.rmSync(wav);
 }
 async function openVersus(browser, params, dsf = 2){
   // Same 540x960 layout either way, so the game plays identically; dsf 1 is
@@ -97,7 +110,7 @@ try{
       runs: rows.length, crashed: d.length, before_safe: early.length, before_scheduled_fail: accidental.length,
       left_lost: rows.filter(r => r.loser === 0).length, right_lost: rows.filter(r => r.loser === 1).length,
       crash_seconds: { min: d[0], p10: q(0.1), median: q(0.5), p90: q(0.9), max: d[d.length - 1] },
-      per_round_mean: Object.fromEntries(['coins', 'grazes', 'smashes', 'jerk', 'flipsPerSec'].filter(k => k in rows[0]).map(k => [k, +(rows.reduce((a, r) => a + r[k], 0) / rows.length).toFixed(2)])),
+      per_round_mean: Object.fromEntries(['coins', 'coinsPerSec', 'missed', 'boosts', 'litFrac', 'speed', 'grazes', 'smashes', 'jerk', 'flipsPerSec'].filter(k => k in rows[0]).map(k => [k, +(rows.reduce((a, r) => a + r[k], 0) / rows.length).toFixed(2)])),
       errors: rows.reduce((a, r) => a + r.errors, 0), early_seeds: early.map(r => r.seed)
     }, null, 2));
     fs.mkdirSync(path.join(here, 'out'), { recursive: true });
@@ -124,6 +137,7 @@ try{
       } while(!st.done);
       await enc.write(await page.screenshot({ type: 'png' }));
       await enc.end();
+      await addAudio(page, file, (frames + 1) / +common.fps);
       await page.close();
       console.log(JSON.stringify({ file: path.relative(root, file), seconds: +(frames / +common.fps).toFixed(2), crashAt: st.deathT, loser: st.loser === 0 ? left : right, errors }));
     }
@@ -151,6 +165,7 @@ try{
         } while(!st.done);
         await enc.write(await page.screenshot({ type: 'png' }));
         await enc.end();
+        await addAudio(page, file, (frames + 1) / +common.fps);
         await page.close();
         console.log(JSON.stringify({ file: path.relative(root, file), seconds: +(frames / +common.fps).toFixed(2), crashAt: +st.deathT.toFixed(2), winner: st.loser === 0 ? m.right : m.left, errors: errors.length }));
       }
