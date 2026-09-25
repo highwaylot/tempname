@@ -44,6 +44,13 @@ It prints when and who crashed for 100 seeds, and a summary: how many died
 before the safe window (should be 0) and the left/right split (should be
 close to even).
 
+Last check (100 seeds, 2026-09-25): 0 crashes before 6 s; earliest 7.1 s,
+median 11.4 s, 80% between 8.6 and 15.4 s, longest 20.5 s; left lost 41,
+right 59 (within coin-flip noise); the side scheduled to slip lost 86 times,
+and in the other 14 the other bot crashed by accident after the safe window.
+
+`ads/sample-br-vs-ar-s1.mp4` is seed 1: Brazil crashes at 12.0 s.
+
 ## End cards
 
 ```

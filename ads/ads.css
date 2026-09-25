@@ -16,3 +16,6 @@
 .ad-win-name{ font-weight:800; font-size:52px; line-height:1; color:#fff; text-transform:uppercase; text-align:center; text-shadow:0 4px 24px rgba(0,0,0,.9); padding:0 16px; }
 .ad-win-sub{ font-family:'IBM Plex Mono', monospace; font-weight:500; font-size:15px; letter-spacing:.18em; text-transform:uppercase; color:#ff8a8a; text-shadow:0 2px 10px rgba(0,0,0,.9); }
 .ad-dim{ position:absolute; inset:0; background:rgba(5,6,10,.55); opacity:0; }
+
+/* The centre seam glows for play; in a video it pulls the eye off the flags. */
+#seamClip{ opacity:.35; }

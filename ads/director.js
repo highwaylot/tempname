@@ -15,6 +15,7 @@ import '../src/main.js';
 import { game, cursors, startRun, laneBounds, HIT_R, DRAW_R, PHASE_RUN, PHASE_DEAD, BOOST_DRAIN } from '../src/game.js';
 import { state } from '../src/state.js';
 import { view, clearImageCache, clearHaloCache } from '../src/render.js';
+import { world } from '../src/world.js';
 
 var q = new URLSearchParams(location.search);
 var P = {
@@ -102,20 +103,14 @@ function sideTarget(s, dt){
   return { tx: Math.max(b.x0 + DRAW_R, Math.min(b.x1 - DRAW_R, tx)), ty: ty };
 }
 
+// The game marks every crash with a ripple of strength 1.6 and life 2.2 at
+// the exact hit point (game.js die()); its x says which lane crashed.
 function loserSide(){
-  var best = -1, bd = 1e9;
-  [0,1].forEach(function(s){
-    var c = cursors[s];
-    game.obstacles.forEach(function(o){
-      if(o.side !== s) return;
-      o.rects.forEach(function(r){
-        var nx = Math.max(r.x, Math.min(c.x, r.x + r.w)), ny = Math.max(o.y, Math.min(c.y, o.y + o.h));
-        var d = Math.hypot(c.x - nx, c.y - ny);
-        if(d < bd){ bd = d; best = s; }
-      });
-    });
-  });
-  return best;
+  for(var i = world.ripples.length - 1; i >= 0; i--){
+    var r = world.ripples[i];
+    if(r.strength === 1.6 && r.life === 2.2) return r.x < view.W / 2 ? 0 : 1;
+  }
+  return -1;
 }
 
 // ---------- overlays ----------
