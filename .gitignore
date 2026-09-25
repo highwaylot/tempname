@@ -8,3 +8,6 @@ test/scratch-*
 ads/versus.html
 ads/out/
 ads/out-sim*.log
+creator/index.html
+creator/flags.gen.js
+dist-creator/

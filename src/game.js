@@ -15,6 +15,8 @@ export var game = {
   phase: PHASE_READY,
   dist: 0,
   coins: 0,
+  // Coins by lane (left, right); the creator page's per-side counters read it.
+  coinsBy: [0, 0],
   speed: 0,
   obstacles: [],
   pickups: [],
@@ -117,6 +119,7 @@ export function startRun(){
   game.phase = PHASE_RUN;
   game.dist = 0;
   game.coins = 0;
+  game.coinsBy[0] = 0; game.coinsBy[1] = 0;
   game.speed = 200;
   game.obstacles.length = 0;
   game.pickups.length = 0;
@@ -679,6 +682,7 @@ export function update(dt){
         if(pdx*pdx + pdy*pdy < pr*pr){
           var gain = (p.val || 1) * (game.parallelOn ? 2 : 1);
           game.coins += gain;
+          game.coinsBy[s] += gain;
           game.dist += gain * 2;
           if(p.tier){ collectSpecial(p, gain); }
           else {
