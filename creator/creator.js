@@ -124,10 +124,12 @@ function buildHud(){
       '<div class="cr-lead"><span class="l" id="crLeadL"></span><span class="r" id="crLeadR"></span></div>' +
       '<div class="cr-hook" id="crHook"></div>' +
     '</div>' +
-    '<div class="cr-banner" id="crBanner"></div>' +
-    '<div class="cr-prompt" id="crPrompt">both thumbs down</div>' +
-    '<div class="cr-win"><div id="crWinBadge"></div><div class="cr-win-name" id="crWinName"></div><div class="cr-win-sub" id="crWinSub"></div><div class="cr-win-score" id="crWinScore"></div></div>' +
-    '<div class="cr-next"><div class="cr-next-big">WHO\'S<br>NEXT?</div><div class="cr-next-sub" id="crNextSub">comment the next matchup ↓</div></div>' +
+    '<div class="cr-mid">' +
+      '<div class="cr-banner" id="crBanner"></div>' +
+      '<div class="cr-prompt" id="crPrompt">both thumbs down</div>' +
+      '<div class="cr-win"><div id="crWinBadge"></div><div class="cr-win-name" id="crWinName"></div><div class="cr-win-sub" id="crWinSub"></div><div class="cr-win-score" id="crWinScore"></div></div>' +
+      '<div class="cr-next"><div class="cr-next-big">WHO\'S<br>NEXT?</div><div class="cr-next-sub" id="crNextSub">comment the next matchup ↓</div></div>' +
+    '</div>' +
     '<div class="cr-actions" id="crActions"></div>' +
     '<button type="button" class="cr-btn ghost small cr-quit" id="crQuit" aria-label="Back to menu">✕ menu</button>';
   view.wrap.appendChild(hud);
@@ -171,7 +173,7 @@ function setupRound(m){
   fitNames();
   el.crTag.textContent = m.tag || "";
   el.crHook.textContent = m.hook || defaultHook(m);
-  el.crHook.style.opacity = "1"; hookHidden = false;
+  el.crHook.hidden = false; hookHidden = false;
   el.crScoreL.textContent = "0"; el.crScoreR.textContent = "0"; shown = [0, 0];
   el.crClock.classList.remove("hot");
   el.crBanner.className = "cr-banner";
@@ -254,7 +256,7 @@ function tick(){
     else if(n !== lastCount && n >= 1 && n <= 3){ lastCount = n; bannerFlash(String(n)); }
   }
   if(mode === "live"){
-    if(!hookHidden && game.runTime > 2.2){ hookHidden = true; el.crHook.style.opacity = "0"; }
+    if(!hookHidden && game.runTime > 2.2){ hookHidden = true; el.crHook.hidden = true; }
     if(M.type === "coins"){
       var left = M.secs - game.runTime;
       el.crClock.classList.toggle("hot", left <= 5 || suddenDeath);

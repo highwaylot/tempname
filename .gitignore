@@ -11,3 +11,4 @@ ads/out-sim*.log
 creator/index.html
 creator/flags.gen.js
 dist-creator/
+creator-upload/

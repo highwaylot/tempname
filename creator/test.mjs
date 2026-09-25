@@ -4,18 +4,19 @@
 //   2. coin race: time runs out tied → sudden death → next coin wins, world frozen
 //   3. cup: 8 random entrants, a match played to a crash, the winner advances,
 //      Part moves on, the bracket screen renders, the cup survives a reload
-//   node creator/test.mjs [--shots <dir>]
+//   node creator/test.mjs [--shots <dir>] [--size 375x667]
 import { chromium } from 'playwright';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const url = 'file://' + path.join(here, '../dist-creator/creator/index.html') + '?test=1';
 const i = process.argv.indexOf('--shots'), shots = i > 0 ? process.argv[i + 1] : null;
+const si = process.argv.indexOf('--size'), size = (si > 0 ? process.argv[si + 1] : '390x844').split('x').map(Number);
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? 'ok   ' : 'FAIL ') + msg); if(!cond) fails++; };
 
 const b = await chromium.launch();
-const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+const ctx = await b.newContext({ viewport: { width: size[0], height: size[1] }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', e => errs.push(e.message));
@@ -29,7 +30,7 @@ const hud = () => page.evaluate(() => ({
   win: document.getElementById('crWinName').textContent, sub: document.getElementById('crWinSub').textContent,
   paused: window.__cr.game.paused, coins: window.__cr.game.coinsBy.slice()
 }));
-const L = [97, 640], R = [292, 640];
+const L = [size[0] / 4, size[1] * 0.76], R = [size[0] * 3 / 4, size[1] * 0.76];
 // Wiggle both thumbs (pumping, drifting) until the run ends in a crash.
 async function playToCrash(maxMs){
   for(let k = 0; k * 33 < maxMs; k++){
@@ -57,7 +58,9 @@ await page.waitForTimeout(2000);
 ok((await hud()).banner === 'GO', 'GO after the count');
 await shot('1-live');
 ok(await playToCrash(40000), 'a crash ends the match');
-await page.waitForTimeout(3600);
+await page.waitForTimeout(1300);
+await shot('1-win');
+await page.waitForTimeout(2300);
 h = await hud();
 ok(/wins$/.test(h.win) && /hit the wall$/.test(h.sub), 'result: "' + h.win + '" / "' + h.sub + '"');
 ok(h.cls.includes('end') && h.cls.includes('acts'), 'who\'s-next card and buttons follow');

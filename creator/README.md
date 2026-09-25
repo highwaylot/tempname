@@ -34,5 +34,14 @@ Saved on the phone (localStorage, key `bt.creator.v1`): teams, the last
 match setup, the cup. Nothing here ships in the app. The only engine change
 is `game.coinsBy`, a per-lane coin count.
 
+**Full screen on iPhone.** Inside the Claude app the page sits under the
+app's header, and iPhone Safari can't make a page full screen. Host the one
+file at a normal web address instead (e.g. Netlify Drop: drag a folder that
+holds `index.html`; claim the site with a free account within an hour or it
+is deleted), open that address in Safari, Share → Add to Home Screen, and
+open it from the icon: no browser bars, the page reads the
+`apple-mobile-web-app-capable` tag. Anyone with that address can open the
+page.
+
 On iPhone: turn on Do Not Disturb before recording. If a clip comes out
 silent, flip the ring/silent switch.

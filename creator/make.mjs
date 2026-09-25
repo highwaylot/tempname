@@ -16,7 +16,10 @@ const src = fs.readFileSync(path.join(here, '../index.html'), 'utf8');
 const tag = '<script type="module" src="/src/main.js"></script>';
 if(!src.includes(tag)) throw new Error('index.html entry tag not found');
 const html = src.replace(tag, '<script type="module" src="/creator/creator.js"></script>')
-  .replace(/<title>[^<]*<\/title>/, '<title>Bell Theory Creator</title>');
+  .replace(/<title>[^<]*<\/title>/, '<title>Bell Theory Creator</title>')
+  // Added to the Home Screen from Safari, the page opens full screen with no
+  // browser bars (iOS reads these tags; iOS 26 does it for any site).
+  .replace('user-scalable=no">', 'user-scalable=no">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n<meta name="apple-mobile-web-app-title" content="BT Creator">\n<meta name="theme-color" content="#0b0d11">');
 fs.writeFileSync(path.join(here, 'index.html'), html);
 
 const dir = path.join(path.dirname(require.resolve('flag-icons/package.json')), 'flags/1x1');
