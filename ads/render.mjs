@@ -79,8 +79,8 @@ try{
       while(nextSeed < start + n){
         const seed = nextSeed++;
         const { page, errors } = await openVersus(browser, { ...common, seed: String(seed), left: 'br', right: 'ar' }, 1);
-        const st = await page.evaluate(() => { let s; do { s = window.AD.step(30); } while(!s.done); return { s, failAt: window.AD.failAt }; });
-        rows.push({ seed, deathT: st.s.deathT, loser: st.s.loser, failAt: st.failAt.map(x => +x.toFixed(2)), errors: errors.length });
+        const st = await page.evaluate(() => { let s; do { s = window.AD.step(30); } while(!s.done); return { s, failAt: window.AD.failAt, stats: window.AD.stats ? window.AD.stats() : {} }; });
+        rows.push({ seed, deathT: st.s.deathT, loser: st.s.loser, failAt: st.failAt.map(x => +x.toFixed(2)), ...st.stats, errors: errors.length });
         await page.close();
         process.stdout.write(`seed ${seed}: crash ${st.s.deathT.toFixed ? st.s.deathT.toFixed(2) : st.s.deathT}s, ${st.s.loser === 0 ? 'left' : st.s.loser === 1 ? 'right' : 'none'} lost${errors.length ? ', ' + errors.length + ' errors' : ''}\n`);
       }
@@ -97,6 +97,7 @@ try{
       runs: rows.length, crashed: d.length, before_safe: early.length, before_scheduled_fail: accidental.length,
       left_lost: rows.filter(r => r.loser === 0).length, right_lost: rows.filter(r => r.loser === 1).length,
       crash_seconds: { min: d[0], p10: q(0.1), median: q(0.5), p90: q(0.9), max: d[d.length - 1] },
+      per_round_mean: Object.fromEntries(['coins', 'grazes', 'smashes', 'jerk', 'flipsPerSec'].filter(k => k in rows[0]).map(k => [k, +(rows.reduce((a, r) => a + r[k], 0) / rows.length).toFixed(2)])),
       errors: rows.reduce((a, r) => a + r.errors, 0), early_seeds: early.map(r => r.seed)
     }, null, 2));
     fs.mkdirSync(path.join(here, 'out'), { recursive: true });

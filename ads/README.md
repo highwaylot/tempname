@@ -34,6 +34,17 @@ predict which. Before the safe window a crash needs a one-in-100-million
 roll (`--early 1e-8`). Bots boost, smash slate and graze walls on the way,
 all real engine behaviour.
 
+**How the bots play.** Ads use the "hype" style: they dart for coins
+whenever there's time to get back into the gap (and stay on a coin once
+they've picked it), skim a wall for GRAZE on about 4 in 10 barriers, and
+smash most slate while lit. Motion goes through a virtual thumb on a damped
+spring, stiff only when a wall is under half a second away, with a pump that
+drifts in tempo (2.4–3.4 strokes/s) and reach from stroke to stroke, so the
+orbs move like a hand, not a servo. Long-form uses the "calm" style: same
+motion, wider coin margins, no skimming. `sim` prints per-round coins,
+grazes, smashes and two smoothness numbers (`jerk`, `flipsPerSec`: lower is
+smoother).
+
 **Every rivalry at once:**
 
 ```

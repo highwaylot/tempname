@@ -35,6 +35,9 @@ var P = {
   // breathes over minutes, a boost now and then, and a quiet restart if a bot
   // slips by accident. `len` is the length in seconds.
   zen: q.get("zen") === "1",
+  // Bot personality: "hype" chases coins, skims walls for GRAZE and snaps
+  // fast (the ads); "calm" chases coins with wide margins, never skims (zen).
+  style: q.get("style") || (q.get("zen") === "1" ? "calm" : "hype"),
   len: +(q.get("len") || 600)
 };
 var rng = window.__adBotRng;
@@ -46,8 +49,16 @@ var failAt = P.zen ? [Infinity, Infinity] : [0, 1].map(function(){
 });
 
 var zenPumpUntil = -1, zenNextPump = 25 + rng() * 30, restartAt = -1, events = [], seenPass = new WeakSet(), lastCoins = 0, lastWreck = 0, lastBoost = 0, crashes = 0;
-var t = 0, started = false, deathT = -1, loser = -1, smashPick = new WeakMap(), failDir = new WeakMap();
+var t = 0, started = false, deathT = -1, loser = -1, smashPick = new WeakMap(), failDir = new WeakMap(), grazePick = new WeakMap();
 var pumpPh = [rng() * 6.28, rng() * 6.28], wob = [rng() * 6.28, rng() * 6.28];
+// Human hands, not a servo: each lane has a virtual thumb that the bot's goal
+// pulls on through a damped spring (a touch of overshoot when relaxed, dead
+// stiff when a wall is about to arrive). The pump keeps a loose, drifting
+// tempo with a different reach on every stroke, and fades in and out instead
+// of switching. The game's own Follow smoothing then sits on top, as it does
+// for a player.
+var thumb = [null, null], pumpAmp = [0, 0], pumpHz = [2.9, 2.9], strokeAmp = [1, 1], chase = [null, null];
+var stat = { grazes: 0, smashes: 0, jerk: [0, 0], flips: [0, 0], frames: 0, vx: [[0, 0], [0, 0]] }, seenGraze = new WeakSet(), wreckSeen = 0;
 
 function sideTarget(s, dt){
   var W = view.W, H = view.H, c = cursors[s], b = laneBounds(s);
@@ -66,13 +77,61 @@ function sideTarget(s, dt){
     if(o.y + o.h > reachHi) inBand = true;
     if(!next || o.y > next.y) next = o;
   }
-  var tx = laneC, lit = game.boost > 0;
+  var tx = laneC, lit = game.boost > 0, hype = P.style === "hype", early = t < P.safe;
+  var speed = Math.max(60, game.speed);
+  // The next barrier the orb still has to get through (not yet passed).
+  var up = null;
+  for(var ui=0;ui<game.obstacles.length;ui++){
+    var uo = game.obstacles[ui];
+    if(uo.side !== s || uo.passed || uo.y + uo.h > c.y + HIT_R) continue;
+    if(!up || uo.y > up.y) up = uo;
+  }
   if(next){
     var room = Math.max(0, next.gapW/2 - HIT_R - 8);
-    tx = next.gapC + Math.sin(t * 2.1 + wob[s]) * room * 0.45;
+    tx = next.gapC + (0.62 * Math.sin(t * (hype ? 1.25 : 0.8) + wob[s]) + 0.38 * Math.sin(t * (hype ? 2.1 : 1.4) + wob[s] * 1.7)) * room * (hype ? 0.75 : 0.45);
+    // Near misses: on some barriers, skim one wall close enough for GRAZE
+    // (< 7 px of clearance). Wider before the safe window.
+    if(hype && !next.passed){
+      if(!grazePick.has(next)) grazePick.set(next, { go: rng() < 0.4, dir: rng() < 0.5 ? -1 : 1, g: 2.5 + rng() * 3 });
+      var gp = grazePick.get(next);
+      if(gp.go){
+        var hasWall = next.rects.some(function(r){ return gp.dir < 0 ? r.x < next.gapC : r.x > next.gapC; });
+        if(hasWall) tx = next.gapC + gp.dir * (next.gapW/2 - HIT_R - (early ? 6 : gp.g));
+      }
+    }
+    // Coins: dart out for one that reaches the orb before this barrier does,
+    // with enough time left to get back into the gap. Rare coins are worth a
+    // tighter margin. Only once the barrier behind is fully clear.
+    if(next === up || !next.passed){
+      var tU = (c.y - HIT_R - (next.y + next.h)) / speed, grab = null;
+      var coinOk = function(pk, keep){
+        if(pk.taken || pk.x < b.x0 || pk.x > b.x1 || pk.y > c.y - 4) return false;
+        var tc = (c.y - pk.y) / speed;
+        var margin = (early ? 0.36 : (hype ? 0.22 : 0.42)) - (pk.tier ? 0.06 : 0) + Math.abs(pk.x - tx) / 1500 - (keep ? 0.04 : 0);
+        return pk.y > next.y + next.h + 8 && tc < tU - margin;
+      };
+      // Once a coin is picked, stay on it until it's taken or out of reach:
+      // switching targets every frame is what reads as a robot.
+      if(chase[s] && game.pickups.indexOf(chase[s]) >= 0 && coinOk(chase[s], true)) grab = chase[s];
+      else {
+        for(var pj=0;pj<game.pickups.length;pj++){
+          var pk = game.pickups[pj];
+          if(coinOk(pk, false) && (!grab || pk.y > grab.y)) grab = pk;
+        }
+        chase[s] = grab;
+      }
+      if(grab && !(lit && !next.hard)) tx = grab.x;
+      else if(!grab){
+        // A coin just beyond the barrier and inside its gap: line up with it.
+        for(var pq=0;pq<game.pickups.length;pq++){
+          var pc = game.pickups[pq];
+          if(pc.y < next.y && pc.y > next.y - 160 && Math.abs(pc.x - next.gapC) < room){ tx = pc.x; break; }
+        }
+      }
+    }
     // While lit, most slate gets smashed on purpose: that's the show.
     if(lit && !next.hard){
-      if(!smashPick.has(next)) smashPick.set(next, { go: rng() < 0.7, r: Math.floor(rng() * 8) });
+      if(!smashPick.has(next)) smashPick.set(next, { go: rng() < (hype ? 0.85 : 0.7), r: Math.floor(rng() * 8) });
       var pick = smashPick.get(next);
       // Only smash if the tank will still be lit on impact, with margin:
       // a boost that runs out on the way turns a smash into a crash.
@@ -103,11 +162,47 @@ function sideTarget(s, dt){
   }
   // Pump while the tank isn't lit, but hold still when a barrier is close
   // and the orb is still travelling sideways.
-  var ty = baseY;
   var closeBy = next && (c.y - (next.y + next.h)) < 150 && Math.abs(c.x - tx) > 10;
-  if(!lit && !closeBy && !inBand && !failing && (!P.zen || t < zenPumpUntil)){ pumpPh[s] += dt * 6.28 * 2.9; ty = baseY + Math.sin(pumpPh[s]) * PUMP; }
-  else if(inBand){ ty = baseY; }
-  return { tx: Math.max(b.x0 + DRAW_R, Math.min(b.x1 - DRAW_R, tx)), ty: ty };
+  // A wall about to enter pumping reach: start easing the pump out now.
+  var bandSoon = inBand;
+  for(var k=0;k<game.obstacles.length && !bandSoon;k++){
+    var ob = game.obstacles[k];
+    if(ob.side === s && ob.y <= reachLo && ob.y + ob.h > reachHi - speed * 0.14) bandSoon = true;
+  }
+  var pump = !lit && !closeBy && !bandSoon && !failing && (!P.zen || t < zenPumpUntil);
+  var urgent = !!(up && (c.y - HIT_R - (up.y + up.h)) / speed < 0.5);
+  return { tx: Math.max(b.x0 + DRAW_R, Math.min(b.x1 - DRAW_R, tx)), pump: pump, hold: inBand, urgent: urgent, baseY: baseY, PUMP: PUMP };
+}
+
+// Turn a goal into a thumb position.
+function moveThumb(s, g, dt){
+  var c = cursors[s], hype = P.style === "hype";
+  var T = thumb[s] || (thumb[s] = { x: c.x, v: 0 });
+  var w = g.urgent ? 26 : (hype ? 15 : 10), z = g.urgent ? 1 : (hype ? 0.7 : 0.9), VMAX = hype ? 2400 : 1500;
+  for(var i=0;i<4;i++){
+    var h = dt / 4;
+    T.v += (w * w * (g.tx - T.x) - 2 * z * w * T.v) * h;
+    T.v = Math.max(-VMAX, Math.min(VMAX, T.v));
+    T.x += T.v * h;
+  }
+  // Pump envelope: fade in over ~0.25 s, out over ~0.07 s; gone at once if a
+  // wall is already in reach.
+  var want = g.pump ? 1 : 0;
+  if(g.hold) pumpAmp[s] = 0;
+  else pumpAmp[s] += (want - pumpAmp[s]) * Math.min(1, dt / (want ? 0.25 : 0.07));
+  if(pumpAmp[s] > 0.01){
+    var prev = Math.sin(pumpPh[s]);
+    pumpPh[s] += dt * 6.28 * pumpHz[s];
+    // New tempo and reach at every half stroke (where sin crosses 0, so the
+    // change is seamless): a bit faster or slower, a bit longer or shorter.
+    if((prev < 0) !== (Math.sin(pumpPh[s]) < 0)){
+      pumpHz[s] = Math.max(2.4, Math.min(3.4, pumpHz[s] + (rng() - 0.5) * 0.5));
+      strokeAmp[s] = 0.72 + rng() * 0.28;
+    }
+  }
+  var ty = g.baseY + Math.sin(pumpPh[s]) * g.PUMP * strokeAmp[s] * pumpAmp[s];
+  var b = laneBounds(s);
+  return { tx: Math.max(b.x0 + DRAW_R, Math.min(b.x1 - DRAW_R, T.x)), ty: ty };
 }
 
 // The game marks every crash with a ripple of strength 1.6 and life 2.2 at
@@ -184,9 +279,22 @@ function step(){
     if(game.boost > 0) zenPumpUntil = -1;
   }
   if(started && game.phase === PHASE_RUN && game.dying === 0){
-    [0,1].forEach(function(s){ var g = sideTarget(s, dt); cursors[s].tx = g.tx; cursors[s].ty = g.ty; cursors[s].active = true; });
+    [0,1].forEach(function(s){ var g = moveThumb(s, sideTarget(s, dt), dt); cursors[s].tx = g.tx; cursors[s].ty = g.ty; cursors[s].active = true; });
   }
   window.__adStepFrame(1000 / P.fps);
+  if(started && game.phase === PHASE_RUN && game.dying === 0){
+    // Stats for the sim: how busy the round was and how smooth the orbs moved.
+    game.obstacles.forEach(function(o){ if(o.passed && o.minGraze < 7 && !seenGraze.has(o)){ seenGraze.add(o); stat.grazes++; } });
+    if(game.wreck > wreckSeen) stat.smashes += game.wreck - wreckSeen;
+    wreckSeen = game.wreck;
+    stat.frames++;
+    [0,1].forEach(function(s){
+      var v = cursors[s].vx || 0, pv = stat.vx[s][0];
+      stat.jerk[s] += Math.abs(v - pv);
+      if(Math.abs(v) > 40 && Math.abs(pv) > 40 && (v < 0) !== (pv < 0)) stat.flips[s]++;
+      stat.vx[s][0] = v;
+    });
+  } else wreckSeen = game.wreck;
   if(started){
     t += dt;
     if(P.zen){
@@ -199,7 +307,7 @@ function step(){
       lastWreck = game.wreck;
       game.obstacles.forEach(function(o){ if(o.passed && !seenPass.has(o)){ seenPass.add(o); events.push({ t: +t.toFixed(3), type: "pass", side: o.side }); } });
       if(restartAt < 0 && (game.dying > 0 || game.phase === PHASE_DEAD)){ crashes++; events.push({ t: +t.toFixed(3), type: "crash" }); restartAt = t + 1.6; }
-      if(restartAt >= 0 && t >= restartAt && game.phase === PHASE_DEAD){ restartAt = -1; lastCoins = 0; lastWreck = 0; startRun(); }
+      if(restartAt >= 0 && t >= restartAt && game.phase === PHASE_DEAD){ restartAt = -1; lastCoins = 0; lastWreck = 0; thumb = [null, null]; chase = [null, null]; pumpAmp = [0, 0]; startRun(); }
     } else if(deathT < 0 && (game.dying > 0 || game.phase === PHASE_DEAD)){ deathT = t; loser = loserSide(); crown(); }
   }
   paintLayer();
@@ -210,6 +318,7 @@ window.AD = {
   ready: false,
   step: function(n){ for(var i=0;i<(n||1);i++) step(); return window.AD.status(); },
   status: function(){ return { t: +t.toFixed(3), deathT: deathT, loser: loser, phase: game.phase, dist: Math.floor(game.dist), crashes: crashes, done: P.zen ? t >= P.len : (deathT >= 0 && t - deathT >= 1.9 || t >= P.maxLen) }; },
+  stats: function(){ var f = Math.max(1, stat.frames), secs = f / P.fps; return { coins: game.coins, grazes: stat.grazes, smashes: stat.smashes, jerk: +((stat.jerk[0] + stat.jerk[1]) / 2 / f).toFixed(1), flipsPerSec: +((stat.flips[0] + stat.flips[1]) / 2 / secs).toFixed(2) }; },
   events: function(){ return events; }
 };
 
@@ -227,6 +336,7 @@ window.AD = {
   buildLayer();
   if(P.clean) layer.style.display = "none";
   if(P.zen) document.documentElement.classList.add("zen");
+  if(P.style === "hype") state.follow = 34;   // a little snappier than the default 26: the in-game Follow slider
   // Two frames on the title so the orbs settle, then both thumbs down.
   window.__adStepFrame(1000 / P.fps); window.__adStepFrame(1000 / P.fps);
   var H = view.H;
