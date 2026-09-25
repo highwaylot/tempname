@@ -120,7 +120,7 @@ function buildHud(){
     '<div class="cr-top">' +
       '<div class="cr-tag" id="crTag"></div>' +
       '<div class="cr-vs"><div class="cr-side l" id="crSideL"></div><span class="cr-x">VS</span><div class="cr-side r" id="crSideR"></div></div>' +
-      '<div class="cr-scores"><div class="cr-score"><i></i><b id="crScoreL">0</b></div><div class="cr-clock" id="crClock"></div><div class="cr-score r"><b id="crScoreR">0</b><i></i></div></div>' +
+      '<div class="cr-scores"><div class="cr-score"><span class="cr-mini" id="crMiniL"></span><i></i><b id="crScoreL">0</b></div><div class="cr-clock" id="crClock"></div><div class="cr-score r"><b id="crScoreR">0</b><i></i><span class="cr-mini" id="crMiniR"></span></div></div>' +
       '<div class="cr-lead"><span class="l" id="crLeadL"></span><span class="r" id="crLeadR"></span></div>' +
       '<div class="cr-hook" id="crHook"></div>' +
     '</div>' +
@@ -170,6 +170,7 @@ function setupRound(m){
   hud.hidden = false;
   el.crSideL.innerHTML = badge(sides[0]) + '<span class="cr-name">' + esc(sideName(sides[0])) + '</span>';
   el.crSideR.innerHTML = badge(sides[1]) + '<span class="cr-name">' + esc(sideName(sides[1])) + '</span>';
+  el.crMiniL.innerHTML = badge(sides[0]); el.crMiniR.innerHTML = badge(sides[1]);
   fitNames();
   el.crTag.textContent = m.tag || "";
   el.crHook.textContent = m.hook || defaultHook(m);
@@ -249,7 +250,7 @@ function tick(){
   });
   paintLead();
   el.crClock.textContent = clockText();
-  if(mode === "intro" && game.phase === PHASE_RUN){ mode = "count"; lastCount = 0; el.crPrompt.hidden = true; el.crQuit.hidden = true; }
+  if(mode === "intro" && game.phase === PHASE_RUN){ mode = "count"; lastCount = 0; el.crPrompt.hidden = true; el.crQuit.hidden = true; hud.classList.add("compact"); }
   if(mode === "count"){
     var n = Math.ceil(game.grace);
     if(game.grace <= 0){ mode = "live"; bannerFlash("GO"); }

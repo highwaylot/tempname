@@ -19,9 +19,9 @@
    result and end cards centre in it, so nothing lands on the scoreboard on
    a short screen), and the buttons row. */
 .cr-mid{ position:relative; flex:1; min-height:0; }
-.cr-top{ position:relative; padding-top:calc(max(12px, 6.5vh) + var(--sat)); display:flex; flex-direction:column; align-items:center; gap:8px; padding-inline:12px; }
+.cr-top{ position:relative; padding-top:calc(max(10px, 5vh) + var(--sat)); display:flex; flex-direction:column; align-items:center; gap:6px; padding-inline:12px; }
 .cr-tag{ font-family:'IBM Plex Mono', monospace; font-weight:500; font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--coin); text-shadow:0 2px 10px rgba(0,0,0,.8); min-height:14px; text-align:center; }
-.cr-vs{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; width:min(100%, 440px); padding:10px 12px; border-radius:18px; background:rgba(8,10,14,.66); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.08); }
+.cr-vs{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; width:min(100%, 440px); padding:8px 10px; border-radius:16px; background:rgba(8,10,14,.66); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.08); }
 .cr-side{ display:flex; align-items:center; gap:8px; min-width:0; }
 .cr-side.r{ flex-direction:row-reverse; }
 .cr-name{ font-weight:800; font-size:clamp(14px, 4.6vw, 21px); letter-spacing:.02em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
@@ -36,7 +36,7 @@
 @keyframes crPop{ 0%{ transform:scale(1.45); color:#fff3c4; } 100%{ transform:scale(1); } }
 .cr-clock{ font-family:'IBM Plex Mono', monospace; font-weight:500; font-size:15px; letter-spacing:.08em; color:rgba(255,255,255,.85); font-variant-numeric:tabular-nums; text-shadow:0 2px 8px rgba(0,0,0,.8); }
 .cr-clock.hot{ color:var(--danger); }
-.cr-lead{ position:relative; width:min(78%, 360px); height:7px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,.08); box-shadow:0 0 0 1px rgba(0,0,0,.35); }
+.cr-lead{ position:relative; width:min(78%, 360px); height:6px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,.08); box-shadow:0 0 0 1px rgba(0,0,0,.35); }
 .cr-lead span{ position:absolute; top:0; bottom:0; }
 .cr-lead .l{ left:0; }
 .cr-lead .r{ right:0; }
@@ -49,6 +49,21 @@
 @keyframes crBanner{ 0%{ opacity:0; transform:scale(1.6); } 25%{ opacity:1; transform:scale(1); } 75%{ opacity:1; } 100%{ opacity:0; transform:scale(.96); } }
 .cr-prompt{ position:absolute; left:0; right:0; top:62%; text-align:center; font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:.24em; text-transform:uppercase; color:var(--accent); animation:crBreathe 1.8s ease-in-out infinite; }
 @keyframes crBreathe{ 50%{ opacity:.45; } }
+
+/* During play the intro card folds into one thin bar: flag, coins, clock,
+   coins, flag. The field is the show; names come back on the result card. */
+.cr-mini{ display:none; }
+.cr-hud.compact .cr-top{ padding-top:calc(max(8px, 2.5vh) + var(--sat)); gap:5px; }
+.cr-hud.compact .cr-vs{ display:none; }
+.cr-hud.compact .cr-tag{ font-size:10px; min-height:0; }
+.cr-hud.compact .cr-tag:empty{ display:none; }
+.cr-hud.compact .cr-scores{ width:min(100%, 380px); padding:5px 8px; border-radius:99px; background:rgba(8,10,14,.55); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); border:1px solid rgba(255,255,255,.07); }
+.cr-hud.compact .cr-score{ font-size:clamp(20px, 6.4vw, 28px); gap:6px; }
+.cr-hud.compact .cr-score i{ width:.46em; height:.46em; }
+.cr-hud.compact .cr-mini{ display:block; }
+.cr-hud.compact .cr-mini .cr-badge{ width:28px; height:28px; font-size:9px; box-shadow:0 0 0 1.5px rgba(255,255,255,.8); }
+.cr-hud.compact .cr-clock{ font-size:13px; }
+.cr-hud.compact .cr-lead{ height:4px; width:min(62%, 260px); }
 
 /* result + end card */
 .cr-dim{ position:absolute; inset:0; background:rgba(5,6,10,.58); opacity:0; transition:opacity .4s; }

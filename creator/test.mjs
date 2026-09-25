@@ -54,6 +54,8 @@ await page.waitForTimeout(1300);
 let h = await hud();
 ok(h.phase === 1 && /^[123]$/.test(h.banner), 'both thumbs start the run into a 3-2-1 (banner ' + h.banner + ')');
 ok(await page.evaluate(() => window.__cr.game.grace > 0), 'world held during the count');
+ok(await page.evaluate(() => { const t = document.querySelector('.cr-top').getBoundingClientRect(); return document.querySelector('.cr-hud').classList.contains('compact') && t.bottom < innerHeight * 0.2; }), 'scoreboard folds into a bar in the top fifth once play starts');
+await shot('1-count');
 await page.waitForTimeout(2000);
 ok((await hud()).banner === 'GO', 'GO after the count');
 await shot('1-live');
