@@ -34,6 +34,17 @@ predict which. Before the safe window a crash needs a one-in-100-million
 roll (`--early 1e-8`). Bots boost, smash slate and graze walls on the way,
 all real engine behaviour.
 
+**Every rivalry at once:**
+
+```
+node ads/render.mjs batch --jobs 2 --seed 101
+```
+
+renders one round per pair in `ads/matchups.json` (34 rivalries: sport,
+food and neighbour beef). The same file lists the pairs held back and why:
+live wars, territorial disputes, recent violence. Change `--seed` for a
+fresh set of rounds with different winners.
+
 **Check the fail timing** without recording:
 
 ```
@@ -72,6 +83,12 @@ cut clean every time.
 | `rematch` | REMATCH? | COMMENT "REMATCH" FOR ROUND 2 | For the losing side's fans; a one-word reply. |
 | `survive` | CAN YOUR COUNTRY SURVIVE? | COMMENT YOUR FLAG | Challenge: pride plus doubt. |
 | `you-pick` | YOU PICK. WE PLAY. | COMMENT THE NEXT MATCHUP | Promise: comments visibly become videos. |
+| `settle-it` | SETTLE IT. | WHO SHOULD'VE WON? | Argument bait: every loser's fan has a reply. |
+| `got-beef` | GOT BEEF? | COMMENT YOUR RIVAL | Names the feeling; the rival is one word. |
+| `tag-rival` | TAG YOUR RIVAL | TAG A FRIEND FROM THERE | Tags pull in new viewers: reach, not just comments. |
+| `best-of-3` | BEST OF THREE? | COMMENT "ROUND 2" | Series hook: promises a follow-up. |
+| `rigged` | RIGGED? | COMMENT YOUR EXCUSE | Playful rage bait for the losing side. |
+| `defend-flag` | DEFEND YOUR FLAG | COMMENT YOUR COUNTRY | Pride as a call to arms. |
 
 Design rules the cards follow: one action only, stated as a verb; the
 action is a comment, the cheapest thing a viewer can do; the text sits in

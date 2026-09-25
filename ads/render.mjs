@@ -25,7 +25,7 @@ const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] :
 const PORT = +opt('--port', 5199);
 
 function startServer(){
-  const child = spawn('npx', ['vite', '--port', String(PORT), '--strictPort', '--logLevel', 'error'], { cwd: root, detached: true, stdio: 'ignore' });
+  const child = spawn('npx', ['vite', '--config', 'ads/vite.render.config.mjs', '--port', String(PORT), '--strictPort', '--logLevel', 'error'], { cwd: root, detached: true, stdio: 'ignore' });
   return child;
 }
 function stopServer(child){ try{ process.kill(-child.pid, 'SIGTERM'); }catch(e){} }
@@ -127,6 +127,36 @@ try{
     }
   }
 
+  else if(cmd === 'batch'){
+    // Every pair in the list, one round each, `jobs` at a time.
+    const list = JSON.parse(fs.readFileSync(path.resolve(root, opt('--list', 'ads/matchups.json')), 'utf8')).render;
+    const jobs = +opt('--jobs', 2), seed0 = +opt('--seed', 1);
+    let i = 0;
+    async function worker(){
+      while(i < list.length){
+        const k = i++, m = list[k], seed = seed0 + k;
+        const params = { ...common, seed: String(seed), left: m.left, right: m.right };
+        if(m.leftName) params.leftName = m.leftName;
+        if(m.rightName) params.rightName = m.rightName;
+        const { page, errors } = await openVersus(browser, params);
+        const file = path.join(here, 'out', `${m.left}-vs-${m.right}-s${seed}.mp4`);
+        const enc = encoder(file, +common.fps);
+        let st, frames = 0;
+        do {
+          await enc.write(await page.screenshot({ type: 'png' }));
+          st = await page.evaluate(() => window.AD.step(1));
+          frames++;
+        } while(!st.done);
+        await enc.write(await page.screenshot({ type: 'png' }));
+        await enc.end();
+        await page.close();
+        console.log(JSON.stringify({ file: path.relative(root, file), seconds: +(frames / +common.fps).toFixed(2), crashAt: +st.deathT.toFixed(2), winner: st.loser === 0 ? m.right : m.left, errors: errors.length }));
+      }
+    }
+    await (await openVersus(browser, { ...common, seed: '0' }, 1)).page.close();
+    await Promise.all(Array.from({ length: jobs }, worker));
+  }
+
   else if(cmd === 'endcards'){
     const fps = +opt('--fps', 30);
     const page = await browser.newPage({ viewport: { width: 540, height: 960 }, deviceScaleFactor: 2 });
@@ -137,7 +167,7 @@ try{
     const variants = await page.evaluate(() => window.EC.variants.map(v => ({ id: v.id, seconds: window.EC.seconds })));
     const only = opt('--only');
     for(const v of variants){
-      if(only && v.id !== only) continue;
+      if(only && !only.split(',').includes(v.id)) continue;
       const file = path.join(here, 'endcards', `${v.id}.mp4`);
       const enc = encoder(file, fps);
       const n = Math.round(v.seconds * fps);
