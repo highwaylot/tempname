@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Bell Theory end cards</title>
+<style>
+  /* Sora is one variable file; the game declares 400-700, the cards use it up to 800. */
+  @font-face{ font-family:'Sora'; font-weight:100 800; src:url(/src/fonts/sora-latin-wght.woff2) format('woff2-variations'); }
+  @font-face{ font-family:'IBM Plex Mono'; font-weight:500; src:url(/src/fonts/ibm-plex-mono-latin-500.woff2) format('woff2'); }
+  html,body{ margin:0; background:#000; }
+  canvas{ display:block; width:540px; height:960px; }
+</style></head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// "Who's next?" end cards. One look, several lines of copy, so every round
+// video ends the same way and only the words are A/B tested.
+//
+// Layout respects short-form safe zones at 1080x1920: nothing important
+// above y=380 (status and search bars) or below y=1400 (caption and
+// username), and nothing within 150 px of the right edge (like/comment rail).
+//
+// Timeline (seconds): 0-0.35 fade up from black; 0.2-0.7 the two orbs spin
+// in; 0.45-0.9 headline lands, line by line; 0.95 CTA; 1.2 arrow and name;
+// then a live hold (orbs keep orbiting, stars twinkle, arrow bobs) so the
+// clip can be trimmed to any length after 1.6 s.
+(function(){
+  var SECONDS = 3.2;
+  var VARIANTS = [
+    { id:"who-next",     lines:["WHO'S", "NEXT?"],               hot:"NEXT?",     cta:"COMMENT YOUR MATCHUP",       why:"Open question. Answering it means commenting." },
+    { id:"your-country", lines:["YOUR COUNTRY", "NEXT?"],        hot:"COUNTRY",   cta:"DROP YOUR FLAG BELOW",       why:"Identity. Every viewer has a country to defend." },
+    { id:"pick-two",     lines:["PICK THE", "NEXT MATCH"],       hot:"PICK",      cta:"COMMENT TWO COUNTRIES",      why:"Control. The viewer books the next video." },
+    { id:"rematch",      lines:["REMATCH?"],                     hot:"REMATCH?",  cta:"COMMENT “REMATCH” FOR ROUND 2", why:"Loser's fans. One-word reply, lowest effort." },
+    { id:"survive",      lines:["CAN YOUR", "COUNTRY SURVIVE?"], hot:"SURVIVE?",  cta:"COMMENT YOUR FLAG",          why:"Challenge. Pride plus doubt." },
+    { id:"you-pick",     lines:["YOU PICK.", "WE PLAY."],        hot:"YOU",       cta:"COMMENT THE NEXT MATCHUP",   why:"Promise. Comments visibly turn into videos." }
+  ];
+  var W = 1080, H = 1920;
+  var cv = document.getElementById("c"), g = cv.getContext("2d");
+
+  function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  var r = mulberry32(20260925), STARS = [];
+  for(var i=0;i<460;i++) STARS.push({ x:r()*W, y:r()*H, z:0.2 + r()*0.8, ph:r()*6.28, hue:r() });
+  function clamp(x){ return Math.max(0, Math.min(1, x)); }
+  function easeOut(x){ x = clamp(x); return 1 - Math.pow(1 - x, 3); }
+  function back(x){ x = clamp(x); var c1 = 1.70158, c3 = c1 + 1; return 1 + c3*Math.pow(x-1,3) + c1*Math.pow(x-1,2); }
+
+  function space(t){
+    var bg = g.createRadialGradient(W/2, 820, 60, W/2, 900, 1250);
+    bg.addColorStop(0, "#161b3f"); bg.addColorStop(0.45, "#0a0c1c"); bg.addColorStop(1, "#030409");
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    // Nebula: three soft clouds drifting.
+    [[0.28, 0.34, 520, "107,60,255", 0.20, 0.7], [0.76, 0.55, 600, "31,199,176", 0.13, -0.5], [0.5, 0.78, 480, "255,180,84", 0.08, 0.35]].forEach(function(n){
+      var cx = n[0]*W + Math.sin(t*0.3*n[5])*40, cy = n[1]*H + Math.cos(t*0.25*n[5])*30;
+      var ng = g.createRadialGradient(cx, cy, 0, cx, cy, n[2]);
+      ng.addColorStop(0, "rgba(" + n[3] + "," + n[4] + ")"); ng.addColorStop(1, "rgba(" + n[3] + ",0)");
+      g.fillStyle = ng; g.fillRect(0, 0, W, H);
+    });
+    // Stars: a short warp toward the viewer on entry, then a slow drift.
+    var warp = 1 - easeOut(t / 0.7);
+    STARS.forEach(function(s){
+      var dx = s.x - W/2, dy = s.y - 900;
+      var k = 1 + warp * 0.9 * s.z;
+      var x = W/2 + dx * k, y = 900 + dy * k + ((t * 14 * s.z) % H);
+      if(y > H) y -= H;
+      var tw = 0.55 + 0.45 * Math.sin(t * (1.5 + s.z*2) + s.ph);
+      var col = s.hue < 0.15 ? "255,214,160" : (s.hue < 0.3 ? "170,210,255" : "235,240,255");
+      g.globalAlpha = (0.25 + 0.75 * s.z) * tw;
+      if(warp > 0.05){
+        g.strokeStyle = "rgba(" + col + ",1)"; g.lineWidth = 1 + s.z * 1.6;
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x - dx * warp * 0.25 * s.z, y - dy * warp * 0.25 * s.z); g.stroke();
+      } else {
+        g.fillStyle = "rgba(" + col + ",1)";
+        g.beginPath(); g.arc(x, y, 0.8 + s.z * 2.2, 0, Math.PI*2); g.fill();
+      }
+    });
+    g.globalAlpha = 1;
+  }
+
+  function orbs(t){
+    var a = easeOut((t - 0.2) / 0.5); if(a <= 0) return;
+    var cx = W/2, cy = 600, R = 118 * (0.4 + 0.6 * back((t - 0.2) / 0.55));
+    var ang = t * 1.7 + (1 - a) * 3.0;
+    var p1 = { x: cx + Math.cos(ang) * R, y: cy + Math.sin(ang) * R * 0.42 };
+    var p2 = { x: cx - Math.cos(ang) * R, y: cy - Math.sin(ang) * R * 0.42 };
+    g.globalAlpha = a;
+    // The thread between the pair: the game's two thumbs, entangled.
+    var th = g.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+    th.addColorStop(0, "rgba(255,180,84,.55)"); th.addColorStop(1, "rgba(94,200,255,.55)");
+    g.strokeStyle = th; g.lineWidth = 3; g.setLineDash([2, 12]);
+    g.beginPath(); g.moveTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.stroke(); g.setLineDash([]);
+    [[p1, "255,180,84"], [p2, "94,200,255"]].forEach(function(o){
+      var hg = g.createRadialGradient(o[0].x, o[0].y, 0, o[0].x, o[0].y, 120);
+      hg.addColorStop(0, "rgba(" + o[1] + ",.55)"); hg.addColorStop(1, "rgba(" + o[1] + ",0)");
+      g.fillStyle = hg; g.beginPath(); g.arc(o[0].x, o[0].y, 120, 0, Math.PI*2); g.fill();
+      g.fillStyle = "rgb(" + o[1] + ")"; g.beginPath(); g.arc(o[0].x, o[0].y, 36, 0, Math.PI*2); g.fill();
+      g.fillStyle = "rgba(255,255,255,.55)"; g.beginPath(); g.arc(o[0].x - 11, o[0].y - 12, 10, 0, Math.PI*2); g.fill();
+    });
+    g.globalAlpha = 1;
+  }
+
+  function fitSize(lines){
+    var s = 168;
+    g.font = "800 " + s + "px Sora";
+    var wmax = Math.max.apply(null, lines.map(function(l){ return g.measureText(l).width; }));
+    if(wmax > 860) s = Math.floor(s * 860 / wmax);
+    return s;
+  }
+  function headline(v, t){
+    var size = fitSize(v.lines), lh = size * 1.02;
+    var y0 = 930 - (v.lines.length - 1) * lh / 2;
+    g.textAlign = "center"; g.textBaseline = "middle";
+    v.lines.forEach(function(line, i){
+      var k = (t - 0.45 - i * 0.09) / 0.42;
+      var a = easeOut(k); if(a <= 0) return;
+      var sc = 1.18 - 0.18 * back(k);
+      var y = y0 + i * lh + (1 - easeOut(k)) * 46;
+      g.save(); g.translate(W/2, y); g.scale(sc, sc); g.globalAlpha = a;
+      g.font = "800 " + size + "px Sora";
+      // Split so the hot word can be gold while the rest stays white.
+      var parts = line.indexOf(v.hot) >= 0 ? [line.slice(0, line.indexOf(v.hot)), v.hot, line.slice(line.indexOf(v.hot) + v.hot.length)] : [line, "", ""];
+      var total = g.measureText(line).width, x = -total/2;
+      g.textAlign = "left";
+      parts.forEach(function(p, j){
+        if(!p) return;
+        g.shadowColor = j === 1 ? "rgba(242,193,78,.75)" : "rgba(125,211,192,.55)"; g.shadowBlur = 38;
+        g.fillStyle = j === 1 ? "#f2c14e" : "#ffffff";
+        g.fillText(p, x, 0);
+        g.shadowBlur = 0;
+        x += g.measureText(p).width;
+      });
+      g.restore();
+    });
+    return y0 + (v.lines.length - 1) * lh + size * 0.5;
+  }
+  function cta(v, t, yTop){
+    var a = easeOut((t - 0.95) / 0.35); if(a <= 0) return;
+    var y = Math.max(yTop + 90, 1120);
+    g.globalAlpha = a; g.textAlign = "center"; g.textBaseline = "middle";
+    g.font = "500 40px 'IBM Plex Mono'";
+    if(g.letterSpacing !== undefined) g.letterSpacing = "6px";
+    var w = g.measureText(v.cta).width;
+    var size = w > 900 ? Math.floor(40 * 900 / w) : 40;
+    g.font = "500 " + size + "px 'IBM Plex Mono'";
+    // A pill behind the call to action so it reads as the one thing to do.
+    var pw = Math.min(980, g.measureText(v.cta).width + 90), ph = size + 54;
+    g.fillStyle = "rgba(125,211,192,.12)"; g.strokeStyle = "rgba(125,211,192,.6)"; g.lineWidth = 2;
+    g.beginPath(); if(g.roundRect) g.roundRect(W/2 - pw/2, y - ph/2, pw, ph, ph/2); else g.rect(W/2 - pw/2, y - ph/2, pw, ph); g.fill(); g.stroke();
+    g.fillStyle = "#bff3e7"; g.fillText(v.cta, W/2, y + 2);
+    if(g.letterSpacing !== undefined) g.letterSpacing = "0px";
+    // Arrow pointing down toward the comments.
+    var b = easeOut((t - 1.2) / 0.3), bob = Math.sin(t * 5.2) * 10;
+    if(b > 0){
+      g.globalAlpha = a * b; g.strokeStyle = "#7dd3c0"; g.lineWidth = 7; g.lineCap = "round"; g.lineJoin = "round";
+      var ay = y + ph/2 + 58 + bob;
+      g.beginPath(); g.moveTo(W/2 - 30, ay - 16); g.lineTo(W/2, ay + 14); g.lineTo(W/2 + 30, ay - 16); g.stroke();
+    }
+    // Brand line.
+    var n = easeOut((t - 1.25) / 0.4);
+    if(n > 0){
+      g.globalAlpha = n * 0.85; g.fillStyle = "#e8ecf6";
+      g.font = "500 30px 'IBM Plex Mono'"; if(g.letterSpacing !== undefined) g.letterSpacing = "14px";
+      g.fillText("BELL THEORY", W/2 + 7, 1350);
+      if(g.letterSpacing !== undefined) g.letterSpacing = "0px";
+    }
+    g.globalAlpha = 1;
+  }
+
+  function render(v, t, transparent){
+    g.clearRect(0, 0, W, H);
+    if(!transparent) space(t);
+    orbs(t);
+    var bottom = headline(v, t);
+    cta(v, t, bottom);
+    if(!transparent){
+      var f = 1 - easeOut(t / 0.35);
+      if(f > 0){ g.fillStyle = "rgba(0,0,0," + f + ")"; g.fillRect(0, 0, W, H); }
+    }
+  }
+
+  window.EC = {
+    ready: false, seconds: SECONDS, variants: VARIANTS,
+    frame: function(id, t, transparent){
+      var v = VARIANTS.filter(function(x){ return x.id === id; })[0];
+      render(v, t, transparent);
+      return cv.toDataURL("image/png").split(",")[1];
+    }
+  };
+  Promise.all([document.fonts.load("800 100px Sora"), document.fonts.load("500 40px 'IBM Plex Mono'")]).then(function(){
+    var v = new URLSearchParams(location.search).get("v");
+    render(VARIANTS.filter(function(x){ return x.id === v; })[0] || VARIANTS[0], +(new URLSearchParams(location.search).get("t") || 2.4), false);
+    window.EC.ready = true;
+  });
+})();
+</script>
+</body></html>

@@ -5,3 +5,6 @@ prototype/_scratch-*
 test/scratch-*
 *.log
 *.tsbuildinfo
+ads/versus.html
+ads/out/
+ads/out-sim*.log
