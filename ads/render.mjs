@@ -249,6 +249,18 @@ try{
     console.log(JSON.stringify({ file: path.relative(root, base + '.mp4'), minutes, crashes: st.crashes, events: counts, renderMinutes: +((Date.now() - t0) / 60000).toFixed(1) }));
   }
 
+  else if(cmd === 'thumbs'){
+    // YouTube thumbnails (1280x720) for the long-form videos.
+    const page = await browser.newPage({ viewport: { width: 640, height: 360 }, deviceScaleFactor: 1 });
+    await page.goto(`http://localhost:${PORT}/ads/brand.html`);
+    await page.waitForFunction(() => window.BK && window.BK.ready, null, { timeout: 30000 });
+    const out = path.join(here, 'brand'); fs.mkdirSync(out, { recursive: true });
+    for(const m of (opt('--minutes', '10,20,30')).split(',')){
+      fs.writeFileSync(path.join(out, `thumb-${m}min.png`), Buffer.from(await page.evaluate((k) => window.BK.thumb(+k), m), 'base64'));
+    }
+    console.log('thumbnails written');
+  }
+
   else if(cmd === 'endcards'){
     const fps = +opt('--fps', 30);
     const page = await browser.newPage({ viewport: { width: 540, height: 960 }, deviceScaleFactor: 2 });

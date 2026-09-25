@@ -222,7 +222,10 @@
     g.shadowColor = "rgba(242,193,78,.6)"; g.shadowBlur = 40; g.fillStyle = GOLD; g.fillText(minutes + " MIN", 90, 440); g.shadowBlur = 0;
     g.font = "800 64px Sora"; g.fillStyle = "#ffffff"; g.shadowColor = "rgba(125,211,192,.5)"; g.shadowBlur = 24;
     g.fillText("SPACE ASMR", 94, 530); g.shadowBlur = 0;
-    mono("CALM TWO-ORB GAMEPLAY · AMBIENT", 94 + 330, 600, 24, "#bff3e7", 0.14, 0.95);
+    g.font = "500 24px 'IBM Plex Mono'"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillStyle = "#bff3e7";
+    if(g.letterSpacing !== undefined) g.letterSpacing = "3px";
+    g.fillText("CALM TWO-ORB GAMEPLAY · AMBIENT", 98, 600);
+    if(g.letterSpacing !== undefined) g.letterSpacing = "0px";
   }
   // Reel outro, animated: orbs fly in from the lanes and lock onto the seam,
   // the name lands, then COMING SOON. 4.5 s, holds from 3.2 s.
