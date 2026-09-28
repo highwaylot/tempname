@@ -49,8 +49,10 @@ await page.waitForSelector('.cr-menu');
 await page.click('[data-act=play]');
 await page.waitForTimeout(300);
 ok(await page.evaluate(() => { const n = document.querySelectorAll('.cr-name'); return [...n].every(x => x.scrollWidth <= x.clientWidth + 1); }), 'names fit the banner');
+ok(await page.evaluate(() => window.__cr.music()) === 'intro', 'music: intro groove under the matchup card');
 await touch('touchStart', [L, R]);
 await page.waitForTimeout(1300);
+ok(await page.evaluate(() => window.__cr.music()) === 'build', 'music: 3-2-1 build');
 let h = await hud();
 ok(h.phase === 1 && /^[123]$/.test(h.banner), 'both thumbs start the run into a 3-2-1 (banner ' + h.banner + ')');
 ok(await page.evaluate(() => window.__cr.game.grace > 0), 'world held during the count');
@@ -58,12 +60,14 @@ ok(await page.evaluate(() => { const t = document.querySelector('.cr-top').getBo
 await shot('1-count');
 await page.waitForTimeout(2000);
 ok((await hud()).banner === 'GO', 'GO after the count');
+ok(await page.evaluate(() => window.__cr.music()) === 'live', 'music: drops into the live groove at GO');
 await shot('1-live');
 ok(await playToCrash(40000), 'a crash ends the match');
 await page.waitForTimeout(1300);
 await shot('1-win');
 await page.waitForTimeout(2300);
 h = await hud();
+ok(await page.evaluate(() => window.__cr.music()) === 'outro', 'music: back in, muffled, under the result');
 ok(/wins$/.test(h.win) && /hit the wall$/.test(h.sub), 'result: "' + h.win + '" / "' + h.sub + '"');
 ok(h.cls.includes('end') && h.cls.includes('acts'), 'who\'s-next card and buttons follow');
 await shot('1-end');
@@ -71,6 +75,7 @@ await touch('touchEnd', []);
 
 // 2. coin race with sudden death
 await page.click('[data-a=menu]');
+ok(await page.evaluate(() => window.__cr.music()) === 'off', 'music: off in the menu');
 await page.click('[data-seg=mtype][data-v=coins]');
 await page.click('[data-seg=msecs][data-v="15"]');
 await page.click('[data-act=play]');

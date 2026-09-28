@@ -11,6 +11,7 @@ import { view, clearImageCache, clearHaloCache } from '../src/render.js';
 import { world } from '../src/world.js';
 import { ent } from '../src/native.js';
 import { FLAGS } from './flags.gen.js';
+import { musicArm, musicScene, musicNow, BEAT, BUILD_SECS } from './music.js';
 
 // ---------- saved data ----------
 var KEY = "bt.creator.v1";
@@ -97,7 +98,8 @@ ent.canRun = function(){
   if(!allowRun) return false;
   // A match starts on both thumbs down: hold the world for a 3-2-1 first.
   allowRun = false;
-  queueMicrotask(function(){ if(game.phase === PHASE_RUN){ game.grace = 3; game.countdown = 0; } });
+  // The hold is the music's 6-beat build, so GO lands on the drop.
+  queueMicrotask(function(){ if(game.phase === PHASE_RUN){ game.grace = BUILD_SECS + 0.02; game.countdown = 0; musicScene("build"); } });
   return true;
 };
 function loserSide(){
@@ -163,6 +165,7 @@ function clockText(){
   return (mode === "live" || mode === "over" ? game.runTime : 0).toFixed(1) + "s";
 }
 function setupRound(m){
+  musicArm();   // every caller is a tap, which iPhone needs to start audio
   M = m;
   resetGame();
   closeMenu();
@@ -193,6 +196,7 @@ function setupRound(m){
     paintLead();
   });
   mode = "intro";
+  musicScene("intro");
   allowRun = true;
   el.crClock.textContent = clockText();
 }
@@ -217,6 +221,8 @@ function resetGame(){
 }
 function endMatch(w, how){
   mode = "over"; overAt = performance.now();
+  musicScene("drop");
+  setTimeout(function(){ if(mode === "over") musicScene("outro"); }, 1100);
   var sides = [M.left, M.right], sc = [game.coinsBy[0], game.coinsBy[1]];
   result = { w: w, sc: sc, how: how };
   el.crWinBadge.innerHTML = badge(sides[w]);
@@ -252,7 +258,7 @@ function tick(){
   el.crClock.textContent = clockText();
   if(mode === "intro" && game.phase === PHASE_RUN){ mode = "count"; lastCount = 0; el.crPrompt.hidden = true; el.crQuit.hidden = true; hud.classList.add("compact"); }
   if(mode === "count"){
-    var n = Math.ceil(game.grace);
+    var n = Math.ceil(game.grace / (2 * BEAT) - 0.01);
     if(game.grace <= 0){ mode = "live"; bannerFlash("GO"); }
     else if(n !== lastCount && n >= 1 && n <= 3){ lastCount = n; bannerFlash(String(n)); }
   }
@@ -364,6 +370,7 @@ var menu, tab = "match", cupDraft = { name: "Bell Theory Cup", size: 8, type: "c
 function openMenu(which){
   if(which) tab = which;
   mode = "menu";
+  musicScene("off");
   resetGame();
   if(!menu){ menu = document.createElement("div"); menu.className = "cr-menu"; document.body.appendChild(menu); menu.addEventListener("click", onMenuClick); menu.addEventListener("input", onMenuInput); menu.addEventListener("change", onMenuChange); }
   menu.hidden = false;
@@ -571,7 +578,7 @@ function openPicker(opt){
   el.crActions.addEventListener("click", function(e){ var b = e.target.closest("button"); if(b && b.dataset.a) onAction(b.dataset.a); });
   try{ if(navigator.wakeLock) navigator.wakeLock.request("screen").catch(function(){}); }catch(e){}
   // Test hook for the Playwright checks (creator/test.mjs); inert otherwise.
-  if(/[?&]test=1(&|$)/.test(location.search)) window.__cr = { game: game, store: store, nextMatch: nextMatch };
+  if(/[?&]test=1(&|$)/.test(location.search)) window.__cr = { game: game, store: store, nextMatch: nextMatch, music: musicNow };
   openMenu("match");
   requestAnimationFrame(tick);
 })();

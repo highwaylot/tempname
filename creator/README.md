@@ -30,6 +30,15 @@ Republish the artifact from `dist-creator/creator/index.html` after a build.
 - **Teams**: name, two colours and an optional image (cropped to a 256 px
   square). Uploaded logos are the user's call; keep them out of paid ads.
 
+**Music.** In place of the game's drone bed, a techno loop made in code
+(`creator/music-core.js`, no samples): 128 BPM, A minor, bars A A F G. Muffled
+groove under the matchup card; the 3-2-1 is a 6-beat build (2.81 s) so GO
+lands on the drop; four-on-the-floor in play, bass opening as the tank
+charges, 16th hats once fast, claps from bar 3; boost adds a riser, open hats
+and an acid arpeggio; a crash sinks it, then it comes back muffled under the
+result. Every game effect (coins, pumps, smashes, crash) is unchanged.
+`node creator/music-demo.mjs` renders a 29 s preview offline.
+
 Saved on the phone (localStorage, key `bt.creator.v1`): teams, the last
 match setup, the cup. Nothing here ships in the app. The only engine change
 is `game.coinsBy`, a per-lane coin count.
