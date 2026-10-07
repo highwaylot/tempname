@@ -2,6 +2,42 @@
 
 *2026-10-07. For a session working in `highwaylot/MOSTMATH` that is considering blending Bell Theory into mostmath.com. Written from the Bell Theory repo (`highwaylot/tempname`, branch `claude/bold-thompson-c3s6i5`) after reading MOSTMATH's README, STRATEGY.md and DECISIONS.md at `caa3f87`.*
 
+## 0. Start here: the two live copies
+
+| Artifact | What it is | Link |
+|---|---|---|
+| **Bell Theory** | The game itself, single-file build (play it to feel the target) | https://claude.ai/artifact/CWf9vb1oyPNrheKD119Fh5 |
+| **Bell Theory Creator** | The game wrapped for content: per-side coin counters, 3-2-1 hold, result cards, cups, techno bed | https://claude.ai/artifact/VDEreKKB5QuBCD8XMCNmxE |
+
+Both are private to the founder's account. A session signed in as the founder reads them with the Artifact tool (`action: "read"`, the link as `url`) and gets the full HTML back. Use them to **see and play** the behaviour. Then **copy from source, not from the artifact**: the artifacts are minified, single-file builds (JS, CSS, fonts and, for the creator, 271 flags inlined), so they are hard to edit. The readable source is the repo `highwaylot/tempname`, branch `claude/bold-thompson-c3s6i5`. Attach it with `add_repo` (read access is enough).
+
+### Retool checklist (copying the game into MOSTMATH)
+
+Keep:
+- the scroll, the gaps and collision (`spawnRow`, the obstacle loop in `update`)
+- orb follow and pointer input (`src/input.js`, which works with one lane)
+- the render loop (`src/render.js`) and the sound recipes (`src/audio.js`)
+- optionally the music (`creator/music-core.js`)
+
+Remove:
+- `src/native.js` (Capacitor, haptics, Preferences, the `ent` unlock gate) and any ad or purchase hooks
+- pump, boost, smash, storm, steel, surge and random jackpots
+- coins, or repurpose them (section 4)
+- the settings sheet, the title and crash cards, and lifetime counters
+
+Change:
+- every barrier gap gets a label (the answer or a named distractor from a MOSTMATH skill)
+- `spawnRow` builds 2 or 3 gaps per row instead of one
+- passing through the right gap counts as a solve; the result goes through MOSTMATH's checker, never a string compare
+- speed is capped so each row gives at least ~4 s to read
+- the skin uses MOSTMATH's tokens (equals mark, orange/blue, its fonts)
+- input: one lane by default, keyboard arrows too
+- a best score per device, stored the way MOSTMATH's other games store theirs (`src/app/games/shared.ts`)
+
+### Prompt to paste into the MOSTMATH session
+
+> Read docs/HANDOFF-MOSTMATH.md in highwaylot/tempname (branch claude/bold-thompson-c3s6i5; attach it read-only). Play the Bell Theory artifact (https://claude.ai/artifact/CWf9vb1oyPNrheKD119Fh5) to see the feel. Then build "Thread it" as a fifth game in src/app/games/, following the retool checklist in section 0 and the charter limits in section 4: copy the runner logic from the source files named there, not from the minified artifact. Gaps are labelled with the answer and the skill's distractors, verified by our checker. Own best only, no ads, no random jackpots. Ask me the four questions in section 6 before you start.
+
 ## 1. What Bell Theory is
 
 A two-thumb endless runner for phones. The screen splits into two lanes; each thumb drives one orb. Rows of barriers scroll down, each lane has a gap, and you thread it. Pumping a thumb up and down fills a tank; at full it ignites a boost (1.85× speed, coins pulled in, slate barriers smash instead of killing you). One hit on a wall ends the run. It ships as a Capacitor 8 app (iOS/Android) and as a single-file web page.
