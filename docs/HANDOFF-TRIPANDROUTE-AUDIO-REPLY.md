@@ -35,7 +35,7 @@
 
 ## Marketing videos
 
-- **34 rivalry rounds:** being re-rendered with the new audio (`node ads/render.mjs batch --jobs 2 --seed 101`, into `ads/out/`); see the commit that follows this one for the result.
+- **34 rivalry rounds:** not re-rendered. The founder stopped it: no new videos for now. The existing clips in `ads/out/` keep the old audio; only the Brazil v Argentina round in the preview folder has the new sound.
 - **Long-form zen videos (10/20/30 min):** these never carried the game's drone. They render with game sound off and their own original ambient soundtrack (`ads/ambient.mjs`: pad chords, sub, filtered wind, bells). That soundtrack is itself a continuous bed, which runs against "no continuous beds". It's a separate product (long-form ambient for YouTube), so it's the founder's call whether it stays. Their bot motion predates the smoothing pass either way, so re-render before posting.
 - **Creator page music:** the techno bed on the creator page (`creator/music-core.js`) is music for recorded content, not the game. "Playful and very chill" suggests the founder may want it reconsidered: either keep it for clips, or swap it for a sparse, slower, major-key loop as your section suggests.
 
