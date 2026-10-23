@@ -2,7 +2,7 @@
 // locals at the top of each function that uses them.
 import { state, saveState, reduceMotion } from './state.js';
 import { world } from './world.js';
-import { audio, ensureAudio, unlockMediaSession, releaseMediaSession, startBeds, driveAudio, blip, thump, crashSound, arp, duck } from './audio.js';
+import { audio, ensureAudio, unlockMediaSession, releaseMediaSession, startBeds, blip, thump, crashSound, arp, duck } from './audio.js';
 import { view, fxRunStart } from './render.js';
 import { overlayReady, overlayDead, comboBadge, comboNum, comboMult, gauge, resetComboStat, restartAnim, setOverlay, showDeath, showGate, showPause, hidePause, syncOneHand, isPanelOpen, isRotateShown } from './ui.js';
 import { sidePointer } from './input.js';
@@ -746,7 +746,6 @@ export function update(dt){
     : (game.parallelOn ? 0.92 : (game.phase === PHASE_RUN ? 0.4 + game.charge*0.35 + tier*0.2 : 0.2));
   targetWarmth = Math.min(1, targetWarmth);
   world.tick(dt, targetEntropy, targetWarmth);
-  driveAudio(dt);
 }
 
 // ===================== lifecycle =====================

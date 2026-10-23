@@ -1,18 +1,17 @@
 import { state } from './state.js';
-import { world } from './world.js';
 import { isNative } from './native.js';
 import { syncSoundBtn } from './ui.js';
 
 // ===================== audio (ported + trimmed) =====================
 export var audio = {
   ctx:null, master:null, comp:null, click:null, analyser:null, freqData:null, binIndex:null,
-  noiseGain:null, noiseFilter:null, started:false, soundOffAt:0,
+  started:false, soundOffAt:0,
   noisePCM:null, noiseBuf:null, clickBp:null, crashLp:null
 };
 // The graph is built at load in idle time so the first touch only resumes
 // the context and starts the sources: the context + static graph and the
-// noise PCM. (There is no tonal drone: founder call 2026-10-23, the steady
-// hum under every run is gone; the effects carry the sound.) Nothing sounds
+// noise PCM. There are no background beds (founder call 2026-10-23: no
+// drone, no noise wash); the effects carry the sound. Nothing sounds
 // before the gesture: the context is suspended until a resume() from one,
 // and no source node is started here. On a muted start only the PCM is
 // prepared (no context without the user asking for sound).
@@ -106,14 +105,6 @@ export function ensureAudio(){
     audio.master.connect(audio.comp);
     audio.comp.connect(ctx.destination);
 
-    audio.noiseFilter = ctx.createBiquadFilter();
-    audio.noiseFilter.type = "bandpass";
-    audio.noiseFilter.frequency.value = 3000;
-    audio.noiseFilter.Q.value = 0.6;
-    audio.noiseGain = ctx.createGain();
-    audio.noiseGain.gain.value = 0.0;
-    audio.noiseFilter.connect(audio.noiseGain);
-    audio.noiseGain.connect(audio.master);
     // Shared filters for the impact click and the crash noise: both stages
     // are linear and time-invariant, so one filter after the per-voice gain
     // renders the same samples as one per voice, without two extra nodes per
@@ -138,38 +129,19 @@ export function startBeds(){
   var ctx = ensureAudio();
   if(!ctx || audio.started) return;
   audio.started = true;
-  driveAcc = 1; lastNF = -1; lastNG = -1;
-  // A no-op when the idle prebuild already ran; the fallback for a touch
-  // that lands before it, and for the sound-off-then-on path.
+  // No continuous beds (founder call 2026-10-23): sound happens when
+  // something happens. The noise buffer is still made here because the
+  // crash draws its burst from it. prepNoise is a no-op when the idle
+  // prebuild already ran.
   prepNoise(ctx.sampleRate);
   var buf = ctx.createBuffer(1, audio.noisePCM.length, ctx.sampleRate);
   buf.copyToChannel(audio.noisePCM, 0);
   audio.noiseBuf = buf;
   audio.noisePCM = null;
-  var src = ctx.createBufferSource();
-  src.buffer = buf; src.loop = true;
-  src.connect(audio.noiseFilter);
-  src.start();
   // Mid-range confirmation chirp: proof on a phone speaker that sound is on
   // before the first effect plays.
   blip(660, 0.22, "triangle", 0.3);
   syncSoundBtn();
-}
-// The beds follow the world at 10 Hz: the targets move on a ~1 s time
-// constant, so three setTargetAtTime calls per frame (128 automation
-// events/s at 42 fps) bought nothing. Accumulates the unscaled dt; a param is written only when its
-// target moved (> 1 Hz / > 0.0003). startBeds resets them.
-var driveAcc = 1, lastNF = -1, lastNG = -1;
-export function driveAudio(dt){
-  if(!audio.ctx || !audio.started) return;
-  driveAcc += dt;
-  if(driveAcc < 0.1) return;
-  driveAcc = 0;
-  var t = audio.ctx.currentTime;
-  var nf = 1400 + world.warmth*4200;
-  var ng = 0.04 + world.entropy*0.24;
-  if(Math.abs(nf - lastNF) > 1){ lastNF = nf; audio.noiseFilter.frequency.setTargetAtTime(nf, t, 0.35); }
-  if(Math.abs(ng - lastNG) > 0.0003){ lastNG = ng; audio.noiseGain.gain.setTargetAtTime(ng, t, 0.4); }
 }
 // n (default 1) plays the note as n phase-coherent voices in one: every
 // envelope anchor is scaled by n, which renders the same samples as n
