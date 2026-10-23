@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bell Theory Preview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Bell Theory, a two-thumb runner from Trip and Route. Thread the gaps, or light up and wreck them. Play the preview in your browser.">
+<meta property="og:title" content="Bell Theory: thread it, or wreck it">
+<meta property="og:description" content="A two-thumb runner from Trip and Route. Play the preview in your browser.">
+<meta property="og:image" content="og.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0b0d11">
+<link rel="icon" href="icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Sora:wght@400;600;800&display=swap">
+<style>
+  /* Bell Theory's own world, deliberately one dark theme: the stage colour,
+     the teal of a clean thread and the gold of a coin. */
+  :root{
+    color-scheme: dark;
+    --stage:#0b0d11; --stage-2:#12151b; --panel:#171b23; --line:rgba(255,255,255,.09);
+    --ink:#eef0f4; --ink-dim:#a3aab8; --ink-faint:#646c7b;
+    --teal:#7dd3c0; --gold:#f2c14e; --hot:#ff9b6a;
+    --display:'Sora', system-ui, sans-serif; --mono:'IBM Plex Mono', ui-monospace, monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ background:var(--stage); }
+  body{ margin:0; background:var(--stage); color:var(--ink); font:400 16px/1.6 var(--display); padding-inline:16px; }
+  [hidden]{ display:none !important; }
+  a{ color:var(--teal); }
+  .wrap{ max-width:1080px; margin:0 auto; }
+  .eyebrow{ font:500 11.5px/1 var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--gold); }
+
+  /* hero: the game frame is the thesis */
+  .hero{ display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:56px; align-items:center; padding-block:56px 40px; }
+  .hero-copy{ display:flex; flex-direction:column; gap:20px; max-width:520px; }
+  .logo{ width:min(100%, 420px); height:auto; display:block; }
+  h1.tag{ font-weight:800; font-size:clamp(34px, 5.2vw, 58px); line-height:1.02; letter-spacing:-.01em; margin:0; text-wrap:balance; }
+  h1.tag em{ font-style:normal; color:var(--gold); }
+  .lede{ color:var(--ink-dim); font-size:17px; margin:0; max-width:46ch; }
+  .actions{ display:flex; flex-wrap:wrap; gap:12px; }
+  .btn{ appearance:none; display:inline-flex; align-items:center; gap:10px; min-height:48px; padding:12px 22px; border-radius:14px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font:600 15px var(--display); text-decoration:none; cursor:pointer; }
+  .btn.go{ background:var(--gold); color:#17130a; border-color:transparent; font-weight:800; }
+  .btn:hover{ filter:brightness(1.08); }
+  .btn:focus-visible{ outline:2px solid var(--teal); outline-offset:3px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; padding:0; margin:0; list-style:none; }
+  .chips li{ font:500 11px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--ink-dim); padding:8px 10px; border-radius:99px; border:1px solid var(--line); }
+  .chips li.soon{ color:var(--teal); border-color:rgba(125,211,192,.35); }
+
+  .phone{ position:relative; width:min(360px, calc(78vh * 9 / 16)); max-width:100%; aspect-ratio:9/16; border-radius:34px; padding:10px; background:#05060a; box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.6), 0 0 120px rgba(125,211,192,.08); }
+  .phone .slot{ position:relative; width:100%; height:100%; border-radius:26px; overflow:hidden; background:var(--stage-2); }
+  .phone video, .phone iframe, .phone img{ position:absolute; inset:0; width:100%; height:100%; border:0; object-fit:cover; display:block; }
+  .phone .play-over{ position:absolute; left:50%; bottom:9%; transform:translateX(-50%); z-index:2; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  .under{ display:flex; justify-content:center; gap:10px; margin-top:14px; min-height:36px; }
+  .link-btn{ appearance:none; border:0; background:none; color:var(--ink-dim); font:500 12px var(--mono); letter-spacing:.14em; text-transform:uppercase; cursor:pointer; padding:8px; }
+  .link-btn:focus-visible{ outline:2px solid var(--teal); }
+
+  /* sections */
+  section{ padding-block:48px; border-top:1px solid var(--line); }
+  h2{ font-weight:800; font-size:clamp(24px, 3.4vw, 34px); line-height:1.1; margin:10px 0 24px; text-wrap:balance; }
+  .moves{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px; }
+  .move{ padding:20px; border-radius:18px; background:var(--panel); border:1px solid var(--line); display:flex; flex-direction:column; gap:10px; }
+  .move h3{ margin:0; font-weight:800; font-size:20px; letter-spacing:.02em; text-transform:uppercase; }
+  .move h3.t{ color:var(--teal); } .move h3.p{ color:var(--gold); } .move h3.w{ color:var(--hot); }
+  .move p{ margin:0; color:var(--ink-dim); font-size:15px; }
+  .move .num{ font:500 11.5px/1.5 var(--mono); letter-spacing:.08em; color:var(--ink-faint); }
+
+  .versus{ display:grid; grid-template-columns:auto minmax(0, 1fr); gap:40px; align-items:center; }
+  .versus .phone{ width:min(300px, calc(70vh * 9 / 16)); }
+  .versus p{ color:var(--ink-dim); max-width:48ch; margin:0 0 14px; }
+  .note{ font:500 11.5px/1.6 var(--mono); letter-spacing:.06em; color:var(--ink-faint); }
+
+  .controls{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
+  .controls div{ padding:18px 20px; border-radius:16px; border:1px solid var(--line); }
+  .controls b{ display:block; font:500 11px var(--mono); letter-spacing:.2em; text-transform:uppercase; color:var(--gold); margin-bottom:6px; }
+  .controls span{ color:var(--ink-dim); font-size:15px; }
+
+  footer{ border-top:1px solid var(--line); padding-block:28px 40px; color:var(--ink-faint); font:500 12px/1.7 var(--mono); letter-spacing:.06em; display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; }
+
+  /* phones: the game opens over the page, full height */
+  .overlay{ position:fixed; inset:0; z-index:50; background:var(--stage); display:flex; flex-direction:column; padding-top:env(safe-area-inset-top, 0px); }
+  .overlay-bar{ display:flex; align-items:center; justify-content:space-between; padding:6px 12px; border-bottom:1px solid var(--line); }
+  .overlay-bar span{ font:500 11px var(--mono); letter-spacing:.2em; text-transform:uppercase; color:var(--ink-dim); }
+  .overlay iframe{ flex:1; width:100%; border:0; display:block; }
+  body.playing{ overflow:hidden; }
+
+  @media (max-width: 860px){
+    .hero{ grid-template-columns:1fr; gap:32px; padding-block:32px 24px; justify-items:center; text-align:left; }
+    .hero-copy{ order:1; } .hero-stage{ order:2; }
+    .moves{ grid-template-columns:1fr; }
+    .versus{ grid-template-columns:1fr; justify-items:center; }
+    .controls{ grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion: reduce){ .btn:hover{ filter:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-copy">
+      <span class="eyebrow">A Trip and Route game · Preview</span>
+      <img class="logo" src="logo.png" alt="Bell Theory" width="1160" height="288">
+      <h1 class="tag">Thread it, <em>or wreck it.</em></h1>
+      <p class="lede">Two lanes, two orbs, one thumb on each. Slip through the gaps, grab the coins, pump to charge the tank, then light up and smash straight through. One wall ends the run.</p>
+      <div class="actions">
+        <button type="button" class="btn go" id="play">Play the preview</button>
+        <a class="btn" href="#versus">Country vs country</a>
+      </div>
+      <ul class="chips">
+        <li>Free in your browser</li>
+        <li>No account</li>
+        <li class="soon">iOS &amp; Android soon</li>
+      </ul>
+    </div>
+    <div class="hero-stage">
+      <div class="phone" id="stage">
+        <div class="slot" id="slot">
+          <video id="trailer" poster="trailer.jpg" muted loop playsinline preload="metadata" aria-label="Bell Theory trailer"><source src="trailer.mp4" type="video/mp4"><source src="trailer.webm" type="video/webm"></video>
+          <button type="button" class="btn go play-over" id="play2">▶ Play</button>
+        </div>
+      </div>
+      <div class="under"><button type="button" class="link-btn" id="stop" hidden>■ Stop and show the trailer</button></div>
+    </div>
+  </header>
+
+  <section aria-labelledby="h-how">
+    <span class="eyebrow">How it plays</span>
+    <h2 id="h-how">Your brain, split in two</h2>
+    <div class="moves">
+      <div class="move"><h3 class="t">Thread</h3><p>Each lane gets its own wall with its own gap. Steer both orbs through at once. Skim a wall without touching it for a GRAZE.</p><span class="num">clean passes chain a combo · ×1 more every 5</span></div>
+      <div class="move"><h3 class="p">Pump</h3><p>Flick a thumb up and down to fill the tank. Pump both thumbs in rhythm and it fills fastest.</p><span class="num">both thumbs together · 1.8× charge</span></div>
+      <div class="move"><h3 class="w">Wreck</h3><p>At full, the tank lights up. You run faster, coins pull toward you, and slate shatters on contact. Chain enough smashes and the whole field goes.</p><span class="num">boost 1.85× speed · 4–6 smashes · WRECKED</span></div>
+    </div>
+  </section>
+
+  <section id="versus" aria-labelledby="h-vs">
+    <div class="versus">
+      <div class="phone">
+        <div class="slot"><video poster="match.jpg" controls playsinline preload="none" aria-label="Brazil versus Argentina round"><source src="match.mp4" type="video/mp4"><source src="match.webm" type="video/webm"></video></div>
+      </div>
+      <div>
+        <span class="eyebrow">Country vs country</span>
+        <h2 id="h-vs">Who hits the wall first?</h2>
+        <p>Put a flag on each orb and every run becomes a match. Brazil on the left, Argentina on the right: the side that touches a wall loses, and the comments pick the next matchup.</p>
+        <p class="note">AI vs AI round, played on the real game engine. Sound on.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-ctl">
+    <span class="eyebrow">Controls</span>
+    <h2 id="h-ctl">Built for two thumbs</h2>
+    <div class="controls">
+      <div><b>Phone</b><span>Left thumb drives the left orb, right thumb the right. Put both down to start. Pump up and down to charge.</span></div>
+      <div><b>Computer</b><span>One lane, the orb follows your mouse. Click to start and to run again. The full game wants a phone.</span></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>© 2026 Trip and Route · Bell Theory preview</span>
+    <span>No ads, no tracking. Progress stays on this device.</span>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="overlay-bar"><button type="button" class="link-btn" id="close">← Back</button><span>Bell Theory · preview</span></div>
+</div>
+
+<script>
+(function(){
+  var slot = document.getElementById('slot'), trailer = document.getElementById('trailer');
+  var overlay = document.getElementById('overlay'), stop = document.getElementById('stop'), playBtn2 = document.getElementById('play2');
+  var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(calm){ trailer.controls = true; } else { var p = trailer.play(); if(p && p.catch) p.catch(function(){ trailer.controls = true; }); }
+
+  // The game is one self-contained file. It loads into a frame: inline on a
+  // wide screen, over the page on a phone. Read and inlined when the host
+  // allows it (some hosts refuse framing a URL but allow inline content).
+  function gameFrame(){
+    var f = document.createElement('iframe');
+    f.title = 'Bell Theory'; f.setAttribute('allow', 'autoplay; fullscreen');
+    fetch('play.html').then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function(t){ f.srcdoc = t; }).catch(function(){ f.src = 'play.html'; });
+    return f;
+  }
+  function play(){
+    trailer.pause();
+    if(window.matchMedia('(min-width: 861px)').matches){
+      slot.replaceChildren(gameFrame()); stop.hidden = false;
+      document.getElementById('stage').scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
+    } else {
+      var f = gameFrame(); overlay.appendChild(f); overlay.hidden = false; document.body.classList.add('playing'); f.focus();
+    }
+  }
+  function restore(){ slot.replaceChildren(trailer, playBtn2); stop.hidden = true; if(!calm) trailer.play().catch(function(){}); }
+  document.getElementById('play').addEventListener('click', play);
+  playBtn2.addEventListener('click', play);
+  stop.addEventListener('click', restore);
+  document.getElementById('close').addEventListener('click', function(){
+    var f = overlay.querySelector('iframe'); if(f) f.remove();
+    overlay.hidden = true; document.body.classList.remove('playing');
+  });
+})();
+</script>
+</body>
+</html>
