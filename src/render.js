@@ -295,9 +295,8 @@ export function draw(){
     var bw = W / bars;
     ctx2d.fillStyle = "rgba(125,211,192,0.085)";
     for(var bi=0; bi<bars; bi++){
-      // Non-linear bin mapping (audio.binIndex): the drone lives in the
-      // first few bins, so a straight 1:1 map piled all the energy into the
-      // far-left corner.
+      // Non-linear bin mapping (audio.binIndex): a straight 1:1 map piled
+      // the low end into the far-left corner.
       var bin = audio.binIndex[bi];
       var bh = (audio.freqData[bin] / 255) * H * 0.1;
       ctx2d.fillRect(bi*bw, H - bh, bw - 1.5, bh);

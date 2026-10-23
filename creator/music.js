@@ -6,14 +6,14 @@ import { game } from '../src/game.js';
 
 var music = null, timer = 0;
 // Call from a tap (the audio context needs a gesture on iPhone). Replaces the
-// game's drone and noise bed; every effect (coins, pumps, smashes, crash)
+// game's noise bed; every effect (coins, pumps, smashes, crash)
 // still plays through the game's master as before.
 export function musicArm(){
   var ctx = ensureAudio(); if(!ctx) return;
   unlockMediaSession();
   startBeds();
   if(music) return;
-  try{ audio.droneGain.disconnect(); audio.noiseGain.disconnect(); }catch(e){}
+  try{ audio.noiseGain.disconnect(); }catch(e){}
   music = createMusic(ctx, audio.master, function(){ return { lit: game.boost > 0, charge: game.charge, speed: game.speed }; });
   timer = setInterval(function(){ music.tick(ctx.currentTime + 0.12); }, 25);
 }
