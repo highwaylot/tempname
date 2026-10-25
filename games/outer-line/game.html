@@ -4,109 +4,141 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#070910">
+<meta name="theme-color" content="#08080c">
 <title>Outer Line</title>
 <style>
-  /* Outer Line: a space metro. Each line is a tunnel, each station a stop.
-     Night-transit palette: deep navy, signal colours per line, warm platform light. */
+  /* Outer Line: skating the space metro after hours. A late-night skate-video
+     look: black tunnel, acid lime and hot magenta, heavy italic type, tape
+     labels. System faces only, so it looks right on a locked-down Chromebook. */
   :root{
     color-scheme: dark;
-    --night:#070910; --ink:#eef1f7; --dim:#9aa3b5; --faint:#5b6476;
-    --line:#ff8a3d; --line2:#46c2ff; --line3:#b07cff; --ok:#7ee0a8;
-    --display:'Arial Rounded MT Bold', 'Nunito', system-ui, sans-serif;
-    --mono:ui-monospace, 'SF Mono', Menlo, monospace;
+    --void:#08080c; --tile:#15151d; --ink:#f4f4f0; --dim:#a8a8b4; --faint:#5c5c68;
+    --lime:#c6ff00; --mag:#ff2e88; --cyan:#2ee6ff; --tape:#f2efe2;
+    --heavy:'Arial Black', 'Helvetica Neue', Impact, system-ui, sans-serif;
+    --mono:ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body{ margin:0; height:100%; background:var(--night); color:var(--ink); font-family:var(--display); overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; }
+  html, body{ margin:0; height:100%; background:var(--void); color:var(--ink); font-family:var(--heavy); overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; }
   [hidden]{ display:none !important; }
   canvas{ position:fixed; inset:0; width:100%; height:100%; display:block; }
-  .hud{ position:fixed; left:0; right:0; top:0; padding:calc(10px + env(safe-area-inset-top, 0px)) 14px 0; display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; }
-  .hud .stn{ font:700 13px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
-  .hud .stn b{ color:var(--ink); }
-  .track{ position:relative; width:min(70vw, 360px); height:6px; border-radius:3px; background:rgba(255,255,255,.1); }
-  .track i{ position:absolute; left:0; top:0; bottom:0; border-radius:3px; background:var(--line); width:0; }
-  .track em{ position:absolute; top:50%; width:12px; height:12px; margin:-6px 0 0 -6px; border-radius:50%; background:#fff; box-shadow:0 0 10px rgba(255,255,255,.7); left:0; }
-  .track span{ position:absolute; right:-4px; top:50%; width:14px; height:14px; margin-top:-7px; border-radius:50%; border:3px solid var(--line); background:var(--night); }
-  .tools{ position:fixed; right:12px; top:calc(10px + env(safe-area-inset-top, 0px)); display:flex; gap:8px; }
-  .tool{ appearance:none; width:40px; height:40px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:rgba(10,13,22,.7); color:var(--ink); font:700 15px var(--display); cursor:pointer; }
-  .tool:focus-visible, .btn:focus-visible, .stop:focus-visible{ outline:2px solid var(--line2); outline-offset:2px; }
 
-  /* screens */
-  .screen{ position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:calc(20px + env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px)); background:radial-gradient(120% 80% at 50% 30%, rgba(14,20,40,.55), rgba(7,9,16,.92)); text-align:center; overflow-y:auto; }
-  .title{ font-weight:800; font-size:clamp(40px, 10vw, 72px); letter-spacing:.02em; line-height:.95; margin:0; }
-  .title em{ font-style:normal; color:var(--line); }
-  .sub{ font:600 12px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0; }
-  .map{ width:min(94vw, 640px); }
-  .map svg{ width:100%; height:auto; display:block; overflow:visible; }
-  .stop{ cursor:pointer; }
-  .stop text{ font:700 11px var(--mono); letter-spacing:.06em; fill:var(--dim); text-transform:uppercase; }
-  .stop.locked{ cursor:default; opacity:.4; }
-  .stop.done circle.dot{ fill:var(--line); }
-  .stop:hover circle.ring, .stop:focus-visible circle.ring{ stroke-width:5; }
-  .row{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-  .btn{ appearance:none; min-height:48px; padding:12px 22px; border-radius:14px; border:1px solid rgba(255,255,255,.14); background:rgba(18,23,38,.9); color:var(--ink); font:800 16px var(--display); cursor:pointer; }
-  .btn.go{ background:var(--line); color:#1a0d04; border-color:transparent; }
-  .btn.daily{ border-color:var(--line2); color:var(--line2); }
-  .keys{ font:600 12px var(--mono); color:var(--faint); letter-spacing:.06em; line-height:1.8; max-width:42ch; }
-  .keys b{ color:var(--dim); }
-  .card{ display:flex; flex-direction:column; align-items:center; gap:10px; }
-  .big{ font-weight:800; font-size:clamp(30px, 8vw, 52px); line-height:1; margin:0; }
-  .share{ font:600 13px var(--mono); white-space:pre; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:12px 16px; color:var(--ink); text-align:left; }
-  .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); font:700 13px var(--mono); background:rgba(18,23,38,.95); border:1px solid rgba(255,255,255,.14); padding:10px 14px; border-radius:10px; }
-  .hint{ position:fixed; left:0; right:0; top:calc(58px + env(safe-area-inset-top, 0px)); text-align:center; font:600 12px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--faint); pointer-events:none; transition:opacity .6s; }
-  @media (max-width: 560px){ .hud{ align-items:flex-start; padding-right:112px; } .track{ width:100%; } }
+  /* tape label */
+  .tape{ display:inline-block; background:var(--tape); color:#111; font:900 italic 13px var(--heavy); letter-spacing:.04em; text-transform:uppercase; padding:5px 10px 4px; transform:rotate(-2deg); box-shadow:2px 3px 0 rgba(0,0,0,.45); }
+  .tape.lime{ background:var(--lime); } .tape.mag{ background:var(--mag); color:#fff; }
+  .page > .tape{ align-self:flex-start; }
+
+  /* HUD */
+  .hud-top{ position:fixed; left:12px; right:120px; top:calc(10px + env(safe-area-inset-top, 0px)); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+  .prog{ position:relative; height:4px; background:rgba(255,255,255,.12); max-width:420px; transform:skewX(-20deg); }
+  .prog i{ position:absolute; left:0; top:0; bottom:0; width:0; background:var(--lime); box-shadow:0 0 10px var(--lime); }
+  .hud-bot{ position:fixed; left:14px; right:14px; bottom:calc(14px + env(safe-area-inset-bottom, 0px)); display:flex; align-items:flex-end; justify-content:space-between; gap:12px; pointer-events:none; }
+  .spd{ font:900 italic clamp(40px, 9vw, 74px)/.85 var(--heavy); letter-spacing:-.02em; color:var(--ink); text-shadow:3px 3px 0 var(--mag); font-variant-numeric:tabular-nums; }
+  .spd small{ font-size:.28em; letter-spacing:.1em; color:var(--lime); text-shadow:none; margin-left:4px; }
+  .flow{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .flow b{ font:900 italic 14px var(--heavy); letter-spacing:.08em; color:var(--lime); text-transform:uppercase; }
+  .flowbar{ width:min(46vw, 260px); height:14px; transform:skewX(-20deg); background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.2); position:relative; overflow:hidden; }
+  .flowbar i{ position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg, var(--cyan), var(--lime) 60%, var(--mag)); }
+  .flowbar span{ position:absolute; top:0; bottom:0; width:2px; background:rgba(0,0,0,.6); }
+  .score{ font:900 italic 15px var(--heavy); color:var(--dim); letter-spacing:.06em; }
+  .tools{ position:fixed; right:12px; top:calc(10px + env(safe-area-inset-top, 0px)); display:flex; gap:8px; }
+  .tool{ appearance:none; width:42px; height:42px; border:2px solid rgba(255,255,255,.25); background:rgba(8,8,12,.7); color:var(--ink); font:900 16px var(--heavy); cursor:pointer; transform:skewX(-8deg); }
+  .tool:focus-visible, .btn:focus-visible, .spot:focus-visible{ outline:3px solid var(--lime); outline-offset:3px; }
+  .hint{ position:fixed; left:0; right:0; top:calc(64px + env(safe-area-inset-top, 0px)); text-align:center; font:700 12px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); pointer-events:none; transition:opacity .6s; }
+
+  /* screens: zine pages */
+  .screen{ position:fixed; inset:0; overflow-y:auto; padding:calc(22px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    background:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,.06) 1px, transparent 1.5px) 0 0/9px 9px,
+      linear-gradient(160deg, rgba(255,46,136,.16), transparent 40%),
+      rgba(8,8,12,.9); }
+  .page{ max-width:900px; margin:0 auto; display:flex; flex-direction:column; gap:22px; }
+  .logo{ font:900 italic clamp(54px, 13vw, 128px)/.82 var(--heavy); letter-spacing:-.03em; margin:0; color:var(--ink); text-shadow:5px 5px 0 var(--mag), 10px 10px 0 rgba(198,255,0,.35); transform:rotate(-3deg); transform-origin:left bottom; }
+  .logo em{ font-style:italic; color:var(--lime); text-shadow:5px 5px 0 var(--mag); }
+  .kicker{ font:700 12px var(--mono); letter-spacing:.22em; text-transform:uppercase; color:var(--dim); margin:0; }
+  .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .btn{ appearance:none; min-height:52px; padding:12px 24px; border:3px solid var(--ink); background:transparent; color:var(--ink); font:900 italic 18px var(--heavy); letter-spacing:.02em; text-transform:uppercase; cursor:pointer; transform:skewX(-10deg); box-shadow:5px 5px 0 rgba(0,0,0,.5); }
+  .btn > span{ display:inline-block; transform:skewX(10deg); }
+  .btn.go{ background:var(--lime); color:#0b0b0b; border-color:var(--lime); box-shadow:5px 5px 0 var(--mag); }
+  .btn.mag{ border-color:var(--mag); color:var(--mag); }
+  .btn:active{ transform:skewX(-10deg) translate(3px, 3px); box-shadow:2px 2px 0 rgba(0,0,0,.5); }
+  .spots{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:14px; }
+  .spot{ appearance:none; text-align:left; border:0; padding:14px 14px 12px; background:#14141c; color:var(--ink); cursor:pointer; position:relative; transform:rotate(var(--r, 0deg)); box-shadow:4px 4px 0 rgba(0,0,0,.55); display:flex; flex-direction:column; gap:6px; min-height:104px; font-family:var(--heavy); }
+  .spot .n{ font:900 italic 30px/1 var(--heavy); color:var(--sc, var(--lime)); }
+  .spot .nm{ font:900 italic 15px/1.1 var(--heavy); text-transform:uppercase; }
+  .spot .st{ font:700 11px var(--mono); letter-spacing:.08em; color:var(--dim); margin-top:auto; }
+  .spot.locked{ cursor:default; opacity:.35; }
+  .spot.done::after{ content:"LANDED"; position:absolute; right:-6px; top:-8px; background:var(--lime); color:#111; font:900 italic 10px var(--heavy); padding:3px 6px; transform:rotate(6deg); }
+  .keys{ font:700 12px/1.9 var(--mono); color:var(--dim); letter-spacing:.04em; margin:0; }
+  .keys b{ color:var(--lime); }
+  .big{ font:900 italic clamp(40px, 10vw, 88px)/.88 var(--heavy); margin:0; letter-spacing:-.02em; text-shadow:4px 4px 0 var(--mag); }
+  .stats{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; }
+  .stat{ background:#14141c; padding:12px 14px; box-shadow:4px 4px 0 rgba(0,0,0,.55); }
+  .stat b{ display:block; font:900 italic 30px/1 var(--heavy); color:var(--lime); font-variant-numeric:tabular-nums; }
+  .stat span{ font:700 11px var(--mono); letter-spacing:.14em; color:var(--dim); text-transform:uppercase; }
+  .share{ font:700 14px/1.5 var(--mono); white-space:pre; background:#101016; border:2px dashed rgba(255,255,255,.25); padding:14px 16px; color:var(--ink); align-self:flex-start; max-width:100%; overflow-x:auto; }
+  .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%) rotate(-2deg); font:900 italic 14px var(--heavy); background:var(--lime); color:#111; padding:10px 14px; box-shadow:4px 4px 0 var(--mag); }
+  @media (max-width: 560px){ .hud-top{ right:108px; } .spots{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
   @media (prefers-reduced-motion: reduce){ .hint{ transition:none; } }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 
-<div class="hud" id="hud" hidden>
-  <div class="stn" id="stnName">—</div>
-  <div class="track"><i id="trackFill"></i><em id="trackDot"></em><span></span></div>
+<div class="hud-top" id="hudTop" hidden>
+  <div><span class="tape" id="stnName">—</span></div>
+  <div class="prog"><i id="progFill"></i></div>
+</div>
+<div class="hud-bot" id="hudBot" hidden>
+  <div>
+    <div class="spd" id="spd">0<small>KM/H</small></div>
+    <div class="score" id="score">STYLE 0</div>
+  </div>
+  <div class="flow"><b id="flowTier">ROLLING</b><div class="flowbar"><i id="flowFill"></i><span style="left:33%"></span><span style="left:66%"></span></div></div>
 </div>
 <div class="tools">
   <button type="button" class="tool" id="mute" aria-label="Sound off">♪</button>
-  <button type="button" class="tool" id="toMap" aria-label="Line map" hidden>☰</button>
+  <button type="button" class="tool" id="toMap" aria-label="Spots" hidden>☰</button>
 </div>
 <div class="hint" id="hint" hidden></div>
 
 <section class="screen" id="mapScreen">
-  <p class="sub">A Trip and Route game</p>
-  <h1 class="title">OUTER <em>LINE</em></h1>
-  <p class="sub">mind the gap · walls are floors</p>
-  <div class="map" id="map"></div>
-  <div class="row">
-    <button type="button" class="btn go" id="playNext">Ride to the next stop</button>
-    <button type="button" class="btn daily" id="playDaily">Today's route</button>
+  <div class="page">
+    <p class="kicker">A Trip and Route game · after hours on the metro</p>
+    <h1 class="logo">OUTER<br><em>LINE</em></h1>
+    <div class="row">
+      <button type="button" class="btn go" id="playNext"><span>Drop in</span></button>
+      <button type="button" class="btn mag" id="playDaily"><span>Today's route</span></button>
+    </div>
+    <p class="keys" id="keys"></p>
+    <div class="spots" id="spots"></div>
   </div>
-  <p class="keys" id="keys"></p>
 </section>
 
 <section class="screen" id="arriveScreen" hidden>
-  <div class="card">
-    <p class="sub">now arriving</p>
+  <div class="page">
+    <span class="tape lime">landed</span>
     <p class="big" id="arriveName">—</p>
-    <p class="sub" id="arriveSub"></p>
-  </div>
-  <div class="row">
-    <button type="button" class="btn go" id="arriveNext">Next stop</button>
-    <button type="button" class="btn" id="arriveMap">Line map</button>
+    <div class="stats" id="arriveStats"></div>
+    <div class="row">
+      <button type="button" class="btn go" id="arriveNext"><span>Next stop</span></button>
+      <button type="button" class="btn" id="arriveAgain"><span>Again</span></button>
+      <button type="button" class="btn" id="arriveMap"><span>Spots</span></button>
+    </div>
   </div>
 </section>
 
 <section class="screen" id="dailyScreen" hidden>
-  <div class="card">
-    <p class="sub" id="dailyHead">today's route</p>
+  <div class="page">
+    <span class="tape mag" id="dailyHead">today's route</span>
     <p class="big" id="dailyPct">—</p>
     <div class="share" id="shareText"></div>
+    <div class="row">
+      <button type="button" class="btn go" id="copyShare"><span>Copy card</span></button>
+      <button type="button" class="btn" id="dailyAgain"><span>Practice</span></button>
+      <button type="button" class="btn" id="dailyMap"><span>Spots</span></button>
+    </div>
+    <p class="keys">Your first ride of the day goes on the card. Practice all you want after.</p>
   </div>
-  <div class="row">
-    <button type="button" class="btn go" id="copyShare">Copy card</button>
-    <button type="button" class="btn" id="dailyAgain">Practice again</button>
-    <button type="button" class="btn" id="dailyMap">Line map</button>
-  </div>
-  <p class="keys">Your first ride of the day is the one on the card. Practice rides don't change it.</p>
 </section>
 
 <div class="toast" id="toast" hidden></div>
@@ -122,45 +154,47 @@ var store = {
 };
 var $ = function(id){ return document.getElementById(id); };
 var TAU = Math.PI * 2;
+function clamp(v, a, b){ return v < a ? a : v > b ? b : v; }
 
 // ---------------------------------------------------------------- the line
-// Ten stops, easy to hard. Each is generated from its own seed, so every
-// rider gets the same ride. N = sides of the tunnel, C = tile columns per side.
+// Ten stops, easy to hard, each from its own seed so every rider gets the
+// same ride. N = tunnel sides, C = tile columns per side, speed = base speed
+// before momentum (flow multiplies it up to 1 + FLOW_MAX).
 var STOPS = [
-  { name:"Dockyard",       N:6, C:3, len:110, speed:8.0,  holes:.10, gapEvery:0,  gapLen:0, width:3, seed:11 },
-  { name:"Lumen Avenue",   N:6, C:3, len:130, speed:8.5,  holes:.22, gapEvery:28, gapLen:1, width:3, seed:23 },
-  { name:"Halo Junction",  N:6, C:3, len:150, speed:9.0,  holes:.34, gapEvery:24, gapLen:2, width:2, seed:37 },
-  { name:"Quarry Steps",   N:6, C:3, len:160, speed:9.5,  holes:.45, gapEvery:22, gapLen:2, width:2, seed:41 },
-  { name:"Lantern Market", N:8, C:2, len:170, speed:10.0, holes:.40, gapEvery:20, gapLen:2, width:2, seed:53 },
-  { name:"Orbit Park",     N:8, C:2, len:180, speed:10.5, holes:.52, gapEvery:18, gapLen:2, width:2, seed:67 },
-  { name:"Glass Bridge",   N:8, C:2, len:190, speed:11.0, holes:.62, gapEvery:16, gapLen:3, width:1, seed:71 },
-  { name:"Deep Siding",    N:6, C:3, len:200, speed:11.5, holes:.60, gapEvery:15, gapLen:3, width:1, seed:83 },
-  { name:"Comet Yard",     N:8, C:2, len:210, speed:12.0, holes:.70, gapEvery:14, gapLen:3, width:1, seed:97 },
-  { name:"Terminus",       N:6, C:3, len:240, speed:12.5, holes:.72, gapEvery:13, gapLen:3, width:1, seed:101 }
+  { name:"Dockyard",       N:6, C:3, len:130, speed:10.0, holes:.12, gapEvery:30, gapLen:1, width:3, seed:11 },
+  { name:"Lumen Avenue",   N:6, C:3, len:150, speed:10.5, holes:.24, gapEvery:24, gapLen:2, width:3, seed:23 },
+  { name:"Halo Junction",  N:6, C:3, len:170, speed:11.0, holes:.36, gapEvery:22, gapLen:2, width:2, seed:37 },
+  { name:"Quarry Steps",   N:6, C:3, len:180, speed:11.5, holes:.46, gapEvery:20, gapLen:2, width:2, seed:41 },
+  { name:"Lantern Market", N:8, C:2, len:190, speed:12.0, holes:.42, gapEvery:18, gapLen:2, width:2, seed:53 },
+  { name:"Orbit Park",     N:8, C:2, len:200, speed:12.5, holes:.54, gapEvery:16, gapLen:3, width:2, seed:67 },
+  { name:"Glass Bridge",   N:8, C:2, len:210, speed:13.0, holes:.62, gapEvery:15, gapLen:3, width:1, seed:71 },
+  { name:"Deep Siding",    N:6, C:3, len:220, speed:13.5, holes:.62, gapEvery:14, gapLen:3, width:1, seed:83 },
+  { name:"Comet Yard",     N:8, C:2, len:230, speed:14.0, holes:.70, gapEvery:13, gapLen:3, width:1, seed:97 },
+  { name:"Terminus",       N:6, C:3, len:260, speed:14.5, holes:.72, gapEvery:12, gapLen:3, width:1, seed:101 }
 ];
-var LINE_COLORS = ["#ff8a3d", "#ff8a3d", "#ff8a3d", "#ff8a3d", "#46c2ff", "#46c2ff", "#46c2ff", "#b07cff", "#b07cff", "#b07cff"];
+var SPOT_COLORS = ["#c6ff00", "#c6ff00", "#c6ff00", "#2ee6ff", "#2ee6ff", "#2ee6ff", "#ff2e88", "#ff2e88", "#ff2e88", "#ff2e88"];
 
-// World units. Radius to the polygon's corners; row depth; jump physics.
-var R = 3, D = 1.6, GRAV = 30, JUMP_V = 10, LAT = 5.2;
+// World units and feel. Lateral movement is a skater's: it accelerates,
+// carries momentum, and slides to a stop instead of snapping.
+var R = 3, D = 1.6, GRAV = 32, JUMP_V = 10.5;
+var ACC = 46, AIR_ACC = 26, FRICTION = 1.5, AIR_FRICTION = .25, VL_BASE = 6.5, VL_FLOW = 3;
+var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045;
 
 // A station: rows of tiles, 1 = floor. One guaranteed path of `width`
 // tiles wanders around the tunnel (so you have to take the walls), every
 // other tile drops with probability `holes`, and every `gapEvery` rows a
-// full gap of `gapLen` rows needs a jump. Gaps stay well inside the jump:
-// at speed v a jump covers v * 2 * JUMP_V / GRAV units (5.3+ at 8 u/s),
-// and the longest gap is 3 rows = 4.8 units.
+// gap of `gapLen` rows needs a jump. After every sideways shift the old
+// column stays for as many rows as a full sideways step takes (accelerate
+// and stop: 2*sqrt(tileW/ACC)) at the top speed this stop can reach.
 function buildStation(p, seedOverride){
   var rng = mulberry32((seedOverride != null ? seedOverride : p.seed) * 2654435761 >>> 0);
   var cols = p.N * p.C, rows = [], path = Math.floor(rng() * cols), drift = 0, start = path, trail = [];
-  // A sideways step of one tile takes tileW / LAT seconds; keep the old
-  // column for that many rows (plus one) after every shift so a step is
-  // always possible at this stop's speed.
-  var tileW = 2 * R * Math.sin(Math.PI / p.N) / p.C, keep = Math.ceil(tileW / LAT * p.speed / D) + 1, hist = [];
-  var START = 10, END = 8;
+  var tileW = 2 * R * Math.sin(Math.PI / p.N) / p.C, vTop = p.speed * (1 + FLOW_MAX) * TUCK;
+  var keep = Math.ceil((2 * Math.sqrt(tileW / ACC) + .08) * vTop / D) + 1, hist = [];
+  var START = 12, END = 8;
   for(var r = 0; r < p.len; r++){
     var row = new Uint8Array(cols);
     if(r < START || r >= p.len - END){ row.fill(1); rows.push(row); trail.push(path); continue; }
-    // the path drifts at most one column every two rows
     if(r % 2 === 0){
       if(rng() < .35) drift = rng() < .5 ? -1 : 1;
       if(rng() < .3) drift = 0;
@@ -169,31 +203,25 @@ function buildStation(p, seedOverride){
     for(var c = 0; c < cols; c++) row[c] = rng() < p.holes ? 0 : 1;
     hist.push(path); if(hist.length > keep) hist.shift();
     for(var hi = 0; hi < hist.length; hi++) for(var w = 0; w < p.width; w++) row[(hist[hi] + w) % cols] = 1;
-    // a jump gap, never right before the end
     if(p.gapEvery && r > START + 4 && r < p.len - END - 6 && (r - START) % p.gapEvery === 0){
       for(var g = 0; g < p.gapLen; g++){ rows.push(new Uint8Array(cols)); trail.push(path); r++; }
-      // land on a full row so a jump from anywhere on the path is safe
       var land = new Uint8Array(cols); land.fill(1); rows.push(land); trail.push(path);
       continue;
     }
     rows.push(row); trail.push(path);
   }
-  // trail[r] = the guaranteed path's first column on row r (for the start
-  // position and the solvability check in test.mjs)
   return { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:rows.length, start:start, trail:trail, width:p.width };
 }
 
-// The daily route: one station a day, the same for everyone. UTC date sets
-// the seed and the run number (#1 = 2026-10-25).
+// Today's route: the same for everyone; UTC day, #1 = 2026-10-25.
 function dailyInfo(){
   var now = new Date(), day = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  var epoch = Date.UTC(2026, 9, 25), n = Math.floor((day - epoch) / 864e5) + 1;
-  var key = new Date(day).toISOString().slice(0, 10);
-  return { n:n, key:key, p:dailyParams(n), reset:new Date(day + 864e5) };
+  var n = Math.floor((day - Date.UTC(2026, 9, 25)) / 864e5) + 1;
+  return { n:n, key:new Date(day).toISOString().slice(0, 10), p:dailyParams(n), reset:new Date(day + 864e5) };
 }
 function dailyParams(n){
   var r = mulberry32(n * 7919 >>> 0);
-  var p = { name:"Route " + n, N: r() < .5 ? 6 : 8, C:0, len:200, speed:10 + r() * 1.5, holes:.5 + r() * .15, gapEvery:16, gapLen:2 + (r() < .5 ? 1 : 0), width:1, seed:n * 104729 };
+  var p = { name:"Route " + n, N: r() < .5 ? 6 : 8, C:0, len:220, speed:12 + r() * 1.5, holes:.5 + r() * .15, gapEvery:15, gapLen:2 + (r() < .5 ? 1 : 0), width:1, seed:n * 104729 };
   p.C = p.N === 8 ? 2 : 3;
   return p;
 }
@@ -208,8 +236,7 @@ function geom(N){
 function surf(G, p){
   p = ((p % G.P) + G.P) % G.P;
   var s = Math.min(G.N - 1, Math.floor(p / G.S)), t = (p - s * G.S) / G.S, a = G.V[s], b = G.V[s + 1];
-  var ang = Math.PI / 2 + s * TAU / G.N;   // inward normal of side s
-  return { x:a[0] + (b[0] - a[0]) * t, y:a[1] + (b[1] - a[1]) * t, s:s, up:ang };
+  return { x:a[0] + (b[0] - a[0]) * t, y:a[1] + (b[1] - a[1]) * t, s:s, up:Math.PI / 2 + s * TAU / G.N };
 }
 
 // ---------------------------------------------------------------- state
@@ -219,55 +246,90 @@ addEventListener("resize", resize); resize();
 
 var S = {
   mode:"map", st:null, G:null, stopIdx:0, daily:null, dailyFirst:false,
-  p:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, side:0, t:0, arrived:false, attempt:0,
-  best: store.get("best", 0)        // highest stop index reached
+  p:0, vl:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, side:0, t:0, arrived:false,
+  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9,
+  best: store.get("best", 0), bestStyle: store.get("bestStyle", {})
 };
-var input = { left:false, right:false, jumpQ:0 };
+var input = { left:false, right:false, tuck:false, jumpQ:0 };
+var pops = [];   // trick callouts drawn on the canvas
+
+function speedNow(){ return S.st ? S.st.p.speed * (1 + S.flow * FLOW_MAX) * (input.tuck && S.grounded ? TUCK : 1) : 0; }
 
 function startStation(params, opts){
   opts = opts || {};
   S.st = buildStation(params, opts.seed);
   S.G = geom(S.st.N);
-  // start on the guaranteed path (rows 0-9 are full, so there's time to settle)
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
-  S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
+  S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9;
   S.roll = surf(S.G, S.p).up; S.side = surf(S.G, S.p).s;
-  S.color = opts.color || LINE_COLORS[Math.min(S.stopIdx, 9)];
+  S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
+  S.label = opts.label || ("STOP " + String(S.stopIdx + 1).padStart(2, "0") + " · " + params.name);
+  pops.length = 0;
   S.mode = "ride";
-  document.documentElement.style.setProperty("--line", S.color);
   showScreen(null);
-  $("hud").hidden = false; $("toMap").hidden = false;
-  $("stnName").innerHTML = opts.label || ("Next stop: <b>" + params.name + "</b>");
-  hint(touchy ? "hold left or right side · tap or swipe up to jump" : "← → to move · space to jump", 2600);
+  $("hudTop").hidden = false; $("hudBot").hidden = false; $("toMap").hidden = false;
+  $("stnName").textContent = S.label;
+  hint(touchy ? "hold a side to carve · tap to jump · hold both to tuck" : "← → carve · space jump · ↓ tuck", 2600);
 }
 function tileAt(p, z){
   var st = S.st, row = Math.floor(z / D);
-  if(row < 0) return 1;
-  if(row >= st.len) return 1;          // the platform past the end
+  if(row < 0 || row >= st.len) return 1;
   var G = S.G, pp = ((p % G.P) + G.P) % G.P, col = Math.floor(pp / (G.S / st.C)) % st.cols;
   return st.rows[row][col];
 }
 
+// ---------------------------------------------------------------- tricks
+// Momentum is the game. Every clean move adds flow; flow is speed; speed
+// makes everything bigger. It drains slowly when you just cruise, and a
+// fall takes all of it.
+var TRICKS = {
+  wall:  { label:"WALL RIDE", flow:.07, pts:100 },
+  gap:   { label:"GAP",       flow:.10, pts:200 },
+  big:   { label:"BIG GAP",   flow:.16, pts:400 },
+  xfer:  { label:"TRANSFER",  flow:.10, pts:250 },
+  hop:   { label:"HOP",       flow:.05, pts:80 },
+  edge:  { label:"EDGE",      flow:.05, pts:150 }
+};
+var TIERS = ["ROLLING", "FLOWING", "FULL SEND"];
+function trick(kind, extra){
+  var k = TRICKS[kind];
+  S.combo = S.comboT > 0 ? S.combo + 1 : 1; S.comboT = 2.4;
+  S.bestCombo = Math.max(S.bestCombo, S.combo);
+  var mult = Math.min(8, S.combo);
+  S.style += Math.round(k.pts * mult * (1 + S.flow));
+  S.flow = Math.min(1, S.flow + k.flow);
+  pops.push({ text:(extra || k.label) + (S.combo > 1 ? "  ×" + mult : ""), t:0, x:(Math.random() - .5) * .18, rot:-.08 + Math.random() * .06, big:kind === "big" || kind === "xfer" });
+  if(pops.length > 4) pops.shift();
+  SFX.trick(S.combo);
+  var tier = S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0;
+  if(tier > S.tier){ S.tier = tier; pops.push({ text:TIERS[tier] + "!", t:0, x:0, rot:-.04, big:true, color:"#ff2e88" }); SFX.tier(); }
+}
+
 // ---------------------------------------------------------------- audio
-// Effects only, short and soft: sound happens when something happens.
+// Effects only, short and pitched: sound happens when something happens.
 var AC = null, muted = store.get("muted", false);
 function ac(){ if(muted) return null; if(!AC){ try{ AC = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; } } if(AC.state !== "running") AC.resume(); return AC; }
 function tone(f0, f1, dur, type, vol, delay){
   var a = ac(); if(!a) return;
   var t = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
   o.type = type || "sine"; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * .9);
-  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol || .12, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol || .12, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
   o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + .02);
 }
+var SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
 var SFX = {
-  jump: function(){ tone(520, 820, .12, "sine", .1); },
-  land: function(){ tone(300, 240, .07, "triangle", .07); },
-  side: function(){ tone(980, 1100, .04, "sine", .035); },
-  fall: function(){ tone(420, 110, .45, "sine", .1); },
-  arrive: function(){ [523, 659, 784, 1047].forEach(function(f, i){ tone(f, f * 1.01, .22, "triangle", .09, i * .09); }); }
+  jump: function(){ tone(380, 620, .1, "triangle", .08); },
+  land: function(hard){ tone(hard ? 160 : 220, 90, hard ? .14 : .08, "sine", hard ? .2 : .12); },
+  side: function(){ tone(1500, 1700, .03, "sine", .03); },
+  fall: function(){ tone(500, 70, .55, "sawtooth", .07); },
+  // each trick in a combo climbs the scale, so a long line sounds like a run of notes
+  trick: function(n){ var f = 440 * Math.pow(2, SCALE[Math.min(SCALE.length - 1, n - 1)] / 12); tone(f, f * 1.02, .14, "square", .045); tone(f * 2, f * 2.02, .1, "sine", .04, .02); },
+  tier: function(){ [0, 4, 7, 12].forEach(function(s, i){ var f = 523 * Math.pow(2, s / 12); tone(f, f, .16, "square", .05, i * .06); }); },
+  arrive: function(){ [0, 4, 7, 12, 16].forEach(function(s, i){ var f = 392 * Math.pow(2, s / 12); tone(f, f * 1.01, .22, "triangle", .08, i * .08); }); }
 };
 function syncMute(){ $("mute").textContent = muted ? "×" : "♪"; $("mute").setAttribute("aria-label", muted ? "Sound on" : "Sound off"); }
-$("mute").addEventListener("click", function(){ muted = !muted; store.set("muted", muted); syncMute(); if(!muted) tone(660, 880, .1, "sine", .08); });
+$("mute").addEventListener("click", function(){ muted = !muted; store.set("muted", muted); syncMute(); if(!muted) tone(660, 880, .1, "triangle", .08); });
 syncMute();
 
 // ---------------------------------------------------------------- input
@@ -275,34 +337,37 @@ var touchy = matchMedia("(pointer: coarse)").matches;
 addEventListener("keydown", function(e){
   if(e.code === "ArrowLeft" || e.code === "KeyA"){ input.left = true; e.preventDefault(); }
   if(e.code === "ArrowRight" || e.code === "KeyD"){ input.right = true; e.preventDefault(); }
-  if(e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW"){ input.jumpQ = .15; e.preventDefault(); }
+  if(e.code === "ArrowDown" || e.code === "KeyS"){ input.tuck = true; e.preventDefault(); }
+  if(e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW"){ if(!e.repeat) input.jumpQ = .14; e.preventDefault(); }
   if(e.code === "Escape" && S.mode === "ride") toMap();
 });
 addEventListener("keyup", function(e){
   if(e.code === "ArrowLeft" || e.code === "KeyA") input.left = false;
   if(e.code === "ArrowRight" || e.code === "KeyD") input.right = false;
+  if(e.code === "ArrowDown" || e.code === "KeyS") input.tuck = false;
 });
-// Touch: hold the left or right half to steer; a quick tap or an upward
-// swipe jumps. Several fingers at once are fine (steer with one, jump with another).
+// Touch: hold a side to carve that way; both sides at once is a tuck; a
+// quick tap or an upward swipe jumps.
 var ptrs = {};
 function steerFromPtrs(){
-  input.left = false; input.right = false;
-  for(var id in ptrs){ var q = ptrs[id]; if(q.steer){ if(q.x < W / 2) input.left = true; else input.right = true; } }
+  var l = false, r = false;
+  for(var id in ptrs){ if(ptrs[id].x < W / 2) l = true; else r = true; }
+  input.tuck = l && r; input.left = l && !r; input.right = r && !l;
 }
 cv.addEventListener("pointerdown", function(e){
   if(S.mode !== "ride") return;
   ac();
-  ptrs[e.pointerId] = { x:e.clientX, y:e.clientY, t:performance.now(), steer:true, jumped:false };
+  ptrs[e.pointerId] = { x:e.clientX, y:e.clientY, t:performance.now(), jumped:false };
   steerFromPtrs();
 });
 cv.addEventListener("pointermove", function(e){
   var q = ptrs[e.pointerId]; if(!q) return;
-  if(!q.jumped && q.y - e.clientY > 28 && performance.now() - q.t < 300){ q.jumped = true; input.jumpQ = .15; }
+  if(!q.jumped && q.y - e.clientY > 28 && performance.now() - q.t < 300){ q.jumped = true; input.jumpQ = .14; }
   q.x = e.clientX; steerFromPtrs();
 });
 function ptrUp(e){
   var q = ptrs[e.pointerId]; if(!q) return;
-  if(!q.jumped && performance.now() - q.t < 170 && Math.abs(e.clientY - q.y) < 20) input.jumpQ = .15;
+  if(!q.jumped && performance.now() - q.t < 170 && Math.abs(e.clientY - q.y) < 20) input.jumpQ = .14;
   delete ptrs[e.pointerId]; steerFromPtrs();
 }
 cv.addEventListener("pointerup", ptrUp); cv.addEventListener("pointercancel", ptrUp);
@@ -311,178 +376,253 @@ cv.addEventListener("pointerup", ptrUp); cv.addEventListener("pointercancel", pt
 function update(dt){
   if(S.mode !== "ride") return;
   S.t += dt;
-  var st = S.st, G = S.G, sp = st.p.speed;
-  if(S.dead > 0){ S.dead -= dt; S.h -= 14 * dt; S.z += sp * .25 * dt; if(S.dead <= 0) retry(); return; }
-  S.z += sp * dt;
-  var lat = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-  // radius from the tunnel axis shrinks as you rise; turning is a little
-  // quicker in the air, like in the original genre
-  S.p += lat * LAT * dt * (S.grounded ? 1 : 1.15);
+  var st = S.st, G = S.G, tw = G.S / st.C;
+  if(S.dead > 0){ S.dead -= dt; S.h -= 16 * dt; S.z += speedNow() * .2 * dt; S.shake = Math.max(S.shake, .3); if(S.dead <= 0) retry(); return; }
+  var sp = speedNow(); S.z += sp * dt; S.topSpeed = Math.max(S.topSpeed, sp);
+  if(S.comboT > 0){ S.comboT -= dt; if(S.comboT <= 0) S.combo = 0; }
+  S.flow = Math.max(0, S.flow - FLOW_DECAY * dt * (S.comboT > 0 ? .3 : 1));
+  if(S.flow < .33) S.tier = 0; else if(S.flow < .66) S.tier = Math.min(S.tier, 1);
+
+  // carve: accelerate toward the held side, carry momentum, slide to a stop;
+  // turning against your slide bites harder so it stays controllable
+  var lat = (input.right ? 1 : 0) - (input.left ? 1 : 0), acc = (S.grounded ? ACC : AIR_ACC) * (input.tuck && S.grounded ? .55 : 1);
+  var vmax = VL_BASE + VL_FLOW * S.flow;
+  if(lat){ S.vl += lat * acc * dt * (S.vl * lat < 0 ? 1.7 : 1); }
+  else S.vl -= S.vl * Math.min(1, (S.grounded ? FRICTION : AIR_FRICTION) * dt);
+  S.vl = clamp(S.vl, -vmax, vmax);
+  S.p += S.vl * dt;
+
   if(input.jumpQ > 0) input.jumpQ -= dt;
+  S.landT += dt;
   if(S.grounded){
-    if(input.jumpQ > 0){ S.grounded = false; S.vh = JUMP_V; input.jumpQ = 0; SFX.jump(); }
-    else if(!tileAt(S.p, S.z)){ S.grounded = false; S.vh = 0; }
+    if(input.jumpQ > 0){
+      // a jump right as you land is a hop: it keeps the line going
+      if(S.landT < .16 && S.airT > .25) trick("hop");
+      S.grounded = false; S.vh = JUMP_V; input.jumpQ = 0; S.airGap = false; S.airSide = false; S.airT = 0; SFX.jump();
+    }
+    else if(!tileAt(S.p, S.z)){ S.grounded = false; S.vh = 0; S.airGap = false; S.airSide = false; S.airT = 0; }
   }
   if(!S.grounded){
+    S.airT += dt;
+    if(!tileAt(S.p, S.z)) S.airGap = true;
     S.vh -= GRAV * dt; S.h += S.vh * dt;
     if(S.h <= 0 && S.vh < 0){
-      if(tileAt(S.p, S.z) && S.h > -.35){ S.h = 0; S.vh = 0; S.grounded = true; SFX.land(); }
-      else if(S.h < -1.2){ S.dead = .7; SFX.fall(); }
+      if(tileAt(S.p, S.z) && S.h > -.35){
+        var hard = S.vh < -12;
+        S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
+        if(S.airGap){ var rowsCleared = Math.round(S.airT * sp / D); trick(rowsCleared >= 5 ? "big" : "gap"); }
+        if(S.airSide) trick("xfer");
+      }
+      else if(S.h < -1.2){ S.dead = .75; S.flow = 0; S.combo = 0; S.comboT = 0; SFX.fall(); }
     }
-    if(S.h > R * .9) { S.h = R * .9; S.vh = Math.min(S.vh, 0); }
+    if(S.h > R * .9){ S.h = R * .9; S.vh = Math.min(S.vh, 0); }
   }
   var sf = surf(G, S.p);
-  if(sf.s !== S.side){ S.side = sf.s; if(S.grounded) SFX.side(); }
-  // the camera rolls so the side under you is the floor
+  if(sf.s !== S.side){
+    S.side = sf.s;
+    // one wall ride per half second, so circling an 8-sided tunnel isn't a combo farm
+    if(S.grounded){ SFX.side(); if(S.t - S.wallT > .5){ S.wallT = S.t; trick("wall"); } } else S.airSide = true;
+  }
+  // grinding the edge of a hole
+  if(S.grounded && tileAt(S.p, S.z)){
+    var edge = !tileAt(S.p + tw * .6, S.z) || !tileAt(S.p - tw * .6, S.z);
+    if(edge){ S.edgeT += dt; if(!S.onEdge && S.edgeT > .18){ S.onEdge = true; trick("edge"); } }
+    else { S.edgeT = 0; S.onEdge = false; }
+  }
+  S.shake = Math.max(0, S.shake - dt * 2.5);
+  // camera rolls so the side under you is the floor
   var target = sf.up, d = ((target - S.roll + Math.PI) % TAU + TAU) % TAU - Math.PI;
-  S.roll += d * Math.min(1, dt * 9);
+  S.roll += d * Math.min(1, dt * 10);
+  for(var i = pops.length - 1; i >= 0; i--){ pops[i].t += dt; if(pops[i].t > 1.1) pops.splice(i, 1); }
   if(!S.arrived && S.z / D >= st.len - 2){ S.arrived = true; arrive(); }
 }
 function retry(){
-  S.attempt++;
   if(S.daily && S.dailyFirst){ finishDaily(Math.min(99, Math.floor(S.z / D / S.st.len * 100))); return; }
-  var keepSeed = S.daily ? S.daily.p.seed : null;
   var p = S.daily ? S.daily.p : STOPS[S.stopIdx];
-  startStation(p, { seed:keepSeed, color:S.color, label:$("stnName").innerHTML });
+  startStation(p, { seed:S.daily ? S.daily.p.seed : null, color:S.color, label:S.label });
 }
 
 // ---------------------------------------------------------------- render
 var stars = [];
-(function(){ var r = mulberry32(7); for(var i = 0; i < 220; i++) stars.push([r() * TAU, r(), .4 + r() * 1.4]); })();
+(function(){ var r = mulberry32(7); for(var i = 0; i < 260; i++) stars.push([r() * TAU, r(), .5 + r() * 1.6, r()]); })();
+function hexRgb(h){ var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
 function draw(){
-  ctx.fillStyle = "#070910"; ctx.fillRect(0, 0, W, H);
-  var cx = W / 2, cy = H * .5, f = Math.min(W, H) * .95;
-  // stars turn with the tunnel
+  var flow = S.st ? S.flow : 0, sp = speedNow();
+  ctx.fillStyle = "#08080c"; ctx.fillRect(0, 0, W, H);
+  var shx = S.shake ? (Math.random() - .5) * S.shake * 12 : 0, shy = S.shake ? (Math.random() - .5) * S.shake * 12 : 0;
+  var cx = W / 2 + shx, cy = H * .48 + shy;
+  // a wider lens as you speed up
+  var f = Math.min(W, H) * .9 * (1 - .24 * flow);
   var roll = S.st ? S.roll - Math.PI / 2 : 0;
+  // stars stream past at speed
   for(var i = 0; i < stars.length; i++){
-    var s = stars[i], a = s[0] - roll, rr = (.2 + s[1] * .9) * Math.max(W, H);
-    ctx.fillStyle = "rgba(220,230,255," + (.25 + s[1] * .5).toFixed(2) + ")";
-    ctx.fillRect(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, s[2], s[2]);
+    var s = stars[i], a = s[0] - roll, rr = (.15 + ((s[1] + S.t * (.05 + sp * .012) * (.4 + s[3])) % 1) * .95) * Math.max(W, H);
+    var len = 1 + sp * .25 * s[3] * (.3 + flow);
+    ctx.strokeStyle = "rgba(240,240,255," + (.18 + s[1] * .45).toFixed(2) + ")"; ctx.lineWidth = s[2];
+    ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); ctx.lineTo(cx + Math.cos(a) * (rr + len), cy + Math.sin(a) * (rr + len)); ctx.stroke();
   }
   if(!S.st) return;
   var st = S.st, G = S.G, tw = G.S / st.C;
-  var me = surf(G, S.p), up = S.roll, ux = Math.cos(up), uy = Math.sin(up), rx = Math.sin(up), ry = -Math.cos(up);
-  // camera: behind and above you, toward the axis
-  var camH = 1.3 + Math.max(0, S.h) * .55, camZ = S.z - 4.4;
+  var me = surf(G, S.p), lean = clamp(S.vl / (VL_BASE + VL_FLOW), -1, 1);
+  var up = S.roll + lean * .05, ux = Math.cos(up), uy = Math.sin(up), rx = Math.sin(up), ry = -Math.cos(up);
+  var camH = 1.25 + Math.max(0, S.h) * .5, camZ = S.z - (4.2 + flow * 1.4);
   var mx = me.x + Math.cos(me.up) * camH, my = me.y + Math.sin(me.up) * camH;
-  var camX = mx * .82, camY = my * .82;    // pulled toward the axis so the far tunnel shows
+  var camX = mx * .8, camY = my * .8;
   function proj(x, y, z){
     var dz = z - camZ; if(dz < .15) return null;
     var dx = x - camX, dy = y - camY;
-    return [cx + f * (dx * rx + dy * ry) / dz, cy - f * (dx * ux + dy * uy) / dz + f * .05, dz];
+    return [cx + f * (dx * rx + dy * ry) / dz, cy - f * (dx * ux + dy * uy) / dz + f * .06, dz];
   }
-  var r0 = Math.max(0, Math.floor(camZ / D)), r1 = Math.min(st.len + 6, r0 + 64);
-  var col = S.color, rgb = hexRgb(col);
+  var r0 = Math.max(0, Math.floor(camZ / D)), r1 = Math.min(st.len + 8, r0 + 70);
+  var rgb = hexRgb(S.color);
   for(var r = r1; r >= r0; r--){
-    var z0 = r * D, z1 = z0 + D * .94, row = r < st.len ? st.rows[r] : null, fog = Math.max(0, 1 - (z0 - camZ) / (64 * D));
+    var z0 = r * D, z1 = z0 + D * .92, row = r < st.len ? st.rows[r] : null, fog = Math.max(0, 1 - (z0 - camZ) / (70 * D));
     if(fog <= 0) continue;
+    var finish = r >= st.len - 8, seam = r % 8 === 0;
     for(var c = 0; c < st.cols; c++){
       if(row && !row[c]) continue;
-      var pa = c * tw + tw * .04, pb = (c + 1) * tw - tw * .04;
-      var A = surf(G, pa), B = surf(G, pb);
+      var A = surf(G, c * tw + tw * .05), B = surf(G, (c + 1) * tw - tw * .05);
       var q0 = proj(A.x, A.y, z0), q1 = proj(B.x, B.y, z0), q2 = proj(B.x, B.y, z1), q3 = proj(A.x, A.y, z1);
       if(!q0 || !q1 || !q2 || !q3) continue;
-      var side = Math.floor(c / st.C), under = side === me.s;
-      var lit = (r % 2 ? .78 : .9) * fog, end = r >= st.len - 8;
+      var under = Math.floor(c / st.C) === me.s;
       ctx.beginPath(); ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.lineTo(q3[0], q3[1]); ctx.closePath();
-      var base = end ? [255, 214, 140] : (under ? [Math.round(rgb[0] * .28 + 30), Math.round(rgb[1] * .28 + 34), Math.round(rgb[2] * .28 + 52)] : [26, 32, 52]);
-      ctx.fillStyle = "rgba(" + base[0] + "," + base[1] + "," + base[2] + "," + (lit * (end ? .55 : .95)).toFixed(3) + ")";
+      if(finish){ ctx.fillStyle = ((r + c) % 2) ? "rgba(244,244,240," + (.8 * fog).toFixed(3) + ")" : "rgba(8,8,12," + (.9 * fog).toFixed(3) + ")"; ctx.fill(); continue; }
+      var shade = under ? 30 : 20;
+      ctx.fillStyle = "rgba(" + shade + "," + shade + "," + (shade + 10) + "," + (.96 * fog).toFixed(3) + ")";
       ctx.fill();
-      ctx.strokeStyle = "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + (fog * (under ? .6 : .3)).toFixed(3) + ")";
-      ctx.lineWidth = 1; ctx.stroke();
+      var glow = (under ? .75 : .32) * fog * (seam ? 1.6 : 1);
+      ctx.strokeStyle = seam ? "rgba(255,46,136," + Math.min(1, glow).toFixed(3) + ")" : "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + glow.toFixed(3) + ")";
+      ctx.lineWidth = under ? 1.6 : 1; ctx.stroke();
     }
   }
-  // you: a glowing rider just ahead of the camera
-  var px = me.x + Math.cos(me.up) * (S.h + .32), py = me.y + Math.sin(me.up) * (S.h + .32);
-  var P = proj(px, py, S.z);
-  if(P){
-    var rad = f * .2 / P[2];
-    var gl = ctx.createRadialGradient(P[0], P[1], rad * .2, P[0], P[1], rad * 2.4);
-    gl.addColorStop(0, "rgba(255,255,255,.55)"); gl.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(P[0], P[1], rad * 2.4, 0, TAU); ctx.fill();
-    ctx.fillStyle = S.dead > 0 ? "#ff6f6f" : "#ffffff"; ctx.beginPath(); ctx.arc(P[0], P[1], rad, 0, TAU); ctx.fill();
-    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(P[0] + rad * .25, P[1] - rad * .15, rad * .38, 0, TAU); ctx.fill();
+  // speed lines
+  var nLines = Math.round(10 + 70 * flow + (input.tuck ? 20 : 0));
+  ctx.strokeStyle = "rgba(255,255,255," + (.06 + .18 * flow).toFixed(3) + ")"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for(var k = 0; k < nLines; k++){
+    var ang = (k * 2.399 + S.t * 3) % TAU, r1s = Math.max(W, H) * (.35 + ((k * .618 + S.t * (1.5 + sp * .05)) % 1) * .5), r2s = r1s + 30 + sp * 3 * (.5 + flow);
+    ctx.moveTo(cx + Math.cos(ang) * r1s, cy + Math.sin(ang) * r1s); ctx.lineTo(cx + Math.cos(ang) * r2s, cy + Math.sin(ang) * r2s);
   }
-  // progress
+  ctx.stroke();
+  drawSkater(proj, me, lean, f);
+  // callouts
+  ctx.save(); ctx.textAlign = "center";
+  for(var j = 0; j < pops.length; j++){
+    var pp = pops[j], tt = pp.t, sc = tt < .12 ? .6 + tt / .12 * .55 : 1.15 - Math.min(.15, (tt - .12) * .6), al = tt > .75 ? Math.max(0, 1 - (tt - .75) / .35) : 1;
+    var size = (pp.big ? 46 : 32) * Math.min(1.4, Math.min(W, H) / 700 + .4);
+    ctx.save();
+    ctx.translate(W / 2 + pp.x * W, H * (.22 + (pops.length - 1 - j) * .075) - tt * 26);
+    ctx.rotate(pp.rot); ctx.scale(sc, sc); ctx.globalAlpha = al;
+    ctx.font = "italic 900 " + Math.round(size) + "px 'Arial Black', Impact, system-ui, sans-serif";
+    ctx.fillStyle = "#ff2e88"; ctx.fillText(pp.text, 4, 4);
+    ctx.fillStyle = pp.color === "#ff2e88" ? "#c6ff00" : "#f4f4f0"; ctx.fillText(pp.text, 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
+  // HUD numbers
   var prog = Math.min(1, S.z / D / st.len);
-  $("trackFill").style.width = (prog * 100).toFixed(1) + "%";
-  $("trackDot").style.left = (prog * 100).toFixed(1) + "%";
+  $("progFill").style.width = (prog * 100).toFixed(1) + "%";
+  $("spd").firstChild.nodeValue = String(Math.round(sp * 10));
+  $("flowFill").style.width = (S.flow * 100).toFixed(1) + "%";
+  $("flowTier").textContent = TIERS[S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0] + (S.combo > 1 ? "  ×" + Math.min(8, S.combo) : "");
+  $("score").textContent = "STYLE " + S.style.toLocaleString("en-US");
 }
-function hexRgb(h){ var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+// The skater, seen from behind: board, legs, hoodie, head. Leans into the
+// carve, crouches on a tuck and a landing, throws its arms up in the air.
+function drawSkater(proj, me, lean, f){
+  var px = me.x + Math.cos(me.up) * Math.max(-3, S.h), py = me.y + Math.sin(me.up) * Math.max(-3, S.h);
+  var P = proj(px, py, S.z); if(!P) return;
+  var k = f / P[2] * .82;   // pixels per world unit at the rider, drawn a touch small so the track stays readable
+  var crouch = (input.tuck && S.grounded ? .28 : 0) + (S.landT < .15 ? (1 - S.landT / .15) * .3 : 0);
+  var air = S.grounded ? 0 : 1;
+  ctx.save();
+  ctx.translate(P[0], P[1]);
+  ctx.rotate(lean * .35 + (S.dead > 0 ? S.t * 9 : 0));
+  var g = ctx.createRadialGradient(0, 0, k * .05, 0, 0, k * .8);
+  g.addColorStop(0, "rgba(198,255,0,.35)"); g.addColorStop(1, "rgba(198,255,0,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, k * .8, k * .3, 0, 0, TAU); ctx.fill();
+  // board, from behind: the deck edge and two wheels
+  var bw = k * .62, bh = k * .07;
+  ctx.fillStyle = "#c6ff00"; ctx.fillRect(-bw / 2, -bh, bw, bh);
+  ctx.fillStyle = "#111"; ctx.beginPath(); ctx.arc(-bw * .32, k * .02, k * .045, 0, TAU); ctx.arc(bw * .32, k * .02, k * .045, 0, TAU); ctx.fill();
+  // legs
+  var hip = -k * (.62 - crouch * .5), knee = -k * (.32 - crouch * .15);
+  ctx.strokeStyle = "#1d1d26"; ctx.lineWidth = k * .1; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-k * .14, -bh); ctx.lineTo(-k * .16 - crouch * k * .12, knee); ctx.lineTo(-k * .07, hip);
+  ctx.moveTo(k * .14, -bh); ctx.lineTo(k * .16 + crouch * k * .12, knee); ctx.lineTo(k * .07, hip); ctx.stroke();
+  // hoodie
+  var sh = hip - k * .42;
+  ctx.fillStyle = "#ff2e88";
+  ctx.beginPath(); ctx.moveTo(-k * .17, hip + k * .02); ctx.lineTo(k * .17, hip + k * .02); ctx.lineTo(k * .2, sh); ctx.quadraticCurveTo(0, sh - k * .08, -k * .2, sh); ctx.closePath(); ctx.fill();
+  // arms: out for balance, up in the air
+  var armY = sh + k * .06, reach = k * (.32 + air * .05), lift = air ? -k * .32 : k * (.1 - lean * .12);
+  ctx.strokeStyle = "#ff2e88"; ctx.lineWidth = k * .085;
+  ctx.beginPath(); ctx.moveTo(-k * .18, armY); ctx.lineTo(-k * .18 - reach, armY + lift + lean * k * .1);
+  ctx.moveTo(k * .18, armY); ctx.lineTo(k * .18 + reach, armY + (air ? lift : k * (.1 + lean * .12)) - lean * k * .1); ctx.stroke();
+  // head and beanie
+  ctx.fillStyle = "#f4d2b0"; ctx.beginPath(); ctx.arc(0, sh - k * .14, k * .12, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#c6ff00"; ctx.beginPath(); ctx.arc(0, sh - k * .17, k * .125, Math.PI, 0); ctx.fill();
+  ctx.restore();
+}
 
 // ---------------------------------------------------------------- screens
-function showScreen(id){ ["mapScreen", "arriveScreen", "dailyScreen"].forEach(function(s){ $(s).hidden = s !== id; }); if(id){ $("hud").hidden = true; $("toMap").hidden = true; } }
+function showScreen(id){ ["mapScreen", "arriveScreen", "dailyScreen"].forEach(function(s){ $(s).hidden = s !== id; }); if(id){ $("hudTop").hidden = true; $("hudBot").hidden = true; $("toMap").hidden = true; } }
 function hint(text, ms){ var h = $("hint"); h.textContent = text; h.hidden = false; h.style.opacity = "1"; clearTimeout(hint.t); hint.t = setTimeout(function(){ h.style.opacity = "0"; }, ms); }
 function toast(text){ var t = $("toast"); t.textContent = text; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function(){ t.hidden = true; }, 1800); }
-
 function renderMap(){
-  // a transit map: one line, ten stops, three colour sections
-  var w = 640, hgt = 170, pts = [];
-  for(var i = 0; i < STOPS.length; i++){
-    var x = 30 + i * (w - 60) / (STOPS.length - 1), y = 70 + Math.sin(i * .9) * 26 + (i > 4 ? 18 : 0);
-    pts.push([x, y]);
-  }
-  var seg = "";
-  for(var j = 1; j < pts.length; j++){
-    seg += '<line x1="' + pts[j - 1][0] + '" y1="' + pts[j - 1][1] + '" x2="' + pts[j][0] + '" y2="' + pts[j][1] + '" stroke="' + LINE_COLORS[j] + '" stroke-width="8" stroke-linecap="round"/>';
-  }
-  var stops = pts.map(function(pt, i){
-    var open = i <= S.best, done = i < S.best, ty = (i % 2 ? pt[1] + 34 : pt[1] - 22);
-    return '<g class="stop' + (open ? "" : " locked") + (done ? " done" : "") + '" data-i="' + i + '" tabindex="' + (open ? 0 : -1) + '" role="button" aria-label="' + STOPS[i].name + (open ? "" : " (locked)") + '">' +
-      '<circle class="ring" cx="' + pt[0] + '" cy="' + pt[1] + '" r="11" fill="#070910" stroke="' + LINE_COLORS[i] + '" stroke-width="4"/>' +
-      '<circle class="dot" cx="' + pt[0] + '" cy="' + pt[1] + '" r="4" fill="' + (open ? "#ffffff" : "#3a4256") + '"/>' +
-      '<text x="' + pt[0] + '" y="' + ty + '" text-anchor="middle">' + STOPS[i].name + '</text></g>';
+  $("spots").innerHTML = STOPS.map(function(s, i){
+    var open = i <= S.best, done = i < S.best, bs = S.bestStyle[i];
+    return '<button type="button" class="spot' + (open ? "" : " locked") + (done ? " done" : "") + '" data-i="' + i + '" style="--r:' + ((i * 37 % 7) - 3) * .6 + 'deg;--sc:' + SPOT_COLORS[i] + '"' + (open ? "" : " disabled") + '>' +
+      '<span class="n">' + String(i + 1).padStart(2, "0") + '</span><span class="nm">' + s.name + '</span>' +
+      '<span class="st">' + (open ? (bs ? "best " + bs.toLocaleString("en-US") : "not landed yet") : "locked") + '</span></button>';
   }).join("");
-  $("map").innerHTML = '<svg viewBox="0 -10 ' + w + ' ' + (hgt + 20) + '" aria-label="Line map">' + seg + stops + '</svg>';
-  $("map").querySelectorAll(".stop").forEach(function(g){
-    var go = function(){ var i = +g.dataset.i; if(i <= S.best) rideStop(i); };
-    g.addEventListener("click", go);
-    g.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } });
-  });
+  $("spots").querySelectorAll(".spot").forEach(function(b){ b.addEventListener("click", function(){ rideStop(+b.dataset.i); }); });
   var nx = Math.min(S.best, STOPS.length - 1);
-  $("playNext").textContent = S.best >= STOPS.length ? "Ride the line again" : "Ride to " + STOPS[nx].name;
-  $("keys").innerHTML = touchy ? "<b>Hold</b> left or right to move · <b>tap</b> or <b>swipe up</b> to jump · run onto a wall and it becomes the floor"
-    : "<b>← →</b> or <b>A D</b> to move · <b>Space</b> to jump · run onto a wall and it becomes the floor";
+  $("playNext").firstChild.textContent = S.best >= STOPS.length ? "Run it back" : "Drop in: " + STOPS[nx].name;
+  $("keys").innerHTML = touchy ? "<b>hold</b> a side to carve · <b>tap</b> or <b>swipe up</b> to jump · <b>hold both</b> to tuck · walls become floors · chain tricks for speed"
+    : "<b>← →</b> carve · <b>space</b> jump · <b>↓</b> tuck · walls become floors · chain wall rides, gaps and hops to build speed";
 }
-function toMap(){ S.mode = "map"; S.st = null; S.daily = null; input.left = input.right = false; renderMap(); showScreen("mapScreen"); }
+function toMap(){ S.mode = "map"; S.st = null; S.daily = null; input.left = input.right = input.tuck = false; renderMap(); showScreen("mapScreen"); }
 function rideStop(i){ ac(); S.stopIdx = i; S.daily = null; startStation(STOPS[i]); }
 function arrive(){
   S.mode = "arrive"; SFX.arrive();
   if(S.daily){ finishDaily(100); return; }
   if(S.stopIdx + 1 > S.best){ S.best = S.stopIdx + 1; store.set("best", S.best); }
+  if(!S.bestStyle[S.stopIdx] || S.style > S.bestStyle[S.stopIdx]){ S.bestStyle[S.stopIdx] = S.style; store.set("bestStyle", S.bestStyle); }
   $("arriveName").textContent = STOPS[S.stopIdx].name;
+  $("arriveStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo]]
+    .map(function(x){ return '<div class="stat"><b>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join("");
   var last = S.stopIdx === STOPS.length - 1;
-  $("arriveSub").textContent = last ? "end of the line" : "next stop " + STOPS[S.stopIdx + 1].name;
-  $("arriveNext").textContent = last ? "Back to the start" : "Next stop";
-  setTimeout(function(){ showScreen("arriveScreen"); $("arriveNext").focus(); }, 350);
+  $("arriveNext").firstChild.textContent = last ? "Back to Dockyard" : "Next: " + STOPS[S.stopIdx + 1].name;
+  setTimeout(function(){ showScreen("arriveScreen"); $("arriveNext").focus(); }, 380);
 }
 $("arriveNext").addEventListener("click", function(){ rideStop(S.stopIdx === STOPS.length - 1 ? 0 : S.stopIdx + 1); });
+$("arriveAgain").addEventListener("click", function(){ rideStop(S.stopIdx); });
 $("arriveMap").addEventListener("click", toMap);
 $("toMap").addEventListener("click", toMap);
 $("playNext").addEventListener("click", function(){ rideStop(Math.min(S.best, STOPS.length - 1)); });
 $("playDaily").addEventListener("click", function(){ playDaily(false); });
-
 function playDaily(practice){
   ac();
   var d = dailyInfo(), rec = store.get("daily", {});
   S.daily = d; S.dailyFirst = !practice && rec.key !== d.key;
-  startStation(d.p, { color:"#46c2ff", label:"Today's route <b>#" + d.n + "</b>" + (S.dailyFirst ? "" : " · practice") });
+  startStation(d.p, { color:"#ff2e88", label:"TODAY'S ROUTE #" + d.n + (S.dailyFirst ? "" : " · PRACTICE") });
 }
 function finishDaily(pct){
   var d = S.daily, rec = store.get("daily", {});
-  if(S.dailyFirst){ rec = { key:d.key, pct:pct }; store.set("daily", rec); S.dailyFirst = false; }
+  if(S.dailyFirst){ rec = { key:d.key, pct:pct, style:S.style }; store.set("daily", rec); S.dailyFirst = false; }
   S.mode = "daily";
-  var mine = rec.key === d.key ? rec.pct : pct;
-  var bar = ""; for(var i = 0; i < 10; i++) bar += i < Math.round(mine / 10) ? "🟧" : "⬛";
-  var text = "Outer Line · Route #" + d.n + "\n" + bar + " " + mine + "%\n" + (mine >= 100 ? "Arrived." : "Off the line at " + mine + "%.");
+  var mine = rec.key === d.key ? rec.pct : pct, style = rec.key === d.key ? rec.style : S.style;
+  var bar = ""; for(var i = 0; i < 10; i++) bar += i < Math.round(mine / 10) ? "🟩" : "⬛";
+  var text = "OUTER LINE · ROUTE #" + d.n + "\n" + bar + " " + mine + "%\nstyle " + style.toLocaleString("en-US") + (mine >= 100 ? " · landed" : "");
   $("dailyHead").textContent = "today's route #" + d.n;
-  $("dailyPct").textContent = mine >= 100 ? "Arrived" : mine + "%";
+  $("dailyPct").textContent = mine >= 100 ? "LANDED" : mine + "%";
   $("shareText").textContent = text;
   showScreen("dailyScreen");
 }
 $("copyShare").addEventListener("click", function(){
   var t = $("shareText").textContent;
-  var ok = function(){ toast("Copied. Paste it anywhere."); }, no = function(){ var r = document.createRange(); r.selectNodeContents($("shareText")); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("Selected. Copy it from here."); };
+  var ok = function(){ toast("Copied. Post it."); }, no = function(){ var r = document.createRange(); r.selectNodeContents($("shareText")); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("Selected. Copy it from here."); };
   try{ navigator.clipboard.writeText(t).then(ok, no); }catch(e){ no(); }
 });
 $("dailyAgain").addEventListener("click", function(){ playDaily(true); });
@@ -492,7 +632,6 @@ $("dailyMap").addEventListener("click", toMap);
 var last = 0;
 function frame(ts){
   var dt = last ? Math.min(.05, (ts - last) / 1000) : 0; last = ts;
-  // fixed substeps keep landings honest at low frame rates
   var n = Math.max(1, Math.ceil(dt / .01));
   for(var i = 0; i < n; i++) update(dt / n);
   draw();
@@ -501,11 +640,8 @@ function frame(ts){
 renderMap(); showScreen("mapScreen");
 requestAnimationFrame(frame);
 
-// Test hook (Playwright): ?test=1 only.
-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, dailyParams:dailyParams, startStation:startStation, update:update, surf:surf, D:D };
-// The site's preview page can start a ride straight away: ?play=1 (next stop) or ?daily=1.
-// (An embedding page that inlines the game can't pass a query string, so it
-// sets window.__OL_START = "daily" | "play" before the game's script runs.)
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+// An embedding page that inlines the game sets window.__OL_START first.
 var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
 if(startWith === "daily") playDaily(false);
 else if(startWith === "play") rideStop(Math.min(S.best, STOPS.length - 1));

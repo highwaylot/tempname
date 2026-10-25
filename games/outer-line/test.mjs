@@ -29,7 +29,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
 // 1. solvability
 {
   const { ctx, page, errs } = await open({ width: 1280, height: 800 });
-  ok(await page.evaluate(() => document.querySelectorAll('#map .stop').length === 10), 'line map shows 10 stops');
+  ok(await page.evaluate(() => document.querySelectorAll('#spots .spot').length === 10), 'spot list shows 10 stops');
   await shot(page, 'map');
   const results = await page.evaluate(() => {
     const O = window.__ol, S = O.S, out = [];
@@ -41,14 +41,17 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
         const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
         const target = (st.trail[row] + st.width / 2) * tw;
         let d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
-        O.input.left = d < -tw * .12; O.input.right = d > tw * .12;
+        // steer like a skater: aim a sideways speed at the target and hold
+        // whichever key closes the difference (momentum, not teleporting)
+        const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
+        O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
         if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
         O.update(1 / 120); steps++;
         if(S.dead > 0 && !lastDead) deaths++;
         lastDead = S.dead > 0;
       }
       O.input.left = O.input.right = false;
-      return { arrived: S.mode !== 'ride' && S.arrived, deaths, secs: +(steps / 120).toFixed(1), rows: st.len };
+      return { arrived: S.mode !== 'ride' && S.arrived, deaths, secs: +(steps / 120).toFixed(1), rows: st.len, style: S.style, combo: S.bestCombo, top: +(S.topSpeed / st.p.speed).toFixed(2) };
     }
     for(let i = 0; i < O.STOPS.length; i++) out.push(Object.assign({ name: O.STOPS[i].name }, ride(() => O.rideStop(i))));
     out.push(Object.assign({ name: 'daily' }, ride(() => O.playDaily(true))));
@@ -58,7 +61,9 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     out.push({ name: 'routes #1–60', arrived: bad.length === 0, deaths: bad.length, secs: 0, rows: 200, bad });
     return out;
   });
-  for(const r of results) ok(r.arrived && r.deaths === 0, `autopilot finishes ${r.name} (${r.rows} rows, ${r.secs}s, ${r.deaths} deaths)`);
+  for(const r of results) ok(r.arrived && r.deaths === 0, `autopilot finishes ${r.name} (${r.rows} rows, ${r.secs}s, ${r.deaths} deaths${r.style != null ? `, style ${r.style}, best combo ×${r.combo}, top speed ${r.top}× base` : ''})`);
+  const stops = results.filter(r => r.style != null && r.name !== 'daily');
+  ok(stops.every(r => r.style > 0 && r.top > 1.15), 'momentum builds on every stop: tricks score and top speed beats base by 15 %+ (lowest ' + Math.min(...stops.map(r => r.top)) + '×)');
   ok(await page.evaluate(() => window.__ol.S.best >= 10), 'finishing a stop unlocks the next (best = ' + await page.evaluate(() => window.__ol.S.best) + ')');
   ok(errs.length === 0, 'no errors (solvability)' + (errs.length ? ': ' + errs[0] : ''));
   await ctx.close();
@@ -78,8 +83,8 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await page.waitForTimeout(500);
   await shot(page, 'ride-desktop');
   // walk onto a wall: the tunnel rolls so it becomes the floor
-  const side0 = await page.evaluate(() => { const S = window.__ol.S; S.dead = 0; S.h = 0; S.grounded = true; return S.side; });
-  await page.evaluate(() => { const O = window.__ol, S = O.S; S.p += O.S.G.S; for(let i = 0; i < 120; i++) O.update(1 / 120); });
+  const side0 = await page.evaluate(() => { const O = window.__ol, S = O.S; S.dead = 0; S.h = 0; S.grounded = true; S.vl = 0; O.input.left = O.input.right = false; return S.side; });
+  await page.evaluate(() => { const O = window.__ol, S = O.S; S.p += O.S.G.S; S.vl = 0; for(let i = 0; i < 120; i++){ S.vl = 0; S.dead = 0; S.h = 0; S.grounded = true; O.update(1 / 120); } });
   const roll = await page.evaluate(() => { const S = window.__ol.S, up = window.__ol.surf(S.G, S.p).up; return { side: S.side, diff: Math.abs(((up - S.roll + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI) }; });
   ok(roll.side !== side0 && roll.diff < 0.05, 'stepping onto the next wall rolls the camera to it (side ' + side0 + ' → ' + roll.side + ')');
   // arrive
@@ -95,7 +100,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await page.evaluate(() => { const S = window.__ol.S; S.z = (S.st.len - 3) * window.__ol.D; S.h = 0; S.grounded = true; });
   await page.waitForTimeout(900);
   const card = await page.evaluate(() => ({ shown: !document.getElementById('dailyScreen').hidden, text: document.getElementById('shareText').textContent }));
-  ok(card.shown && /Outer Line · Route #\d+/.test(card.text) && /100%/.test(card.text), 'today\'s route ends on a share card: ' + JSON.stringify(card.text));
+  ok(card.shown && /OUTER LINE · ROUTE #\d+/.test(card.text) && /100%/.test(card.text), 'today\'s route ends on a share card: ' + JSON.stringify(card.text));
   await shot(page, 'daily');
   ok(errs.length === 0, 'no errors (desktop)' + (errs.length ? ': ' + errs[0] : ''));
   await ctx.close();

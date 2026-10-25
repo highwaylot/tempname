@@ -4,169 +4,165 @@
 <meta charset="utf-8">
 <title>Outer Line Preview</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Outer Line, a tunnel runner on a space metro from Trip and Route. Walls are floors. One route a day, the same for everyone. Play the preview in your browser.">
-<meta property="og:title" content="Outer Line: walls are floors">
-<meta property="og:description" content="A space-metro tunnel runner from Trip and Route. Ride today's route in your browser.">
+<meta name="description" content="Outer Line, from Trip and Route: skate the space metro after hours. Walls are floors, tricks are speed. Play in your browser.">
+<meta property="og:title" content="Outer Line: walls are floors, tricks are speed">
+<meta property="og:description" content="Skate the space metro after hours. Play in your browser.">
 <meta property="og:image" content="og.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#070910">
+<meta name="theme-color" content="#08080c">
 <link rel="icon" href="icon-512.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
-  /* Night transit: deep navy, signal colours for the three line sections,
-     warm platform light at the stops. One dark theme, deliberately. */
+  /* The game's own skate-video look: black, acid lime, hot magenta, heavy
+     italic system type, tape labels, hard offset shadows. One dark theme. */
   :root{
     color-scheme: dark;
-    --night:#070910; --night-2:#0d1120; --panel:#121729; --line:rgba(255,255,255,.09);
-    --ink:#eef1f7; --dim:#a4adbf; --faint:#636c80;
-    --orange:#ff8a3d; --blue:#46c2ff; --violet:#b07cff; --platform:#ffd68c;
-    --display:'Nunito', 'Arial Rounded MT Bold', system-ui, sans-serif; --mono:'IBM Plex Mono', ui-monospace, monospace;
+    --void:#08080c; --panel:#14141c; --ink:#f4f4f0; --dim:#a8a8b4; --faint:#62626e;
+    --lime:#c6ff00; --mag:#ff2e88; --cyan:#2ee6ff; --tape:#f2efe2;
+    --heavy:'Arial Black', 'Helvetica Neue', Impact, system-ui, sans-serif; --mono:ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   }
   *{ box-sizing:border-box; }
-  html{ background:var(--night); }
-  body{ margin:0; background:var(--night); color:var(--ink); font:600 16px/1.6 var(--display); padding-inline:16px; }
+  html{ background:var(--void); }
+  body{ margin:0; color:var(--ink); font:600 16px/1.6 system-ui, sans-serif; padding-inline:16px;
+    background:radial-gradient(circle at 1px 1px, rgba(255,255,255,.05) 1px, transparent 1.5px) 0 0/9px 9px, var(--void); }
   [hidden]{ display:none !important; }
   .wrap{ max-width:1100px; margin:0 auto; }
-  .eyebrow{ font:500 11.5px/1 var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--orange); }
+  .tape{ display:inline-block; background:var(--tape); color:#111; font:900 italic 13px var(--heavy); letter-spacing:.04em; text-transform:uppercase; padding:5px 10px 4px; transform:rotate(-2deg); box-shadow:2px 3px 0 rgba(0,0,0,.45); }
+  .tape.lime{ background:var(--lime); } .tape.mag{ background:var(--mag); color:#fff; }
 
-  /* the line itself runs across the top of the page */
-  .strip{ height:6px; margin-inline:-16px; background:linear-gradient(90deg, var(--orange) 0 40%, var(--blue) 40% 70%, var(--violet) 70%); }
+  header.hero{ padding-block:40px 24px; display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.25fr); gap:28px; align-items:center; }
+  h1{ margin:14px 0 0; font:900 italic clamp(64px, 11vw, 140px)/.8 var(--heavy); letter-spacing:-.03em; text-shadow:6px 6px 0 var(--mag), 12px 12px 0 rgba(198,255,0,.3); transform:rotate(-3deg); transform-origin:left bottom; }
+  h1 em{ color:var(--lime); font-style:italic; }
+  .tag{ margin:22px 0 0; font:900 italic clamp(20px, 2.6vw, 30px)/1.1 var(--heavy); text-transform:uppercase; }
+  .tag span{ color:var(--mag); }
+  .lede{ margin:14px 0 0; color:var(--dim); max-width:44ch; }
+  .actions{ display:flex; flex-wrap:wrap; gap:14px; margin-top:22px; }
+  .btn{ appearance:none; min-height:52px; padding:12px 24px; border:3px solid var(--ink); background:transparent; color:var(--ink); font:900 italic 18px var(--heavy); text-transform:uppercase; cursor:pointer; transform:skewX(-10deg); box-shadow:5px 5px 0 rgba(0,0,0,.5); text-decoration:none; display:inline-flex; align-items:center; }
+  .btn > span{ display:inline-block; transform:skewX(10deg); }
+  .btn.go{ background:var(--lime); color:#0b0b0b; border-color:var(--lime); box-shadow:5px 5px 0 var(--mag); }
+  .btn.mag{ border-color:var(--mag); color:var(--mag); }
+  .btn:focus-visible, .link-btn:focus-visible{ outline:3px solid var(--cyan); outline-offset:4px; }
 
-  header.hero{ padding-block:44px 28px; display:flex; flex-direction:column; gap:22px; }
-  .hero-top{ display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(0, 1fr); gap:32px; align-items:end; }
-  h1{ margin:0; font-weight:900; font-size:clamp(46px, 8vw, 92px); line-height:.9; letter-spacing:-.01em; }
-  h1 em{ font-style:normal; color:var(--orange); }
-  .tag{ margin:10px 0 0; font-weight:800; font-size:clamp(20px, 2.6vw, 28px); color:var(--dim); }
-  .lede{ margin:0; color:var(--dim); max-width:48ch; }
-  .actions{ display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
-  .btn{ appearance:none; display:inline-flex; align-items:center; gap:10px; min-height:48px; padding:12px 22px; border-radius:14px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font:800 16px var(--display); text-decoration:none; cursor:pointer; }
-  .btn.go{ background:var(--orange); color:#1a0d04; border-color:transparent; }
-  .btn.blue{ border-color:var(--blue); color:var(--blue); background:transparent; }
-  .btn:focus-visible, .link-btn:focus-visible{ outline:2px solid var(--blue); outline-offset:3px; }
-  .chips{ display:flex; flex-wrap:wrap; gap:8px; padding:0; margin:14px 0 0; list-style:none; }
-  .chips li{ font:500 11px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim); padding:8px 10px; border-radius:99px; border:1px solid var(--line); }
-
-  /* a wide window onto the tunnel: the game plays right here on a computer */
-  .window{ position:relative; width:100%; aspect-ratio:16/9; border-radius:22px; overflow:hidden; background:#05060b; box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.6), 0 0 120px rgba(255,138,61,.06); }
+  .screen{ position:relative; transform:rotate(1.2deg); background:#000; padding:10px; box-shadow:10px 10px 0 var(--mag); }
+  .window{ position:relative; width:100%; aspect-ratio:16/10; overflow:hidden; background:#05050a; }
   .window img, .window iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; object-fit:cover; display:block; }
-  .window .play-over{ position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); z-index:2; box-shadow:0 10px 30px rgba(0,0,0,.5); font-size:18px; padding:16px 28px; }
-  .under{ display:flex; justify-content:center; min-height:36px; margin-top:8px; }
-  .link-btn{ appearance:none; border:0; background:none; color:var(--dim); font:500 12px var(--mono); letter-spacing:.14em; text-transform:uppercase; cursor:pointer; padding:8px; }
+  .window .play-over{ position:absolute; left:50%; top:50%; transform:translate(-50%, -50%) skewX(-10deg); z-index:2; font-size:22px; padding:16px 30px; }
+  .window .play-over > span{ transform:skewX(10deg); }
+  .screen .tape{ position:absolute; top:-14px; left:18px; z-index:3; }
+  .under{ display:flex; justify-content:center; min-height:40px; margin-top:16px; }
+  .link-btn{ appearance:none; border:0; background:none; color:var(--dim); font:700 12px var(--mono); letter-spacing:.14em; text-transform:uppercase; cursor:pointer; padding:8px; }
 
-  section{ padding-block:48px; border-top:1px solid var(--line); }
-  h2{ font-weight:900; font-size:clamp(26px, 3.6vw, 38px); line-height:1.05; margin:10px 0 24px; text-wrap:balance; }
-  .moves{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px; }
-  .move{ padding:20px; border-radius:18px; background:var(--panel); border:1px solid var(--line); display:flex; flex-direction:column; gap:10px; }
-  .move h3{ margin:0; font-weight:900; font-size:21px; }
-  .move p{ margin:0; color:var(--dim); font-size:15px; }
-  .num{ font:500 11.5px/1.5 var(--mono); letter-spacing:.06em; color:var(--faint); }
+  section{ padding-block:52px; }
+  h2{ font:900 italic clamp(30px, 4.4vw, 52px)/.95 var(--heavy); margin:14px 0 26px; text-transform:uppercase; letter-spacing:-.01em; }
+  h2 span{ color:var(--lime); }
+  .tricks{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:18px; }
+  .trick{ background:var(--panel); padding:18px 18px 16px; box-shadow:5px 5px 0 rgba(0,0,0,.6); transform:rotate(var(--r)); display:flex; flex-direction:column; gap:8px; }
+  .trick h3{ margin:0; font:900 italic 24px/1 var(--heavy); text-transform:uppercase; color:var(--c); }
+  .trick p{ margin:0; color:var(--dim); font-size:15px; }
+  .trick .num{ font:700 11.5px/1.5 var(--mono); letter-spacing:.06em; color:var(--faint); }
+  .meter{ margin-top:26px; display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center; font:900 italic 14px var(--heavy); text-transform:uppercase; }
+  .meter .bar{ height:16px; transform:skewX(-20deg); border:2px solid rgba(255,255,255,.25); background:linear-gradient(90deg, var(--cyan), var(--lime) 60%, var(--mag)); position:relative; }
+  .meter .bar i{ position:absolute; top:0; bottom:0; width:3px; background:var(--void); }
 
   .daily{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:40px; align-items:center; }
-  .board{ border-radius:18px; background:#05060b; border:1px solid var(--line); padding:22px 24px; font-family:var(--mono); display:flex; flex-direction:column; gap:12px; }
-  .board .r{ display:flex; justify-content:space-between; gap:12px; font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); }
-  .board .r b{ color:var(--platform); font-weight:500; font-variant-numeric:tabular-nums; }
-  .board .big{ font:900 44px/1 var(--display); color:var(--ink); }
-  .board .card{ white-space:pre; font-size:13px; color:var(--ink); background:rgba(255,255,255,.04); border-radius:10px; padding:12px 14px; border:1px solid var(--line); }
-  .daily p{ color:var(--dim); margin:0 0 14px; max-width:48ch; }
-  .rules{ margin:0; padding-left:18px; color:var(--dim); }
-  .rules li{ margin-bottom:6px; }
+  .card{ background:#101016; border:2px dashed rgba(255,255,255,.25); padding:22px 24px; font-family:var(--mono); transform:rotate(-1.5deg); box-shadow:8px 8px 0 var(--lime); }
+  .card .r{ display:flex; justify-content:space-between; gap:12px; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+  .card .r b{ color:var(--lime); font-variant-numeric:tabular-nums; }
+  .card .big{ font:900 italic 54px/1 var(--heavy); margin:10px 0; text-shadow:4px 4px 0 var(--mag); }
+  .card pre{ margin:14px 0 0; font:700 14px/1.5 var(--mono); color:var(--ink); white-space:pre; overflow-x:auto; }
+  .daily p{ color:var(--dim); margin:0 0 14px; max-width:46ch; }
+  .rules{ margin:0 0 20px; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px; }
+  .rules li{ font:900 italic 15px var(--heavy); text-transform:uppercase; }
+  .rules li::before{ content:"✕ "; color:var(--mag); }
 
-  .map img{ width:100%; height:auto; border-radius:18px; border:1px solid var(--line); display:block; }
-  .controls{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
-  .controls div{ padding:18px 20px; border-radius:16px; border:1px solid var(--line); }
-  .controls b{ display:block; font:500 11px var(--mono); letter-spacing:.2em; text-transform:uppercase; color:var(--orange); margin-bottom:6px; }
+  .spots img{ width:100%; height:auto; display:block; box-shadow:8px 8px 0 rgba(0,0,0,.6); }
+  .controls{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; }
+  .controls div{ background:var(--panel); padding:18px 20px; box-shadow:5px 5px 0 rgba(0,0,0,.6); }
+  .controls b{ display:block; font:900 italic 14px var(--heavy); letter-spacing:.06em; text-transform:uppercase; color:var(--lime); margin-bottom:6px; }
   .controls span{ color:var(--dim); font-size:15px; }
-  footer{ border-top:1px solid var(--line); padding-block:28px 40px; color:var(--faint); font:500 12px/1.7 var(--mono); letter-spacing:.06em; display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; }
+  footer{ padding-block:30px 44px; color:var(--faint); font:700 12px/1.7 var(--mono); letter-spacing:.06em; display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; border-top:3px solid var(--panel); }
 
-  .overlay{ position:fixed; inset:0; z-index:50; background:var(--night); display:flex; flex-direction:column; padding-top:env(safe-area-inset-top, 0px); }
-  .overlay-bar{ display:flex; align-items:center; justify-content:space-between; padding:6px 12px; border-bottom:1px solid var(--line); }
-  .overlay-bar span{ font:500 11px var(--mono); letter-spacing:.2em; text-transform:uppercase; color:var(--dim); }
+  .overlay{ position:fixed; inset:0; z-index:50; background:var(--void); display:flex; flex-direction:column; padding-top:env(safe-area-inset-top, 0px); }
+  .overlay-bar{ display:flex; align-items:center; justify-content:space-between; padding:6px 12px; border-bottom:2px solid var(--panel); }
   .overlay iframe{ flex:1; width:100%; border:0; display:block; }
   body.playing{ overflow:hidden; }
 
   @media (max-width: 860px){
-    .hero-top, .daily{ grid-template-columns:1fr; gap:18px; }
-    .moves, .controls{ grid-template-columns:1fr; }
+    header.hero, .daily{ grid-template-columns:1fr; }
+    .tricks, .controls{ grid-template-columns:1fr; }
     .window{ aspect-ratio:4/5; }
+    .screen{ transform:none; box-shadow:6px 6px 0 var(--mag); }
   }
 </style>
 </head>
 <body>
-<div class="strip" aria-hidden="true"></div>
 <div class="wrap">
   <header class="hero">
-    <div class="hero-top">
-      <div>
-        <span class="eyebrow">A Trip and Route game · Preview</span>
-        <h1>OUTER <em>LINE</em></h1>
-        <p class="tag">Walls are floors.</p>
-      </div>
-      <div>
-        <p class="lede">A tunnel runner on a space metro. Run the line stop to stop, jump the gaps, and step onto a wall when the floor runs out: the tunnel turns and the wall becomes the floor.</p>
-        <div class="actions">
-          <button type="button" class="btn go" id="play">Ride the line</button>
-          <button type="button" class="btn blue" id="playDaily">Today's route</button>
-        </div>
-        <ul class="chips"><li>Free in your browser</li><li>Keyboard or touch</li><li>No account</li></ul>
+    <div>
+      <span class="tape">A Trip and Route game · Preview</span>
+      <h1>OUTER<br><em>LINE</em></h1>
+      <p class="tag">Walls are floors. <span>Tricks are speed.</span></p>
+      <p class="lede">Skate the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that just keeps getting faster.</p>
+      <div class="actions">
+        <button type="button" class="btn go" id="play"><span>Drop in</span></button>
+        <button type="button" class="btn mag" id="playDaily"><span>Today's route</span></button>
       </div>
     </div>
     <div>
-      <div class="window" id="window">
-        <img id="poster" src="ride.jpg" alt="Riding the tunnel toward the next stop" width="1280" height="720">
-        <button type="button" class="btn go play-over" id="play2">▶ Ride</button>
+      <div class="screen">
+        <span class="tape lime">live in your browser</span>
+        <div class="window" id="window">
+          <img id="poster" src="ride.jpg" alt="The skater mid-run in the tunnel, at speed" width="1280" height="800">
+          <button type="button" class="btn go play-over" id="play2"><span>▶ Ride</span></button>
+        </div>
       </div>
-      <div class="under"><button type="button" class="link-btn" id="stop" hidden>■ Get off</button></div>
+      <div class="under"><button type="button" class="link-btn" id="stop" hidden>■ Bail out</button></div>
     </div>
   </header>
 
-  <section aria-labelledby="h-how">
-    <span class="eyebrow">How it rides</span>
-    <h2 id="h-how">Ten stops, three sections of track</h2>
-    <div class="moves">
-      <div class="move"><h3 style="color:var(--orange)">Ride</h3><p>The train doesn't stop and neither do you. Steer left and right to stay on the tiles.</p><span class="num">speed 8 → 12.5 across the line</span></div>
-      <div class="move"><h3 style="color:var(--blue)">Turn</h3><p>Out of floor? Step onto the wall. The tunnel turns so the wall is under your feet.</p><span class="num">6- and 8-sided tunnels</span></div>
-      <div class="move"><h3 style="color:var(--violet)">Jump</h3><p>Some stretches have no track at all. Jump them; you can steer in the air.</p><span class="num">gaps up to 3 tiles deep</span></div>
+  <section aria-labelledby="h-flow">
+    <span class="tape mag">momentum</span>
+    <h2 id="h-flow">Every trick is <span>speed</span></h2>
+    <div class="tricks">
+      <div class="trick" style="--r:-1deg;--c:var(--lime)"><h3>Wall ride</h3><p>Carve off the floor onto a wall. The tunnel turns, the wall is the floor, and your flow goes up.</p><span class="num">+flow · once per half second</span></div>
+      <div class="trick" style="--r:.8deg;--c:var(--cyan)"><h3>Gap · transfer</h3><p>Clear a hole. Switch walls in the air for a transfer. Big gaps pay double.</p><span class="num">gaps up to 3 tiles deep</span></div>
+      <div class="trick" style="--r:-.6deg;--c:var(--mag)"><h3>Hop · edge</h3><p>Jump again the instant you land to keep the line alive. Skim the lip of a hole for an edge.</p><span class="num">combo ×8 max · 2.4 s to keep it</span></div>
     </div>
+    <div class="meter" aria-hidden="true"><span>Rolling</span><div class="bar"><i style="left:33%"></i><i style="left:66%"></i></div><span style="color:var(--mag)">Full send</span></div>
+    <p style="color:var(--dim);margin:14px 0 0;max-width:62ch">Flow drains slowly while you cruise and all of it goes when you fall. At full send you're riding 1.8× faster with a wider lens.</p>
   </section>
 
   <section id="daily" aria-labelledby="h-daily">
     <div class="daily">
-      <div class="board" aria-live="polite">
+      <div class="card" aria-live="polite">
         <div class="r"><span>Today's route</span><b id="routeNo">#—</b></div>
-        <div class="big" id="routeName">Route —</div>
+        <div class="big" id="routeName">ROUTE —</div>
         <div class="r"><span>Resets in</span><b id="resetIn">—</b></div>
-        <div class="card" id="cardSample">Outer Line · Route #—
-🟧🟧🟧🟧🟧🟧🟧⬛⬛⬛ 74%
-Off the line at 74%.</div>
+        <pre id="cardSample">OUTER LINE · ROUTE #—
+🟩🟩🟩🟩🟩🟩🟩⬛⬛⬛ 74%
+style 48,210</pre>
       </div>
       <div>
-        <span class="eyebrow" style="color:var(--blue)">One route a day</span>
-        <h2 id="h-daily">Same route for everyone. Post your card.</h2>
-        <p>Every day at midnight UTC the line lays a new route. Everyone in the world rides the same one. Your first ride of the day goes on your card; practice as much as you like after.</p>
-        <ul class="rules">
-          <li>No streaks. Missing a day costs nothing.</li>
-          <li>No accounts, no leaderboard: the card says it.</li>
-          <li>The card never shows the route, so it can't spoil it.</li>
-        </ul>
-        <div class="actions"><button type="button" class="btn blue" id="playDaily2">Ride today's route</button></div>
+        <span class="tape">one route a day</span>
+        <h2 id="h-daily">Same line for <span>everyone</span></h2>
+        <p>Every midnight UTC there's a new route. Your first ride goes on your card with your style score. Then practice it all you want.</p>
+        <ul class="rules"><li>No streaks to lose</li><li>No accounts</li><li>No spoilers on the card</li></ul>
+        <button type="button" class="btn mag" id="playDaily2"><span>Ride today's route</span></button>
       </div>
     </div>
   </section>
 
-  <section class="map" aria-labelledby="h-map">
-    <span class="eyebrow">The line map</span>
-    <h2 id="h-map">Dockyard to Terminus</h2>
-    <img src="map.jpg" alt="The line map: ten stops from Dockyard to Terminus in orange, blue and violet sections" width="1280" height="720" loading="lazy">
+  <section class="spots" aria-labelledby="h-spots">
+    <span class="tape lime">ten stops</span>
+    <h2 id="h-spots">Dockyard to <span>Terminus</span></h2>
+    <img src="map.jpg" alt="The spot list: ten stops from Dockyard to Terminus" width="1280" height="800" loading="lazy">
   </section>
 
   <section aria-labelledby="h-ctl">
-    <span class="eyebrow">Controls</span>
-    <h2 id="h-ctl">Keys or thumbs</h2>
+    <span class="tape">controls</span>
+    <h2 id="h-ctl">Keys or <span>thumbs</span></h2>
     <div class="controls">
-      <div><b>Keyboard</b><span>← → or A D to move, Space or ↑ to jump, Esc for the line map.</span></div>
-      <div><b>Touch</b><span>Hold the left or right side to move. Tap or swipe up to jump. Steer with one thumb, jump with the other.</span></div>
+      <div><b>Keyboard</b><span>← → carve · Space jump · ↓ tuck for speed · Esc for the spots.</span></div>
+      <div><b>Touch</b><span>Hold a side to carve · tap or swipe up to jump · hold both sides to tuck.</span></div>
     </div>
   </section>
 
@@ -177,7 +173,7 @@ Off the line at 74%.</div>
 </div>
 
 <div class="overlay" id="overlay" hidden>
-  <div class="overlay-bar"><button type="button" class="link-btn" id="close">← Back</button><span>Outer Line · preview</span></div>
+  <div class="overlay-bar"><button type="button" class="link-btn" id="close">← Back</button><span class="tape lime">Outer Line</span></div>
 </div>
 
 <script>
@@ -188,16 +184,16 @@ Off the line at 74%.</div>
     var n = Math.floor((day - Date.UTC(2026, 9, 25)) / 864e5) + 1, left = day + 864e5 - now.getTime();
     var h = Math.floor(left / 36e5), m = Math.floor(left % 36e5 / 6e4);
     document.getElementById('routeNo').textContent = '#' + n;
-    document.getElementById('routeName').textContent = 'Route ' + n;
+    document.getElementById('routeName').textContent = 'ROUTE ' + n;
     document.getElementById('resetIn').textContent = h + 'h ' + String(m).padStart(2, '0') + 'm';
-    document.getElementById('cardSample').textContent = 'Outer Line · Route #' + n + '\n🟧🟧🟧🟧🟧🟧🟧⬛⬛⬛ 74%\nOff the line at 74%.';
+    document.getElementById('cardSample').textContent = 'OUTER LINE · ROUTE #' + n + '\n🟩🟩🟩🟩🟩🟩🟩⬛⬛⬛ 74%\nstyle 48,210';
   }
   route(); setInterval(route, 30000);
 
   var win = document.getElementById('window'), poster = document.getElementById('poster'), playOver = document.getElementById('play2');
   var overlay = document.getElementById('overlay'), stop = document.getElementById('stop');
-  // The game is one file. Inlined (srcdoc) where the host allows, so it can't
-  // take a query string: the start screen goes in as window.__OL_START.
+  // The game is one file, inlined (srcdoc) where the host allows, so the
+  // start screen goes in as window.__OL_START instead of a query string.
   function gameFrame(start){
     var f = document.createElement('iframe');
     f.title = 'Outer Line'; f.setAttribute('allow', 'autoplay; fullscreen');
