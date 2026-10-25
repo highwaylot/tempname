@@ -161,7 +161,7 @@ style 48,210</pre>
     <span class="tape">controls</span>
     <h2 id="h-ctl">Keys or <span>thumbs</span></h2>
     <div class="controls">
-      <div><b>Keyboard</b><span>← → carve · Space jump · ↓ tuck for speed · Esc for the spots.</span></div>
+      <div><b>Keyboard</b><span>← → carve · ↑ jump (or Space) · ↓ tuck for speed · Esc for the spots.</span></div>
       <div><b>Touch</b><span>Hold a side to carve · tap or swipe up to jump · hold both sides to tuck.</span></div>
     </div>
   </section>
@@ -197,6 +197,7 @@ style 48,210</pre>
   function gameFrame(start){
     var f = document.createElement('iframe');
     f.title = 'Outer Line'; f.setAttribute('allow', 'autoplay; fullscreen');
+    f.addEventListener('load', function(){ try{ f.contentWindow.focus(); }catch(e){} });
     fetch('play.html').then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); })
       .then(function(t){ f.srcdoc = t.replace('<head>', '<head><script>window.__OL_START=' + JSON.stringify(start) + '<\/script>'); })
       .catch(function(){ f.src = 'play.html?' + (start === 'daily' ? 'daily=1' : 'play=1'); });
@@ -210,6 +211,16 @@ style 48,210</pre>
       var g = gameFrame(start); overlay.appendChild(g); overlay.hidden = false; document.body.classList.add('playing'); g.focus();
     }
   }
+  // While the game is open, keys pressed with the focus still on this page
+  // go to the game instead of scrolling the page.
+  var GAME_KEYS = { ArrowLeft:1, ArrowRight:1, ArrowUp:1, ArrowDown:1, Space:1, KeyA:1, KeyD:1, KeyW:1, KeyS:1, Escape:1 };
+  function liveFrame(){ return win.querySelector('iframe') || overlay.querySelector('iframe'); }
+  function forward(type){ return function(e){
+    var f = liveFrame(); if(!f || !GAME_KEYS[e.code] || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if(e.code === 'Space' && e.target.tagName === 'BUTTON') return;
+    e.preventDefault(); f.contentWindow.postMessage({ olKey:{ type:type, code:e.code, repeat:e.repeat } }, '*');
+  }; }
+  addEventListener('keydown', forward('down')); addEventListener('keyup', forward('up'));
   document.getElementById('play').addEventListener('click', function(){ play('play'); });
   playOver.addEventListener('click', function(){ play('play'); });
   document.getElementById('playDaily').addEventListener('click', function(){ play('daily'); });

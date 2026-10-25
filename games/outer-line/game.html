@@ -178,7 +178,7 @@ var SPOT_COLORS = ["#c6ff00", "#c6ff00", "#c6ff00", "#2ee6ff", "#2ee6ff", "#2ee6
 // carries momentum, and slides to a stop instead of snapping.
 var R = 3, D = 1.6, GRAV = 32, JUMP_V = 10.5;
 var ACC = 46, AIR_ACC = 26, FRICTION = 1.5, AIR_FRICTION = .25, VL_BASE = 6.5, VL_FLOW = 3;
-var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045;
+var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11;
 
 // A station: rows of tiles, 1 = floor. One guaranteed path of `width`
 // tiles wanders around the tunnel (so you have to take the walls), every
@@ -238,6 +238,17 @@ function surf(G, p){
   var s = Math.min(G.N - 1, Math.floor(p / G.S)), t = (p - s * G.S) / G.S, a = G.V[s], b = G.V[s + 1];
   return { x:a[0] + (b[0] - a[0]) * t, y:a[1] + (b[1] - a[1]) * t, s:s, up:Math.PI / 2 + s * TAU / G.N };
 }
+// The view's "up", continuous around the tunnel: a side's own normal across
+// its middle, easing (smoothstep) into the next side's over the stretch
+// before each corner, so the camera never steps when you change walls.
+var UP_BAND = .5;
+function upAt(G, p){
+  p = ((p % G.P) + G.P) % G.P;
+  var s = Math.min(G.N - 1, Math.floor(p / G.S)), u = (p - s * G.S) / G.S * 2 - 1, a = Math.abs(u);
+  var e = a < 1 - UP_BAND ? 0 : (a - (1 - UP_BAND)) / UP_BAND; e = e * e * (3 - 2 * e);
+  return Math.PI / 2 + s * TAU / G.N + (u < 0 ? -1 : 1) * e * Math.PI / G.N;
+}
+function wrapA(a){ return ((a + Math.PI) % TAU + TAU) % TAU - Math.PI; }
 
 // ---------------------------------------------------------------- state
 var cv = $("c"), ctx = cv.getContext("2d"), W = 0, H = 0, DPR = 1;
@@ -246,14 +257,16 @@ addEventListener("resize", resize); resize();
 
 var S = {
   mode:"map", st:null, G:null, stopIdx:0, daily:null, dailyFirst:false,
-  p:0, vl:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, side:0, t:0, arrived:false,
-  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9,
+  p:0, vl:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, rollV:0, side:0, t:0, arrived:false,
+  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, flowS:0, tuckS:0, leanS:0, cam:null,
   best: store.get("best", 0), bestStyle: store.get("bestStyle", {})
 };
 var input = { left:false, right:false, tuck:false, jumpQ:0 };
 var pops = [];   // trick callouts drawn on the canvas
 
-function speedNow(){ return S.st ? S.st.p.speed * (1 + S.flow * FLOW_MAX) * (input.tuck && S.grounded ? TUCK : 1) : 0; }
+// Speed follows flow and the tuck through a short ease, so a trick is a
+// surge rather than a jolt.
+function speedNow(){ return S.st ? S.st.p.speed * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) : 0; }
 
 function startStation(params, opts){
   opts = opts || {};
@@ -261,8 +274,8 @@ function startStation(params, opts){
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
-  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9;
-  S.roll = surf(S.G, S.p).up; S.side = surf(S.G, S.p).s;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0;
+  S.roll = upAt(S.G, S.p); S.side = surf(S.G, S.p).s;
   S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
   S.label = opts.label || ("STOP " + String(S.stopIdx + 1).padStart(2, "0") + " · " + params.name);
   pops.length = 0;
@@ -270,7 +283,8 @@ function startStation(params, opts){
   showScreen(null);
   $("hudTop").hidden = false; $("hudBot").hidden = false; $("toMap").hidden = false;
   $("stnName").textContent = S.label;
-  hint(touchy ? "hold a side to carve · tap to jump · hold both to tuck" : "← → carve · space jump · ↓ tuck", 2600);
+  hint(touchy ? "hold a side to carve · tap to jump · hold both to tuck" : "← → carve · ↑ jump · ↓ tuck", 2600);
+  try{ window.focus(); }catch(e){}
 }
 function tileAt(p, z){
   var st = S.st, row = Math.floor(z / D);
@@ -334,17 +348,27 @@ syncMute();
 
 // ---------------------------------------------------------------- input
 var touchy = matchMedia("(pointer: coarse)").matches;
-addEventListener("keydown", function(e){
-  if(e.code === "ArrowLeft" || e.code === "KeyA"){ input.left = true; e.preventDefault(); }
-  if(e.code === "ArrowRight" || e.code === "KeyD"){ input.right = true; e.preventDefault(); }
-  if(e.code === "ArrowDown" || e.code === "KeyS"){ input.tuck = true; e.preventDefault(); }
-  if(e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW"){ if(!e.repeat) input.jumpQ = .14; e.preventDefault(); }
-  if(e.code === "Escape" && S.mode === "ride") toMap();
-});
-addEventListener("keyup", function(e){
-  if(e.code === "ArrowLeft" || e.code === "KeyA") input.left = false;
-  if(e.code === "ArrowRight" || e.code === "KeyD") input.right = false;
-  if(e.code === "ArrowDown" || e.code === "KeyS") input.tuck = false;
+// ↑ is the jump (Space and W too). An embedding page that has the focus
+// forwards these keys by postMessage, so they never scroll the page instead.
+function keyDown(code, repeat){
+  if(code === "ArrowLeft" || code === "KeyA"){ input.left = true; return true; }
+  if(code === "ArrowRight" || code === "KeyD"){ input.right = true; return true; }
+  if(code === "ArrowDown" || code === "KeyS"){ input.tuck = true; return true; }
+  if(code === "ArrowUp" || code === "Space" || code === "KeyW"){ if(!repeat) input.jumpQ = .14; return true; }
+  if(code === "Escape" && S.mode === "ride"){ toMap(); return true; }
+  return false;
+}
+function keyUp(code){
+  if(code === "ArrowLeft" || code === "KeyA") input.left = false;
+  if(code === "ArrowRight" || code === "KeyD") input.right = false;
+  if(code === "ArrowDown" || code === "KeyS") input.tuck = false;
+}
+addEventListener("keydown", function(e){ if(keyDown(e.code, e.repeat)) e.preventDefault(); });
+addEventListener("keyup", function(e){ keyUp(e.code); });
+addEventListener("blur", function(){ input.left = input.right = input.tuck = false; });
+addEventListener("message", function(e){
+  var m = e.data && e.data.olKey; if(!m || e.source !== window.parent) return;
+  if(m.type === "down") keyDown(m.code, m.repeat); else keyUp(m.code);
 });
 // Touch: hold a side to carve that way; both sides at once is a tuck; a
 // quick tap or an upward swipe jumps.
@@ -377,6 +401,9 @@ function update(dt){
   if(S.mode !== "ride") return;
   S.t += dt;
   var st = S.st, G = S.G, tw = G.S / st.C;
+  S.flowS += (S.flow - S.flowS) * Math.min(1, dt * 4);
+  S.tuckS += ((input.tuck && S.grounded ? 1 : 0) - S.tuckS) * Math.min(1, dt * 6);
+  S.leanS += (clamp(S.vl / (VL_BASE + VL_FLOW), -1, 1) - S.leanS) * Math.min(1, dt * 10);
   if(S.dead > 0){ S.dead -= dt; S.h -= 16 * dt; S.z += speedNow() * .2 * dt; S.shake = Math.max(S.shake, .3); if(S.dead <= 0) retry(); return; }
   var sp = speedNow(); S.z += sp * dt; S.topSpeed = Math.max(S.topSpeed, sp);
   if(S.comboT > 0){ S.comboT -= dt; if(S.comboT <= 0) S.combo = 0; }
@@ -430,9 +457,10 @@ function update(dt){
     else { S.edgeT = 0; S.onEdge = false; }
   }
   S.shake = Math.max(0, S.shake - dt * 2.5);
-  // camera rolls so the side under you is the floor
-  var target = sf.up, d = ((target - S.roll + Math.PI) % TAU + TAU) % TAU - Math.PI;
-  S.roll += d * Math.min(1, dt * 10);
+  // camera rolls so the side under you is the floor: a critically damped
+  // spring toward the continuous up, so the roll eases in and out
+  var d = wrapA(upAt(G, S.p) - S.roll), w = ROLL_W;
+  S.rollV += (w * w * d - 2 * w * S.rollV) * dt; S.roll += S.rollV * dt;
   for(var i = pops.length - 1; i >= 0; i--){ pops[i].t += dt; if(pops[i].t > 1.1) pops.splice(i, 1); }
   if(!S.arrived && S.z / D >= st.len - 2){ S.arrived = true; arrive(); }
 }
@@ -447,9 +475,10 @@ var stars = [];
 (function(){ var r = mulberry32(7); for(var i = 0; i < 260; i++) stars.push([r() * TAU, r(), .5 + r() * 1.6, r()]); })();
 function hexRgb(h){ var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
 function draw(){
-  var flow = S.st ? S.flow : 0, sp = speedNow();
+  var flow = S.st ? S.flowS : 0, sp = speedNow();
   ctx.fillStyle = "#08080c"; ctx.fillRect(0, 0, W, H);
-  var shx = S.shake ? (Math.random() - .5) * S.shake * 12 : 0, shy = S.shake ? (Math.random() - .5) * S.shake * 12 : 0;
+  // shake is a smooth wobble, not per-frame noise, so it reads as weight
+  var shx = S.shake * 7 * (Math.sin(S.t * 41) + Math.sin(S.t * 27.3 + 1.7)) / 2, shy = S.shake * 7 * (Math.sin(S.t * 37.1 + .6) + Math.sin(S.t * 23.9 + 2.9)) / 2;
   var cx = W / 2 + shx, cy = H * .48 + shy;
   // a wider lens as you speed up
   var f = Math.min(W, H) * .9 * (1 - .24 * flow);
@@ -463,36 +492,50 @@ function draw(){
   }
   if(!S.st) return;
   var st = S.st, G = S.G, tw = G.S / st.C;
-  var me = surf(G, S.p), lean = clamp(S.vl / (VL_BASE + VL_FLOW), -1, 1);
+  var me = surf(G, S.p), lean = S.leanS;
   var up = S.roll + lean * .05, ux = Math.cos(up), uy = Math.sin(up), rx = Math.sin(up), ry = -Math.cos(up);
   var camH = 1.25 + Math.max(0, S.h) * .5, camZ = S.z - (4.2 + flow * 1.4);
-  var mx = me.x + Math.cos(me.up) * camH, my = me.y + Math.sin(me.up) * camH;
+  // the camera sits above the rider along the smoothed roll, not the side's
+  // normal, so changing walls never jumps it
+  var mx = me.x + Math.cos(S.roll) * camH, my = me.y + Math.sin(S.roll) * camH;
   var camX = mx * .8, camY = my * .8;
+  S.cam = { up:up, x:camX, y:camY, z:camZ, f:1 - .24 * flow };
   function proj(x, y, z){
     var dz = z - camZ; if(dz < .15) return null;
     var dx = x - camX, dy = y - camY;
     return [cx + f * (dx * rx + dy * ry) / dz, cy - f * (dx * ux + dy * uy) / dz + f * .06, dz];
   }
   var r0 = Math.max(0, Math.floor(camZ / D)), r1 = Math.min(st.len + 8, r0 + 70);
-  var rgb = hexRgb(S.color);
+  var rgb = hexRgb(S.color), NEAR = .4;
+  // how much each side is "the floor" right now, from the smoothed roll, so
+  // the highlight slides across with the camera instead of flipping
+  var sideW = [];
+  for(var si = 0; si < G.N; si++) sideW.push(clamp(1 - Math.abs(wrapA(Math.PI / 2 + si * TAU / G.N - S.roll)) / (TAU / G.N), 0, 1));
   for(var r = r1; r >= r0; r--){
-    var z0 = r * D, z1 = z0 + D * .92, row = r < st.len ? st.rows[r] : null, fog = Math.max(0, 1 - (z0 - camZ) / (70 * D));
+    // rows are clipped at a near plane instead of vanishing whole, so tiles
+    // slide out of the bottom of the screen rather than popping
+    var z0 = Math.max(r * D, camZ + NEAR), z1 = r * D + D * .94, row = r < st.len ? st.rows[r] : null;
+    if(z1 <= z0) continue;
+    var fd = (r * D - camZ) / (70 * D), fog = Math.max(0, 1 - fd); fog = fog * fog * (3 - 2 * fog);
     if(fog <= 0) continue;
+    // lines thinner than a few pixels on screen shimmer, so far rows fade them out
+    var px = f * D / Math.max(.5, r * D - camZ), lineA = clamp((px - 3) / 9, 0, 1);
     var finish = r >= st.len - 8, seam = r % 8 === 0;
     for(var c = 0; c < st.cols; c++){
       if(row && !row[c]) continue;
-      var A = surf(G, c * tw + tw * .05), B = surf(G, (c + 1) * tw - tw * .05);
+      var A = surf(G, c * tw + tw * .04), B = surf(G, (c + 1) * tw - tw * .04);
       var q0 = proj(A.x, A.y, z0), q1 = proj(B.x, B.y, z0), q2 = proj(B.x, B.y, z1), q3 = proj(A.x, A.y, z1);
       if(!q0 || !q1 || !q2 || !q3) continue;
-      var under = Math.floor(c / st.C) === me.s;
+      var w = sideW[Math.floor(c / st.C)];
       ctx.beginPath(); ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.lineTo(q3[0], q3[1]); ctx.closePath();
       if(finish){ ctx.fillStyle = ((r + c) % 2) ? "rgba(244,244,240," + (.8 * fog).toFixed(3) + ")" : "rgba(8,8,12," + (.9 * fog).toFixed(3) + ")"; ctx.fill(); continue; }
-      var shade = under ? 30 : 20;
+      var shade = Math.round(20 + 10 * w);
       ctx.fillStyle = "rgba(" + shade + "," + shade + "," + (shade + 10) + "," + (.96 * fog).toFixed(3) + ")";
       ctx.fill();
-      var glow = (under ? .75 : .32) * fog * (seam ? 1.6 : 1);
+      var glow = (.32 + .43 * w) * fog * (seam ? 1.6 : 1) * (seam ? Math.max(lineA, .35) : lineA);
+      if(glow < .01) continue;
       ctx.strokeStyle = seam ? "rgba(255,46,136," + Math.min(1, glow).toFixed(3) + ")" : "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + glow.toFixed(3) + ")";
-      ctx.lineWidth = under ? 1.6 : 1; ctx.stroke();
+      ctx.lineWidth = 1 + .6 * w; ctx.stroke();
     }
   }
   // speed lines
@@ -530,9 +573,15 @@ function draw(){
 // The skater, seen from behind: board, legs, hoodie, head. Leans into the
 // carve, crouches on a tuck and a landing, throws its arms up in the air.
 function drawSkater(proj, me, lean, f){
-  var px = me.x + Math.cos(me.up) * Math.max(-3, S.h), py = me.y + Math.sin(me.up) * Math.max(-3, S.h);
+  var upC = upAt(S.G, S.p), px = me.x + Math.cos(upC) * Math.max(-3, S.h), py = me.y + Math.sin(upC) * Math.max(-3, S.h);
   var P = proj(px, py, S.z); if(!P) return;
   var k = f / P[2] * .82;   // pixels per world unit at the rider, drawn a touch small so the track stays readable
+  // a soft shadow on the floor below, so you can read where you'll land
+  var Q = S.h > .05 && tileAt(S.p, S.z) ? proj(me.x, me.y, S.z) : null;
+  if(Q){
+    var ks = f / Q[2] * .82, sa = Math.max(0, .45 - S.h * .12);
+    ctx.fillStyle = "rgba(0,0,0," + sa.toFixed(3) + ")"; ctx.beginPath(); ctx.ellipse(Q[0], Q[1], ks * .4, ks * .12, -lean * .35, 0, TAU); ctx.fill();
+  }
   var crouch = (input.tuck && S.grounded ? .28 : 0) + (S.landT < .15 ? (1 - S.landT / .15) * .3 : 0);
   var air = S.grounded ? 0 : 1;
   ctx.save();
@@ -580,7 +629,7 @@ function renderMap(){
   var nx = Math.min(S.best, STOPS.length - 1);
   $("playNext").firstChild.textContent = S.best >= STOPS.length ? "Run it back" : "Drop in: " + STOPS[nx].name;
   $("keys").innerHTML = touchy ? "<b>hold</b> a side to carve · <b>tap</b> or <b>swipe up</b> to jump · <b>hold both</b> to tuck · walls become floors · chain tricks for speed"
-    : "<b>← →</b> carve · <b>space</b> jump · <b>↓</b> tuck · walls become floors · chain wall rides, gaps and hops to build speed";
+    : "<b>← →</b> carve · <b>↑</b> jump · <b>↓</b> tuck · walls become floors · chain wall rides, gaps and hops to build speed";
 }
 function toMap(){ S.mode = "map"; S.st = null; S.daily = null; input.left = input.right = input.tuck = false; renderMap(); showScreen("mapScreen"); }
 function rideStop(i){ ac(); S.stopIdx = i; S.daily = null; startStation(STOPS[i]); }
@@ -640,7 +689,7 @@ function frame(ts){
 renderMap(); showScreen("mapScreen");
 requestAnimationFrame(frame);
 
-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
 // An embedding page that inlines the game sets window.__OL_START first.
 var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
 if(startWith === "daily") playDaily(false);

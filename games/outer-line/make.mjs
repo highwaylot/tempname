@@ -64,7 +64,7 @@ fs.writeFileSync(path.join(out, 'game.json'), JSON.stringify({
   short: 'Skate the space metro: walls are floors, tricks are speed.',
   description: 'Skate the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that keeps getting faster. One route a day, the same for everyone.',
   status: 'preview', platforms: { web: 'play.html' },
-  controls: { keys: '← → carve, Space jump, ↓ tuck, Esc for the spots', touch: 'hold a side to carve, tap or swipe up to jump, hold both to tuck' },
+  controls: { keys: '← → carve, ↑ jump (or Space), ↓ tuck, Esc for the spots', touch: 'hold a side to carve, tap or swipe up to jump, hold both to tuck' },
   orientation: 'any', aspect: '16:9', tags: ['skate', 'runner', 'tunnel', 'momentum', 'daily'],
   ageNote: 'No chat, no accounts, no ads, no data leaves the device in this preview.',
   scheme: 'daily',
