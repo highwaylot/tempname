@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#070910">
+<title>Outer Line</title>
+<style>
+  /* Outer Line: a space metro. Each line is a tunnel, each station a stop.
+     Night-transit palette: deep navy, signal colours per line, warm platform light. */
+  :root{
+    color-scheme: dark;
+    --night:#070910; --ink:#eef1f7; --dim:#9aa3b5; --faint:#5b6476;
+    --line:#ff8a3d; --line2:#46c2ff; --line3:#b07cff; --ok:#7ee0a8;
+    --display:'Arial Rounded MT Bold', 'Nunito', system-ui, sans-serif;
+    --mono:ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body{ margin:0; height:100%; background:var(--night); color:var(--ink); font-family:var(--display); overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; }
+  [hidden]{ display:none !important; }
+  canvas{ position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .hud{ position:fixed; left:0; right:0; top:0; padding:calc(10px + env(safe-area-inset-top, 0px)) 14px 0; display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; }
+  .hud .stn{ font:700 13px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
+  .hud .stn b{ color:var(--ink); }
+  .track{ position:relative; width:min(70vw, 360px); height:6px; border-radius:3px; background:rgba(255,255,255,.1); }
+  .track i{ position:absolute; left:0; top:0; bottom:0; border-radius:3px; background:var(--line); width:0; }
+  .track em{ position:absolute; top:50%; width:12px; height:12px; margin:-6px 0 0 -6px; border-radius:50%; background:#fff; box-shadow:0 0 10px rgba(255,255,255,.7); left:0; }
+  .track span{ position:absolute; right:-4px; top:50%; width:14px; height:14px; margin-top:-7px; border-radius:50%; border:3px solid var(--line); background:var(--night); }
+  .tools{ position:fixed; right:12px; top:calc(10px + env(safe-area-inset-top, 0px)); display:flex; gap:8px; }
+  .tool{ appearance:none; width:40px; height:40px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:rgba(10,13,22,.7); color:var(--ink); font:700 15px var(--display); cursor:pointer; }
+  .tool:focus-visible, .btn:focus-visible, .stop:focus-visible{ outline:2px solid var(--line2); outline-offset:2px; }
+
+  /* screens */
+  .screen{ position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:calc(20px + env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px)); background:radial-gradient(120% 80% at 50% 30%, rgba(14,20,40,.55), rgba(7,9,16,.92)); text-align:center; overflow-y:auto; }
+  .title{ font-weight:800; font-size:clamp(40px, 10vw, 72px); letter-spacing:.02em; line-height:.95; margin:0; }
+  .title em{ font-style:normal; color:var(--line); }
+  .sub{ font:600 12px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0; }
+  .map{ width:min(94vw, 640px); }
+  .map svg{ width:100%; height:auto; display:block; overflow:visible; }
+  .stop{ cursor:pointer; }
+  .stop text{ font:700 11px var(--mono); letter-spacing:.06em; fill:var(--dim); text-transform:uppercase; }
+  .stop.locked{ cursor:default; opacity:.4; }
+  .stop.done circle.dot{ fill:var(--line); }
+  .stop:hover circle.ring, .stop:focus-visible circle.ring{ stroke-width:5; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  .btn{ appearance:none; min-height:48px; padding:12px 22px; border-radius:14px; border:1px solid rgba(255,255,255,.14); background:rgba(18,23,38,.9); color:var(--ink); font:800 16px var(--display); cursor:pointer; }
+  .btn.go{ background:var(--line); color:#1a0d04; border-color:transparent; }
+  .btn.daily{ border-color:var(--line2); color:var(--line2); }
+  .keys{ font:600 12px var(--mono); color:var(--faint); letter-spacing:.06em; line-height:1.8; max-width:42ch; }
+  .keys b{ color:var(--dim); }
+  .card{ display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .big{ font-weight:800; font-size:clamp(30px, 8vw, 52px); line-height:1; margin:0; }
+  .share{ font:600 13px var(--mono); white-space:pre; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:12px 16px; color:var(--ink); text-align:left; }
+  .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); font:700 13px var(--mono); background:rgba(18,23,38,.95); border:1px solid rgba(255,255,255,.14); padding:10px 14px; border-radius:10px; }
+  .hint{ position:fixed; left:0; right:0; top:calc(58px + env(safe-area-inset-top, 0px)); text-align:center; font:600 12px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--faint); pointer-events:none; transition:opacity .6s; }
+  @media (max-width: 560px){ .hud{ align-items:flex-start; padding-right:112px; } .track{ width:100%; } }
+  @media (prefers-reduced-motion: reduce){ .hint{ transition:none; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud" id="hud" hidden>
+  <div class="stn" id="stnName">—</div>
+  <div class="track"><i id="trackFill"></i><em id="trackDot"></em><span></span></div>
+</div>
+<div class="tools">
+  <button type="button" class="tool" id="mute" aria-label="Sound off">♪</button>
+  <button type="button" class="tool" id="toMap" aria-label="Line map" hidden>☰</button>
+</div>
+<div class="hint" id="hint" hidden></div>
+
+<section class="screen" id="mapScreen">
+  <p class="sub">A Trip and Route game</p>
+  <h1 class="title">OUTER <em>LINE</em></h1>
+  <p class="sub">mind the gap · walls are floors</p>
+  <div class="map" id="map"></div>
+  <div class="row">
+    <button type="button" class="btn go" id="playNext">Ride to the next stop</button>
+    <button type="button" class="btn daily" id="playDaily">Today's route</button>
+  </div>
+  <p class="keys" id="keys"></p>
+</section>
+
+<section class="screen" id="arriveScreen" hidden>
+  <div class="card">
+    <p class="sub">now arriving</p>
+    <p class="big" id="arriveName">—</p>
+    <p class="sub" id="arriveSub"></p>
+  </div>
+  <div class="row">
+    <button type="button" class="btn go" id="arriveNext">Next stop</button>
+    <button type="button" class="btn" id="arriveMap">Line map</button>
+  </div>
+</section>
+
+<section class="screen" id="dailyScreen" hidden>
+  <div class="card">
+    <p class="sub" id="dailyHead">today's route</p>
+    <p class="big" id="dailyPct">—</p>
+    <div class="share" id="shareText"></div>
+  </div>
+  <div class="row">
+    <button type="button" class="btn go" id="copyShare">Copy card</button>
+    <button type="button" class="btn" id="dailyAgain">Practice again</button>
+    <button type="button" class="btn" id="dailyMap">Line map</button>
+  </div>
+  <p class="keys">Your first ride of the day is the one on the card. Practice rides don't change it.</p>
+</section>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+(function(){
+// ---------------------------------------------------------------- utils
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+var store = {
+  get: function(k, d){ try{ var v = localStorage.getItem("outerline." + k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set: function(k, v){ try{ localStorage.setItem("outerline." + k, JSON.stringify(v)); }catch(e){} }
+};
+var $ = function(id){ return document.getElementById(id); };
+var TAU = Math.PI * 2;
+
+// ---------------------------------------------------------------- the line
+// Ten stops, easy to hard. Each is generated from its own seed, so every
+// rider gets the same ride. N = sides of the tunnel, C = tile columns per side.
+var STOPS = [
+  { name:"Dockyard",       N:6, C:3, len:110, speed:8.0,  holes:.10, gapEvery:0,  gapLen:0, width:3, seed:11 },
+  { name:"Lumen Avenue",   N:6, C:3, len:130, speed:8.5,  holes:.22, gapEvery:28, gapLen:1, width:3, seed:23 },
+  { name:"Halo Junction",  N:6, C:3, len:150, speed:9.0,  holes:.34, gapEvery:24, gapLen:2, width:2, seed:37 },
+  { name:"Quarry Steps",   N:6, C:3, len:160, speed:9.5,  holes:.45, gapEvery:22, gapLen:2, width:2, seed:41 },
+  { name:"Lantern Market", N:8, C:2, len:170, speed:10.0, holes:.40, gapEvery:20, gapLen:2, width:2, seed:53 },
+  { name:"Orbit Park",     N:8, C:2, len:180, speed:10.5, holes:.52, gapEvery:18, gapLen:2, width:2, seed:67 },
+  { name:"Glass Bridge",   N:8, C:2, len:190, speed:11.0, holes:.62, gapEvery:16, gapLen:3, width:1, seed:71 },
+  { name:"Deep Siding",    N:6, C:3, len:200, speed:11.5, holes:.60, gapEvery:15, gapLen:3, width:1, seed:83 },
+  { name:"Comet Yard",     N:8, C:2, len:210, speed:12.0, holes:.70, gapEvery:14, gapLen:3, width:1, seed:97 },
+  { name:"Terminus",       N:6, C:3, len:240, speed:12.5, holes:.72, gapEvery:13, gapLen:3, width:1, seed:101 }
+];
+var LINE_COLORS = ["#ff8a3d", "#ff8a3d", "#ff8a3d", "#ff8a3d", "#46c2ff", "#46c2ff", "#46c2ff", "#b07cff", "#b07cff", "#b07cff"];
+
+// World units. Radius to the polygon's corners; row depth; jump physics.
+var R = 3, D = 1.6, GRAV = 30, JUMP_V = 10, LAT = 5.2;
+
+// A station: rows of tiles, 1 = floor. One guaranteed path of `width`
+// tiles wanders around the tunnel (so you have to take the walls), every
+// other tile drops with probability `holes`, and every `gapEvery` rows a
+// full gap of `gapLen` rows needs a jump. Gaps stay well inside the jump:
+// at speed v a jump covers v * 2 * JUMP_V / GRAV units (5.3+ at 8 u/s),
+// and the longest gap is 3 rows = 4.8 units.
+function buildStation(p, seedOverride){
+  var rng = mulberry32((seedOverride != null ? seedOverride : p.seed) * 2654435761 >>> 0);
+  var cols = p.N * p.C, rows = [], path = Math.floor(rng() * cols), drift = 0, start = path, trail = [];
+  // A sideways step of one tile takes tileW / LAT seconds; keep the old
+  // column for that many rows (plus one) after every shift so a step is
+  // always possible at this stop's speed.
+  var tileW = 2 * R * Math.sin(Math.PI / p.N) / p.C, keep = Math.ceil(tileW / LAT * p.speed / D) + 1, hist = [];
+  var START = 10, END = 8;
+  for(var r = 0; r < p.len; r++){
+    var row = new Uint8Array(cols);
+    if(r < START || r >= p.len - END){ row.fill(1); rows.push(row); trail.push(path); continue; }
+    // the path drifts at most one column every two rows
+    if(r % 2 === 0){
+      if(rng() < .35) drift = rng() < .5 ? -1 : 1;
+      if(rng() < .3) drift = 0;
+      path = (path + drift + cols) % cols;
+    }
+    for(var c = 0; c < cols; c++) row[c] = rng() < p.holes ? 0 : 1;
+    hist.push(path); if(hist.length > keep) hist.shift();
+    for(var hi = 0; hi < hist.length; hi++) for(var w = 0; w < p.width; w++) row[(hist[hi] + w) % cols] = 1;
+    // a jump gap, never right before the end
+    if(p.gapEvery && r > START + 4 && r < p.len - END - 6 && (r - START) % p.gapEvery === 0){
+      for(var g = 0; g < p.gapLen; g++){ rows.push(new Uint8Array(cols)); trail.push(path); r++; }
+      // land on a full row so a jump from anywhere on the path is safe
+      var land = new Uint8Array(cols); land.fill(1); rows.push(land); trail.push(path);
+      continue;
+    }
+    rows.push(row); trail.push(path);
+  }
+  // trail[r] = the guaranteed path's first column on row r (for the start
+  // position and the solvability check in test.mjs)
+  return { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:rows.length, start:start, trail:trail, width:p.width };
+}
+
+// The daily route: one station a day, the same for everyone. UTC date sets
+// the seed and the run number (#1 = 2026-10-25).
+function dailyInfo(){
+  var now = new Date(), day = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  var epoch = Date.UTC(2026, 9, 25), n = Math.floor((day - epoch) / 864e5) + 1;
+  var key = new Date(day).toISOString().slice(0, 10);
+  return { n:n, key:key, p:dailyParams(n), reset:new Date(day + 864e5) };
+}
+function dailyParams(n){
+  var r = mulberry32(n * 7919 >>> 0);
+  var p = { name:"Route " + n, N: r() < .5 ? 6 : 8, C:0, len:200, speed:10 + r() * 1.5, holes:.5 + r() * .15, gapEvery:16, gapLen:2 + (r() < .5 ? 1 : 0), width:1, seed:n * 104729 };
+  p.C = p.N === 8 ? 2 : 3;
+  return p;
+}
+
+// ---------------------------------------------------------------- geometry
+function geom(N){
+  var S = 2 * R * Math.sin(Math.PI / N), V = [];
+  for(var k = 0; k <= N; k++){ var a = -Math.PI / 2 - Math.PI / N + k * TAU / N; V.push([R * Math.cos(a), R * Math.sin(a)]); }
+  return { N:N, S:S, P:N * S, V:V };
+}
+// A point on the perimeter at arc length p, and the inward normal ("up") there.
+function surf(G, p){
+  p = ((p % G.P) + G.P) % G.P;
+  var s = Math.min(G.N - 1, Math.floor(p / G.S)), t = (p - s * G.S) / G.S, a = G.V[s], b = G.V[s + 1];
+  var ang = Math.PI / 2 + s * TAU / G.N;   // inward normal of side s
+  return { x:a[0] + (b[0] - a[0]) * t, y:a[1] + (b[1] - a[1]) * t, s:s, up:ang };
+}
+
+// ---------------------------------------------------------------- state
+var cv = $("c"), ctx = cv.getContext("2d"), W = 0, H = 0, DPR = 1;
+function resize(){ DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+addEventListener("resize", resize); resize();
+
+var S = {
+  mode:"map", st:null, G:null, stopIdx:0, daily:null, dailyFirst:false,
+  p:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, side:0, t:0, arrived:false, attempt:0,
+  best: store.get("best", 0)        // highest stop index reached
+};
+var input = { left:false, right:false, jumpQ:0 };
+
+function startStation(params, opts){
+  opts = opts || {};
+  S.st = buildStation(params, opts.seed);
+  S.G = geom(S.st.N);
+  // start on the guaranteed path (rows 0-9 are full, so there's time to settle)
+  S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
+  S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
+  S.roll = surf(S.G, S.p).up; S.side = surf(S.G, S.p).s;
+  S.color = opts.color || LINE_COLORS[Math.min(S.stopIdx, 9)];
+  S.mode = "ride";
+  document.documentElement.style.setProperty("--line", S.color);
+  showScreen(null);
+  $("hud").hidden = false; $("toMap").hidden = false;
+  $("stnName").innerHTML = opts.label || ("Next stop: <b>" + params.name + "</b>");
+  hint(touchy ? "hold left or right side · tap or swipe up to jump" : "← → to move · space to jump", 2600);
+}
+function tileAt(p, z){
+  var st = S.st, row = Math.floor(z / D);
+  if(row < 0) return 1;
+  if(row >= st.len) return 1;          // the platform past the end
+  var G = S.G, pp = ((p % G.P) + G.P) % G.P, col = Math.floor(pp / (G.S / st.C)) % st.cols;
+  return st.rows[row][col];
+}
+
+// ---------------------------------------------------------------- audio
+// Effects only, short and soft: sound happens when something happens.
+var AC = null, muted = store.get("muted", false);
+function ac(){ if(muted) return null; if(!AC){ try{ AC = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; } } if(AC.state !== "running") AC.resume(); return AC; }
+function tone(f0, f1, dur, type, vol, delay){
+  var a = ac(); if(!a) return;
+  var t = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
+  o.type = type || "sine"; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * .9);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol || .12, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + .02);
+}
+var SFX = {
+  jump: function(){ tone(520, 820, .12, "sine", .1); },
+  land: function(){ tone(300, 240, .07, "triangle", .07); },
+  side: function(){ tone(980, 1100, .04, "sine", .035); },
+  fall: function(){ tone(420, 110, .45, "sine", .1); },
+  arrive: function(){ [523, 659, 784, 1047].forEach(function(f, i){ tone(f, f * 1.01, .22, "triangle", .09, i * .09); }); }
+};
+function syncMute(){ $("mute").textContent = muted ? "×" : "♪"; $("mute").setAttribute("aria-label", muted ? "Sound on" : "Sound off"); }
+$("mute").addEventListener("click", function(){ muted = !muted; store.set("muted", muted); syncMute(); if(!muted) tone(660, 880, .1, "sine", .08); });
+syncMute();
+
+// ---------------------------------------------------------------- input
+var touchy = matchMedia("(pointer: coarse)").matches;
+addEventListener("keydown", function(e){
+  if(e.code === "ArrowLeft" || e.code === "KeyA"){ input.left = true; e.preventDefault(); }
+  if(e.code === "ArrowRight" || e.code === "KeyD"){ input.right = true; e.preventDefault(); }
+  if(e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW"){ input.jumpQ = .15; e.preventDefault(); }
+  if(e.code === "Escape" && S.mode === "ride") toMap();
+});
+addEventListener("keyup", function(e){
+  if(e.code === "ArrowLeft" || e.code === "KeyA") input.left = false;
+  if(e.code === "ArrowRight" || e.code === "KeyD") input.right = false;
+});
+// Touch: hold the left or right half to steer; a quick tap or an upward
+// swipe jumps. Several fingers at once are fine (steer with one, jump with another).
+var ptrs = {};
+function steerFromPtrs(){
+  input.left = false; input.right = false;
+  for(var id in ptrs){ var q = ptrs[id]; if(q.steer){ if(q.x < W / 2) input.left = true; else input.right = true; } }
+}
+cv.addEventListener("pointerdown", function(e){
+  if(S.mode !== "ride") return;
+  ac();
+  ptrs[e.pointerId] = { x:e.clientX, y:e.clientY, t:performance.now(), steer:true, jumped:false };
+  steerFromPtrs();
+});
+cv.addEventListener("pointermove", function(e){
+  var q = ptrs[e.pointerId]; if(!q) return;
+  if(!q.jumped && q.y - e.clientY > 28 && performance.now() - q.t < 300){ q.jumped = true; input.jumpQ = .15; }
+  q.x = e.clientX; steerFromPtrs();
+});
+function ptrUp(e){
+  var q = ptrs[e.pointerId]; if(!q) return;
+  if(!q.jumped && performance.now() - q.t < 170 && Math.abs(e.clientY - q.y) < 20) input.jumpQ = .15;
+  delete ptrs[e.pointerId]; steerFromPtrs();
+}
+cv.addEventListener("pointerup", ptrUp); cv.addEventListener("pointercancel", ptrUp);
+
+// ---------------------------------------------------------------- physics
+function update(dt){
+  if(S.mode !== "ride") return;
+  S.t += dt;
+  var st = S.st, G = S.G, sp = st.p.speed;
+  if(S.dead > 0){ S.dead -= dt; S.h -= 14 * dt; S.z += sp * .25 * dt; if(S.dead <= 0) retry(); return; }
+  S.z += sp * dt;
+  var lat = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  // radius from the tunnel axis shrinks as you rise; turning is a little
+  // quicker in the air, like in the original genre
+  S.p += lat * LAT * dt * (S.grounded ? 1 : 1.15);
+  if(input.jumpQ > 0) input.jumpQ -= dt;
+  if(S.grounded){
+    if(input.jumpQ > 0){ S.grounded = false; S.vh = JUMP_V; input.jumpQ = 0; SFX.jump(); }
+    else if(!tileAt(S.p, S.z)){ S.grounded = false; S.vh = 0; }
+  }
+  if(!S.grounded){
+    S.vh -= GRAV * dt; S.h += S.vh * dt;
+    if(S.h <= 0 && S.vh < 0){
+      if(tileAt(S.p, S.z) && S.h > -.35){ S.h = 0; S.vh = 0; S.grounded = true; SFX.land(); }
+      else if(S.h < -1.2){ S.dead = .7; SFX.fall(); }
+    }
+    if(S.h > R * .9) { S.h = R * .9; S.vh = Math.min(S.vh, 0); }
+  }
+  var sf = surf(G, S.p);
+  if(sf.s !== S.side){ S.side = sf.s; if(S.grounded) SFX.side(); }
+  // the camera rolls so the side under you is the floor
+  var target = sf.up, d = ((target - S.roll + Math.PI) % TAU + TAU) % TAU - Math.PI;
+  S.roll += d * Math.min(1, dt * 9);
+  if(!S.arrived && S.z / D >= st.len - 2){ S.arrived = true; arrive(); }
+}
+function retry(){
+  S.attempt++;
+  if(S.daily && S.dailyFirst){ finishDaily(Math.min(99, Math.floor(S.z / D / S.st.len * 100))); return; }
+  var keepSeed = S.daily ? S.daily.p.seed : null;
+  var p = S.daily ? S.daily.p : STOPS[S.stopIdx];
+  startStation(p, { seed:keepSeed, color:S.color, label:$("stnName").innerHTML });
+}
+
+// ---------------------------------------------------------------- render
+var stars = [];
+(function(){ var r = mulberry32(7); for(var i = 0; i < 220; i++) stars.push([r() * TAU, r(), .4 + r() * 1.4]); })();
+function draw(){
+  ctx.fillStyle = "#070910"; ctx.fillRect(0, 0, W, H);
+  var cx = W / 2, cy = H * .5, f = Math.min(W, H) * .95;
+  // stars turn with the tunnel
+  var roll = S.st ? S.roll - Math.PI / 2 : 0;
+  for(var i = 0; i < stars.length; i++){
+    var s = stars[i], a = s[0] - roll, rr = (.2 + s[1] * .9) * Math.max(W, H);
+    ctx.fillStyle = "rgba(220,230,255," + (.25 + s[1] * .5).toFixed(2) + ")";
+    ctx.fillRect(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, s[2], s[2]);
+  }
+  if(!S.st) return;
+  var st = S.st, G = S.G, tw = G.S / st.C;
+  var me = surf(G, S.p), up = S.roll, ux = Math.cos(up), uy = Math.sin(up), rx = Math.sin(up), ry = -Math.cos(up);
+  // camera: behind and above you, toward the axis
+  var camH = 1.3 + Math.max(0, S.h) * .55, camZ = S.z - 4.4;
+  var mx = me.x + Math.cos(me.up) * camH, my = me.y + Math.sin(me.up) * camH;
+  var camX = mx * .82, camY = my * .82;    // pulled toward the axis so the far tunnel shows
+  function proj(x, y, z){
+    var dz = z - camZ; if(dz < .15) return null;
+    var dx = x - camX, dy = y - camY;
+    return [cx + f * (dx * rx + dy * ry) / dz, cy - f * (dx * ux + dy * uy) / dz + f * .05, dz];
+  }
+  var r0 = Math.max(0, Math.floor(camZ / D)), r1 = Math.min(st.len + 6, r0 + 64);
+  var col = S.color, rgb = hexRgb(col);
+  for(var r = r1; r >= r0; r--){
+    var z0 = r * D, z1 = z0 + D * .94, row = r < st.len ? st.rows[r] : null, fog = Math.max(0, 1 - (z0 - camZ) / (64 * D));
+    if(fog <= 0) continue;
+    for(var c = 0; c < st.cols; c++){
+      if(row && !row[c]) continue;
+      var pa = c * tw + tw * .04, pb = (c + 1) * tw - tw * .04;
+      var A = surf(G, pa), B = surf(G, pb);
+      var q0 = proj(A.x, A.y, z0), q1 = proj(B.x, B.y, z0), q2 = proj(B.x, B.y, z1), q3 = proj(A.x, A.y, z1);
+      if(!q0 || !q1 || !q2 || !q3) continue;
+      var side = Math.floor(c / st.C), under = side === me.s;
+      var lit = (r % 2 ? .78 : .9) * fog, end = r >= st.len - 8;
+      ctx.beginPath(); ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.lineTo(q3[0], q3[1]); ctx.closePath();
+      var base = end ? [255, 214, 140] : (under ? [Math.round(rgb[0] * .28 + 30), Math.round(rgb[1] * .28 + 34), Math.round(rgb[2] * .28 + 52)] : [26, 32, 52]);
+      ctx.fillStyle = "rgba(" + base[0] + "," + base[1] + "," + base[2] + "," + (lit * (end ? .55 : .95)).toFixed(3) + ")";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + (fog * (under ? .6 : .3)).toFixed(3) + ")";
+      ctx.lineWidth = 1; ctx.stroke();
+    }
+  }
+  // you: a glowing rider just ahead of the camera
+  var px = me.x + Math.cos(me.up) * (S.h + .32), py = me.y + Math.sin(me.up) * (S.h + .32);
+  var P = proj(px, py, S.z);
+  if(P){
+    var rad = f * .2 / P[2];
+    var gl = ctx.createRadialGradient(P[0], P[1], rad * .2, P[0], P[1], rad * 2.4);
+    gl.addColorStop(0, "rgba(255,255,255,.55)"); gl.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(P[0], P[1], rad * 2.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = S.dead > 0 ? "#ff6f6f" : "#ffffff"; ctx.beginPath(); ctx.arc(P[0], P[1], rad, 0, TAU); ctx.fill();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(P[0] + rad * .25, P[1] - rad * .15, rad * .38, 0, TAU); ctx.fill();
+  }
+  // progress
+  var prog = Math.min(1, S.z / D / st.len);
+  $("trackFill").style.width = (prog * 100).toFixed(1) + "%";
+  $("trackDot").style.left = (prog * 100).toFixed(1) + "%";
+}
+function hexRgb(h){ var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+
+// ---------------------------------------------------------------- screens
+function showScreen(id){ ["mapScreen", "arriveScreen", "dailyScreen"].forEach(function(s){ $(s).hidden = s !== id; }); if(id){ $("hud").hidden = true; $("toMap").hidden = true; } }
+function hint(text, ms){ var h = $("hint"); h.textContent = text; h.hidden = false; h.style.opacity = "1"; clearTimeout(hint.t); hint.t = setTimeout(function(){ h.style.opacity = "0"; }, ms); }
+function toast(text){ var t = $("toast"); t.textContent = text; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function(){ t.hidden = true; }, 1800); }
+
+function renderMap(){
+  // a transit map: one line, ten stops, three colour sections
+  var w = 640, hgt = 170, pts = [];
+  for(var i = 0; i < STOPS.length; i++){
+    var x = 30 + i * (w - 60) / (STOPS.length - 1), y = 70 + Math.sin(i * .9) * 26 + (i > 4 ? 18 : 0);
+    pts.push([x, y]);
+  }
+  var seg = "";
+  for(var j = 1; j < pts.length; j++){
+    seg += '<line x1="' + pts[j - 1][0] + '" y1="' + pts[j - 1][1] + '" x2="' + pts[j][0] + '" y2="' + pts[j][1] + '" stroke="' + LINE_COLORS[j] + '" stroke-width="8" stroke-linecap="round"/>';
+  }
+  var stops = pts.map(function(pt, i){
+    var open = i <= S.best, done = i < S.best, ty = (i % 2 ? pt[1] + 34 : pt[1] - 22);
+    return '<g class="stop' + (open ? "" : " locked") + (done ? " done" : "") + '" data-i="' + i + '" tabindex="' + (open ? 0 : -1) + '" role="button" aria-label="' + STOPS[i].name + (open ? "" : " (locked)") + '">' +
+      '<circle class="ring" cx="' + pt[0] + '" cy="' + pt[1] + '" r="11" fill="#070910" stroke="' + LINE_COLORS[i] + '" stroke-width="4"/>' +
+      '<circle class="dot" cx="' + pt[0] + '" cy="' + pt[1] + '" r="4" fill="' + (open ? "#ffffff" : "#3a4256") + '"/>' +
+      '<text x="' + pt[0] + '" y="' + ty + '" text-anchor="middle">' + STOPS[i].name + '</text></g>';
+  }).join("");
+  $("map").innerHTML = '<svg viewBox="0 -10 ' + w + ' ' + (hgt + 20) + '" aria-label="Line map">' + seg + stops + '</svg>';
+  $("map").querySelectorAll(".stop").forEach(function(g){
+    var go = function(){ var i = +g.dataset.i; if(i <= S.best) rideStop(i); };
+    g.addEventListener("click", go);
+    g.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } });
+  });
+  var nx = Math.min(S.best, STOPS.length - 1);
+  $("playNext").textContent = S.best >= STOPS.length ? "Ride the line again" : "Ride to " + STOPS[nx].name;
+  $("keys").innerHTML = touchy ? "<b>Hold</b> left or right to move · <b>tap</b> or <b>swipe up</b> to jump · run onto a wall and it becomes the floor"
+    : "<b>← →</b> or <b>A D</b> to move · <b>Space</b> to jump · run onto a wall and it becomes the floor";
+}
+function toMap(){ S.mode = "map"; S.st = null; S.daily = null; input.left = input.right = false; renderMap(); showScreen("mapScreen"); }
+function rideStop(i){ ac(); S.stopIdx = i; S.daily = null; startStation(STOPS[i]); }
+function arrive(){
+  S.mode = "arrive"; SFX.arrive();
+  if(S.daily){ finishDaily(100); return; }
+  if(S.stopIdx + 1 > S.best){ S.best = S.stopIdx + 1; store.set("best", S.best); }
+  $("arriveName").textContent = STOPS[S.stopIdx].name;
+  var last = S.stopIdx === STOPS.length - 1;
+  $("arriveSub").textContent = last ? "end of the line" : "next stop " + STOPS[S.stopIdx + 1].name;
+  $("arriveNext").textContent = last ? "Back to the start" : "Next stop";
+  setTimeout(function(){ showScreen("arriveScreen"); $("arriveNext").focus(); }, 350);
+}
+$("arriveNext").addEventListener("click", function(){ rideStop(S.stopIdx === STOPS.length - 1 ? 0 : S.stopIdx + 1); });
+$("arriveMap").addEventListener("click", toMap);
+$("toMap").addEventListener("click", toMap);
+$("playNext").addEventListener("click", function(){ rideStop(Math.min(S.best, STOPS.length - 1)); });
+$("playDaily").addEventListener("click", function(){ playDaily(false); });
+
+function playDaily(practice){
+  ac();
+  var d = dailyInfo(), rec = store.get("daily", {});
+  S.daily = d; S.dailyFirst = !practice && rec.key !== d.key;
+  startStation(d.p, { color:"#46c2ff", label:"Today's route <b>#" + d.n + "</b>" + (S.dailyFirst ? "" : " · practice") });
+}
+function finishDaily(pct){
+  var d = S.daily, rec = store.get("daily", {});
+  if(S.dailyFirst){ rec = { key:d.key, pct:pct }; store.set("daily", rec); S.dailyFirst = false; }
+  S.mode = "daily";
+  var mine = rec.key === d.key ? rec.pct : pct;
+  var bar = ""; for(var i = 0; i < 10; i++) bar += i < Math.round(mine / 10) ? "🟧" : "⬛";
+  var text = "Outer Line · Route #" + d.n + "\n" + bar + " " + mine + "%\n" + (mine >= 100 ? "Arrived." : "Off the line at " + mine + "%.");
+  $("dailyHead").textContent = "today's route #" + d.n;
+  $("dailyPct").textContent = mine >= 100 ? "Arrived" : mine + "%";
+  $("shareText").textContent = text;
+  showScreen("dailyScreen");
+}
+$("copyShare").addEventListener("click", function(){
+  var t = $("shareText").textContent;
+  var ok = function(){ toast("Copied. Paste it anywhere."); }, no = function(){ var r = document.createRange(); r.selectNodeContents($("shareText")); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("Selected. Copy it from here."); };
+  try{ navigator.clipboard.writeText(t).then(ok, no); }catch(e){ no(); }
+});
+$("dailyAgain").addEventListener("click", function(){ playDaily(true); });
+$("dailyMap").addEventListener("click", toMap);
+
+// ---------------------------------------------------------------- loop
+var last = 0;
+function frame(ts){
+  var dt = last ? Math.min(.05, (ts - last) / 1000) : 0; last = ts;
+  // fixed substeps keep landings honest at low frame rates
+  var n = Math.max(1, Math.ceil(dt / .01));
+  for(var i = 0; i < n; i++) update(dt / n);
+  draw();
+  requestAnimationFrame(frame);
+}
+renderMap(); showScreen("mapScreen");
+requestAnimationFrame(frame);
+
+// Test hook (Playwright): ?test=1 only.
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, dailyParams:dailyParams, startStation:startStation, update:update, surf:surf, D:D };
+// The site's preview page can start a ride straight away: ?play=1 (next stop) or ?daily=1.
+// (An embedding page that inlines the game can't pass a query string, so it
+// sets window.__OL_START = "daily" | "play" before the game's script runs.)
+var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
+if(startWith === "daily") playDaily(false);
+else if(startWith === "play") rideStop(Math.min(S.best, STOPS.length - 1));
+})();
+</script>
+</body>
+</html>
