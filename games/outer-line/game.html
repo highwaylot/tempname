@@ -227,7 +227,7 @@ var FLOOR_L = 64, FLOOR_TINT = .2, FLOOR_WALL = .6, FLOOR_MIN_LUM = .15;
 // touches your speed. Uphills only follow a downhill and cost at most UP_SHARE
 // of what that downhill gave, so slowing down is rare. Top a hill fast enough
 // and you leave the ground: a crest.
-var JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 26, CARRY_MAX = .5, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 1.5, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = .8, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
+var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 26, CARRY_MAX = .5, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 1.5, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = .8, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
 var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
 // A station: rows of tiles, 1 = floor. One guaranteed path of `width`
@@ -416,7 +416,7 @@ addEventListener("resize", resize); resize();
 var S = {
   mode:"map", st:null, G:null, stopIdx:0, daily:null, dailyFirst:false,
   p:0, vl:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, rollV:0, side:0, t:0, arrived:false,
-  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, carry:0, pitch:0, tilt:0, row:0, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
+  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, carry:0, pitch:0, tilt:0, row:0, fellOff:false, sunk:false, holeT:0, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
   best: store.get("best", 0), bestStyle: store.get("bestStyle", {})
 };
 var input = { left:false, right:false, tuck:false, jumpQ:0 };
@@ -434,7 +434,7 @@ function startStation(params, opts){
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
-  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; input.jumpQ = 0;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; input.jumpQ = 0;
   S.roll = upAt(S.G, S.p); S.side = surf(S.G, S.p).s;
   S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
   S.label = opts.label || ("STOP " + String(S.stopIdx + 1).padStart(2, "0") + " · " + params.name);
@@ -702,7 +702,7 @@ function update(dt){
       var land = rr + Math.round(2 * vh / GRAV * sp / D), clear = true;
       // flying over a gap is fine; landing in one is not
       for(var gk = land - 2; gk <= land + 2; gk++) if(st.gap[gk]) clear = false;
-      if(clear){ S.grounded = false; S.vh = vh; S.airGap = false; S.airSide = false; S.airT = 0; trick("crest"); SFX.jump(); break; }
+      if(clear){ S.grounded = false; S.vh = vh; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; trick("crest"); SFX.jump(); break; }
     }
     S.row = row;
   }
@@ -727,18 +727,28 @@ function update(dt){
       if(S.landT < .16 && S.airT > .25) trick("hop");
       // a jump covers at most JUMP_ROWS rows: fast, it's a lower, flatter ollie,
       // so speed never carries you over one gap and into the next
-      S.grounded = false; S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))); input.jumpQ = 0; S.airGap = false; S.airSide = false; S.airT = 0; SFX.jump();
+      S.grounded = false; S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))); input.jumpQ = 0; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; SFX.jump();
     }
-    else if(!tileAt(S.p, S.z)){ S.grounded = false; S.vh = 0; S.airGap = false; S.airSide = false; S.airT = 0; }
+    else if(!tileAt(S.p, S.z)){ S.grounded = false; S.vh = 0; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = true; S.holeT = 0; S.sunk = false; }
   }
   if(!S.grounded){
     S.airT += dt;
-    if(!tileAt(S.p, S.z)) S.airGap = true;
+    var under = tileAt(S.p, S.z);
+    if(!under) S.airGap = true;
     S.vh -= GRAV * dt; S.h += S.vh * dt;
+    // a hole you don't jump is a fall: roll off an edge and you get HOLE_GRACE
+    // seconds (a carve that brushes a hole's side) to be back over floor, which
+    // no forward crossing of a row fits inside at any speed; after that the far
+    // edge is a lip you hit, not ground you land on. A jump that comes up a
+    // little short still catches the lip, as before (down to .35 below).
+    if(!under){
+      if(S.fellOff){ S.holeT += dt; if(S.holeT >= HOLE_GRACE) S.sunk = true; }
+      else if(S.h < -.35) S.sunk = true;
+    }
     if(S.h <= 0 && S.vh < 0){
-      if(tileAt(S.p, S.z) && S.h > -.35){
+      if(under && S.h > -.35 && !S.sunk){
         var hard = S.vh < -12;
-        S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
+        S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; S.fellOff = false; S.sunk = false; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
         if(S.airGap){ var rowsCleared = Math.round(S.airT * sp / D); trick(rowsCleared >= 5 ? "big" : "gap"); }
         if(S.airSide) trick("xfer");
       }

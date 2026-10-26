@@ -221,6 +221,54 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await ctx.close();
 }
 
+// holes can't be skated over: a hole you don't jump is a fall at any speed,
+// a jump still clears it, and a carve that brushes a hole's side survives
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S, out = { glide: [], jump: 0, brush: 0, n: 0 };
+    const setup = (r, c, mult) => {
+      O.rideStop(0); const st = S.st, G = S.G, tw = G.S / st.C;
+      for(let k = r - 3; k <= r + 3; k++) st.rows[k].fill(1);
+      st.rows[r][c] = 0;
+      S.p = (c + .5) * tw; S.z = (r - 2) * O.D; S.vl = 0; S.carry = 0; S.grounded = true; S.h = 0; S.dead = 0;
+      O.input.left = O.input.right = false; O.input.jumpQ = 0; O.input.tuck = mult > 1.8;
+      return { st, tw };
+    };
+    for(const mult of [1, 1.4, 1.8, 2.07]){
+      let fell = 0;
+      for(let t = 0; t < 8; t++){
+        const r = 40 + t * 5, { st } = setup(r, 0, mult); const c = st.trail[r] + 1; st.rows[r].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * (S.G.S / st.C);
+        let died = false;
+        for(let i = 0; i < 120; i++){ S.vl = 0; S.flow = S.flowS = Math.min(1, (mult - 1) / .8); O.update(1 / 120); if(S.dead > 0){ died = true; break; } if(S.z > (r + 3) * O.D && S.grounded) break; }
+        if(died) fell++;
+      }
+      out.glide.push(mult + '×: ' + fell + '/8');
+      // the same hole, jumped
+      const r = 60, { st } = setup(r, 0, mult); const c = st.trail[r] + 1; st.rows[r].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * (S.G.S / st.C);
+      let died = false;
+      for(let i = 0; i < 180; i++){ S.vl = 0; S.flow = S.flowS = Math.min(1, (mult - 1) / .8); if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15; O.update(1 / 120); if(S.dead > 0){ died = true; break; } if(S.z > (r + 4) * O.D && S.grounded) break; }
+      if(!died) out.jump++;
+      O.input.tuck = false;
+    }
+    // brushing a hole's side: carve across the edge of a hole beside you and straight back
+    for(let t = 0; t < 8; t++){
+      const r = 40 + t * 5; O.rideStop(0); const st = S.st, G = S.G, tw = G.S / st.C, c = st.trail[r] + 1;
+      for(let k = r - 4; k <= r + 4; k++){ st.rows[k].fill(1); st.rows[k][c + 1] = 0; }
+      S.p = (c + .5) * tw + tw * .4; S.z = (r - 3) * O.D; S.grounded = true; S.h = 0; S.dead = 0; O.input.jumpQ = 0;
+      let died = false;
+      for(let i = 0; i < 60; i++){ S.vl = i < 4 ? 6 : -6; O.update(1 / 120); if(S.dead > 0){ died = true; break; } }
+      out.n++; if(!died) out.brush++;
+    }
+    return out;
+  });
+  ok(res.glide.every(x => /: 8\/8$/.test(x)), 'rolling over a hole without jumping is a fall at every speed (' + res.glide.join(', ') + '); it used to glide over from 1.4× base up');
+  ok(res.jump === 4, 'jumping the same hole still clears it at every speed (' + res.jump + '/4)');
+  ok(res.brush === res.n, 'a carve that brushes the side of a hole survives (' + res.brush + '/' + res.n + ')');
+  ok(errs.length === 0, 'no errors (holes)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
 // gaps you can see: the floor you ride is a lit surface at least 3:1 against
 // a hole, on every spot colour, measured on rendered pixels too
 {
