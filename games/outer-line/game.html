@@ -631,7 +631,9 @@ function trick(kind, extra){
   if(pops.length > 4) pops.shift();
   SFX.trick(S.combo);
   var tier = S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0;
-  if(tier > S.tier){ S.tier = tier; pops.push({ text:TIERS[tier] + "!", t:0, x:0, rot:-.04, big:true, color:"#ff2e88" }); SFX.tier(); }
+  if(tier > S.tier){ S.tier = tier; pops.push({ text:TIERS[tier] + "!", t:0, x:0, rot:-.04, big:true, color:"#ff2e88" }); SFX.tier(); if(tier === 2){ woosh(1.2); stuntSolo(); } }
+  if((S.combo >= 10 && S.combo % 10 === 0) || ((kind === "big" || kind === "xfer") && S.combo >= 8)) stuntSolo();
+  if(kind === "big") woosh(1);
   if(tier === 2) unlock("send");
   if(S.combo >= 20) unlock("combo");
   if(S.style >= 100000) unlock("gold");
@@ -680,6 +682,108 @@ var SFX = {
   tier: function(){ [0, 4, 7, 12].forEach(function(s, i){ var f = 523 * Math.pow(2, s / 12); tone(f, f, .16, "square", .05, i * .06); }); },
   arrive: function(){ [0, 4, 7, 12, 16].forEach(function(s, i){ var f = 392 * Math.pow(2, s / 12); tone(f, f * 1.01, .22, "triangle", .08, i * .08); }); }
 };
+
+// ---------------------------------------------------------------- music
+// Founder (2026-10-26): "space opera EDM, vibey French EDM … subtle in the
+// background, wooshes for speed, subtle too, and high-score stunts get a
+// cool guitar solo". This overrides the earlier effects-only rule for Outer
+// Line only. Everything is synthesized here (no samples to license). French
+// house in A minor at 122 BPM, four bars Am9 Fmaj7 Cmaj7 G6: a four-on-the-
+// floor kick that pumps the rest (sidechain), filtered disco chord stabs on
+// the offbeats over a soft pad, an octave-bouncing bass, offbeat hats, claps
+// on 2 and 4, and a spacey arpeggio through an echo once you're moving.
+// Energy (speed and flow) opens the chord filter; the menus muffle it.
+// The same code renders offline for checks (window.__ol.renderMusic).
+var M_BPM = 122, M_BEAT = 60 / M_BPM, M_STEP = M_BEAT / 4;
+var M_ROOTS = [45, 41, 48, 43];
+var M_CHORDS = [[57, 60, 64, 67, 71], [53, 57, 60, 64, 69], [52, 55, 59, 60, 64], [55, 59, 62, 64, 67]];
+var M_ARP = [0, 2, 4, 3, 1, 3, 4, 2];
+var M_LICK = [[69, 1], [72, 1], [74, 1], [76, 1], [79, 1], [81, 1], [83, 2, 84], [81, 1], [79, 1], [76, 1], [79, 1], [81, 2], [76, 1], [74, 2, 76], [72, 1], [69, 3]];
+function mhz(m){ return 440 * Math.pow(2, (m - 69) / 12); }
+function createMusic(ctx, dest, getState){
+  var out = ctx.createGain(); out.gain.value = .0001; out.connect(dest);       // everything; fades with scene and mute
+  var sweep = ctx.createBiquadFilter(); sweep.type = "lowpass"; sweep.Q.value = 1.1; sweep.frequency.value = 900; sweep.connect(out);   // the French-house filter: speed opens it
+  var duck = ctx.createGain(); duck.connect(sweep);                            // dips under the guitar
+  var pump = ctx.createGain(); pump.connect(duck);                             // the sidechain: all but the kick
+  var chordLP = ctx.createBiquadFilter(); chordLP.type = "lowpass"; chordLP.Q.value = 3; chordLP.frequency.value = 700; chordLP.connect(pump);
+  var echo = ctx.createDelay(1); echo.delayTime.value = M_STEP * 3; var fb = ctx.createGain(); fb.gain.value = .38; var echoLP = ctx.createBiquadFilter(); echoLP.type = "lowpass"; echoLP.frequency.value = 3000;
+  echo.connect(echoLP); echoLP.connect(fb); fb.connect(echo); echoLP.connect(pump);
+  var len = ctx.sampleRate, nb = ctx.createBuffer(1, len, ctx.sampleRate), nd = nb.getChannelData(0), x = 0x2545F491;
+  for(var i = 0; i < len; i++){ x ^= x << 13; x ^= x >>> 17; x ^= x << 5; nd[i] = (x >>> 0) / 2147483648 - 1; }
+  var step = 0, nextT = 0, level = 0, started = false;
+  function env(g, t, a, v, d){ g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(.0001, t + a + d); }
+  function noise(t, dur){ var src = ctx.createBufferSource(); src.buffer = nb; src.start(t, (t * 7.31) % .5, dur + .05); return src; }
+  function kick(t, v){ var o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(44, t + .12); env(g, t, .003, v, .3); o.connect(g); g.connect(duck); o.start(t); o.stop(t + .36);
+    pump.gain.setValueAtTime(.32, t); pump.gain.linearRampToValueAtTime(1, t + M_BEAT * .85); }
+  function hat(t, v, open){ var src = noise(t, open ? .16 : .04), f = ctx.createBiquadFilter(), g = ctx.createGain(); f.type = "highpass"; f.frequency.value = open ? 7000 : 9000; env(g, t, .002, v, open ? .14 : .03); src.connect(f); f.connect(g); g.connect(pump); }
+  function clap(t, v){ var src = noise(t, .2), f = ctx.createBiquadFilter(), g = ctx.createGain(); f.type = "bandpass"; f.frequency.value = 1400; f.Q.value = .8; g.gain.setValueAtTime(.0001, t);
+    [0, .012, .024].forEach(function(d){ g.gain.setValueAtTime(v, t + d); g.gain.exponentialRampToValueAtTime(v * .3, t + d + .01); }); g.gain.exponentialRampToValueAtTime(.0001, t + .18); src.connect(f); f.connect(g); g.connect(pump); }
+  function stab(t, notes, v, dur){ notes.forEach(function(m){ [-7, 7].forEach(function(c){ var o = ctx.createOscillator(), g = ctx.createGain(); o.type = "sawtooth"; o.frequency.value = mhz(m); o.detune.value = c; env(g, t, .006, v, dur); o.connect(g); g.connect(chordLP); o.start(t); o.stop(t + dur + .05); }); }); }
+  function pad(t, notes, v, dur){ notes.forEach(function(m, n){ var o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter(); o.type = n % 2 ? "triangle" : "sawtooth"; o.frequency.value = mhz(m - 12 * (n === 0 ? 1 : 0)); o.detune.value = (n - 2) * 4;
+    f.type = "lowpass"; f.frequency.value = 900; g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(v, t + dur * .35); g.gain.exponentialRampToValueAtTime(.0001, t + dur); o.connect(f); f.connect(g); g.connect(pump); o.start(t); o.stop(t + dur + .05); }); }
+  function bass(t, m, v){ var o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain(); o.type = "square"; o.frequency.value = mhz(m); f.type = "lowpass"; f.Q.value = 2; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(260, t + .12); env(g, t, .004, v, M_STEP * 1.7); o.connect(f); f.connect(g); g.connect(pump); o.start(t); o.stop(t + M_STEP * 2); }
+  function arp(t, m, v){ var o = ctx.createOscillator(), g = ctx.createGain(); o.type = "triangle"; o.frequency.value = mhz(m); env(g, t, .004, v, M_STEP * 1.4); o.connect(g); g.connect(echo); g.connect(pump); o.start(t); o.stop(t + M_STEP * 1.6); }
+  function play(k, t){
+    var st = getState(), e = st.energy, ride = st.ride, s = k % 16, bar = Math.floor(k / 16), ch = M_CHORDS[bar % 4], root = M_ROOTS[bar % 4];
+    if(s === 0) chordLP.frequency.setTargetAtTime(ride ? 700 + 3300 * e : 450, t, .25);
+    if(s % 4 === 0) sweep.frequency.setTargetAtTime(ride ? 600 * Math.pow(26, e) : 500, t, .3);   // 600 Hz muffled → ~15.6 kHz wide open
+    if(s === 0) pad(t, ch, ride ? .026 : .03, M_BEAT * 4);
+    if(s % 4 === 0 && (ride || s === 0)) kick(t, ride ? .24 : .12);
+    if(s === 4 || s === 12){ if(ride) clap(t, .05); }
+    if(s % 4 === 2){ hat(t, ride ? .045 : .025, true); stab(t, ch.slice(0, 4), ride ? .022 + .016 * e : .014, M_STEP * 1.6); }
+    if(ride && e > .55 && s % 2 === 1) hat(t, .022, false);
+    if(s % 2 === 0) bass(t, root + (s % 4 === 2 ? 12 : 0), ride ? .08 : .045);
+    if(ride && e > .3){ var a = M_ARP[s % 8]; arp(t, ch[a] + 12, .02 + .03 * e); }
+  }
+  return {
+    tick: function(until){
+      var st = getState(), want = st.on ? (st.ride ? 1 : .55) : 0;
+      if(want !== level){ level = want; out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(Math.max(.0001, MUSIC_VOL * want), ctx.currentTime, want ? .6 : .3); }
+      if(!st.on){ started = false; return; }
+      if(!started){ started = true; nextT = Math.max(ctx.currentTime + .05, nextT); }
+      while(nextT < until){ play(step, nextT); step++; nextT += M_STEP; }
+    },
+    // the guitar: a driven saw/square lead through a tanh drive, with bends and
+    // vibrato, playing an A-minor pentatonic run; the band dips under it
+    solo: function(t){
+      t = Math.max(t, ctx.currentTime + .02);
+      var o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), pre = ctx.createGain(), sh = ctx.createWaveShaper(), lp = ctx.createBiquadFilter(), pk = ctx.createBiquadFilter(), g = ctx.createGain(), vib = ctx.createOscillator(), vibG = ctx.createGain();
+      var curve = new Float32Array(1024); for(var c = 0; c < 1024; c++){ var xx = c / 512 - 1; curve[c] = Math.tanh(xx * 6); } sh.curve = curve;
+      o1.type = "sawtooth"; o2.type = "square"; o2.detune.value = 9; pre.gain.value = .7; lp.type = "lowpass"; lp.frequency.value = 3400; lp.Q.value = 1.2; pk.type = "peaking"; pk.frequency.value = 1200; pk.gain.value = 5; pk.Q.value = 1;
+      vib.frequency.value = 6.2; vibG.gain.value = 0; vib.connect(vibG); vibG.connect(o1.detune); vibG.connect(o2.detune);
+      o1.connect(pre); o2.connect(pre); pre.connect(sh); sh.connect(lp); lp.connect(pk); pk.connect(g); g.connect(out); g.connect(echo);
+      var tt = t, sixteenth = M_STEP * .9, sol = SOLO_VOL;
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(sol, t + .02);
+      M_LICK.forEach(function(nt){
+        var f = mhz(nt[0]), d = nt[1] * sixteenth;
+        [o1, o2].forEach(function(o){ o.frequency.setTargetAtTime(f, tt, .008); if(nt[2]) o.frequency.setTargetAtTime(mhz(nt[2]), tt + d * .35, d * .18); });
+        g.gain.setValueAtTime(sol * .75, tt); g.gain.linearRampToValueAtTime(sol, tt + .015);
+        tt += d;
+      });
+      vibG.gain.setValueAtTime(0, tt - 3 * sixteenth); vibG.gain.linearRampToValueAtTime(28, tt);
+      g.gain.setValueAtTime(sol, tt); g.gain.exponentialRampToValueAtTime(.0001, tt + .45);
+      [o1, o2, vib].forEach(function(o){ o.start(t); o.stop(tt + .5); });
+      duck.gain.setTargetAtTime(.45, t, .05); duck.gain.setTargetAtTime(1, tt, .25);
+      return tt + .5 - t;
+    },
+    // speed: a filtered-noise sweep, subtle
+    woosh: function(t, v){
+      t = Math.max(t, ctx.currentTime + .01);
+      var src = noise(t, .7), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      f.type = "bandpass"; f.Q.value = 1.1; f.frequency.setValueAtTime(350, t); f.frequency.exponentialRampToValueAtTime(2600, t + .45); f.frequency.exponentialRampToValueAtTime(900, t + .7);
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(WOOSH_VOL * v, t + .3); g.gain.exponentialRampToValueAtTime(.0001, t + .7);
+      src.connect(f); f.connect(g); g.connect(dest);
+    }
+  };
+}
+var MUSIC_VOL = .55, SOLO_VOL = .07, WOOSH_VOL = .07, SOLO_GAP = 7;
+var music = null, soloAt = -99;
+function musicState(){ var sp = speedNow(), top = S.st ? S.st.p.speed * ((1 + FLOW_MAX) * TUCK + HILL_TOP) * PACE : 1; return { on:!muted, ride:S.mode === "ride" && S.dead <= 0, energy:S.st ? clamp(.6 * (sp / top) / .55 + .4 * S.flow, 0, 1) : 0 }; }
+function musicTick(){ if(!AC || muted) { if(music) music.tick(0); return; } if(!music) music = createMusic(AC, AC.destination, musicState); music.tick(AC.currentTime + .15); }
+setInterval(musicTick, 25);
+function woosh(v){ if(music && AC && !muted) music.woosh(AC.currentTime, v || 1); }
+// a stunt worth a solo: combo milestones, FULL SEND, a big gap or transfer at the top multiplier; not back to back
+function stuntSolo(){ if(!music || !AC || muted || S.t - soloAt < SOLO_GAP) return false; soloAt = S.t; music.solo(AC.currentTime); S.solos = (S.solos || 0) + 1; return true; }
 function syncMute(){ $("mute").textContent = muted ? "×" : "♪"; $("mute").setAttribute("aria-label", muted ? "Sound on" : "Sound off"); }
 $("mute").addEventListener("click", function(){ muted = !muted; store.set("muted", muted); syncMute(); if(!muted) tone(660, 880, .1, "triangle", .08); });
 syncMute();
@@ -771,6 +875,7 @@ function update(dt){
   S.carry = clamp(S.carry, CARRY_MIN * base, CARRY_MAX * base);
   // the camera tilts with the visual slope (already eased row by row), averaged over the last row so it can't jitter; no time lag to grow with speed
   S.pitch = (vgradeAt(S.z) + vgradeAt(S.z - D * .5) + vgradeAt(S.z - D)) / 3;
+  var steep = gr < -.07; if(steep && !S.wasSteep && S.grounded) woosh(.8); S.wasSteep = steep;
   S.tilt += ((gradeAt(S.z) + gradeAt(S.z - D * .5) + gradeAt(S.z - D)) / 3 - S.tilt) * Math.min(1, dt * 6);   // the real slope, for the whole-view shift
   var sp = speedNow(); S.z += sp * dt; S.topSpeed = Math.max(S.topSpeed, sp);
   // crest: tip over the top of a hill fast and you fly (never into a gap)
@@ -781,7 +886,7 @@ function update(dt){
       var land = rr + Math.round(2 * vh / GRAV * sp / D), clear = true;
       // flying over a gap is fine; landing in one is not
       for(var gk = land - 2; gk <= land + 2; gk++) if(st.gap[gk]) clear = false;
-      if(clear){ S.grounded = false; S.vh = vh; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; trick("crest"); SFX.jump(); break; }
+      if(clear){ S.grounded = false; S.vh = vh; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; trick("crest"); SFX.jump(); woosh(1.3); break; }
     }
     S.row = row;
   }
@@ -1269,7 +1374,7 @@ checkProgress(true);
 renderMap(); renderLocker(); showScreen("mapScreen");
 requestAnimationFrame(frame);
 
-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { makeCoins:makeCoins, vgradeAt:vgradeAt, tune:function(o){ if(o.BEND_K != null) BEND_K = o.BEND_K; if(o.HILL_VIS != null) HILL_VIS = o.HILL_VIS; if(o.GAP_FLAT != null) GAP_FLAT = o.GAP_FLAT; }, gradeAt:gradeAt, heightAt:heightAt, floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { renderMusic:function(secs, st, soloAt, wooshAt){ var oc = new OfflineAudioContext(1, Math.ceil(44100 * secs), 44100), m = createMusic(oc, oc.destination, function(){ return st; }); m.tick(secs); if(soloAt != null) m.solo(soloAt); if(wooshAt != null) m.woosh(wooshAt, 1); return oc.startRendering().then(function(buf){ return Array.from(buf.getChannelData(0)); }); }, musicState:musicState, makeCoins:makeCoins, vgradeAt:vgradeAt, tune:function(o){ if(o.BEND_K != null) BEND_K = o.BEND_K; if(o.HILL_VIS != null) HILL_VIS = o.HILL_VIS; if(o.GAP_FLAT != null) GAP_FLAT = o.GAP_FLAT; }, gradeAt:gradeAt, heightAt:heightAt, floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
 // An embedding page that inlines the game sets window.__OL_START first.
 var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : /[?&]forever=1(&|$)/.test(location.search) ? "forever" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
 if(startWith === "daily") playDaily(false);

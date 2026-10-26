@@ -323,6 +323,32 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await ctx.close();
 }
 
+// music: renders, follows speed, the guitar plays on a stunt, mute silences it
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  await page.click('#playNext'); await page.waitForTimeout(400);
+  const res = await page.evaluate(async () => {
+    const O = window.__ol, S = O.S, out = {};
+    const bright = async e => { const d = await O.renderMusic(10, { on: true, ride: true, energy: e }); let s = 0, s1 = 0; for(let i = 44100 * 3; i < d.length; i++){ s += d[i] * d[i]; const df = d[i] - d[i - 1]; s1 += df * df; } return { db: 10 * Math.log10(s / (d.length - 44100 * 3)), b: Math.sqrt(s1 / s) }; };
+    const lo = await bright(.1), hi = await bright(.9); out.loDb = lo.db; out.hiDb = hi.db; out.brightRatio = hi.b / lo.b;
+    // ride the real game to FULL SEND: a stunt solo fires
+    S.solos = 0; const st = S.st, G = S.G, tw = G.S / st.C; let steps = 0;
+    while(S.mode === 'ride' && !S.solos && steps < 120 * 40){ const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D)); const t = (st.trail[row] + st.width / 2) * tw, d = ((t - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2; const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7)); O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4; if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15; O.update(1 / 120); steps++; }
+    O.input.left = O.input.right = false;
+    out.solos = S.solos || 0; out.onBefore = O.musicState().on;
+    return out;
+  });
+  await page.click('#mute');
+  const mutedOn = await page.evaluate(() => window.__ol.musicState().on);
+  await page.click('#mute');
+  ok(res.hiDb < -25 && Math.abs(res.hiDb - res.loDb) < 2, 'the music sits in the background (' + res.hiDb.toFixed(1) + ' dBFS average while riding, under the effects)');
+  ok(res.brightRatio > 2, 'speed opens the music\'s filter: ' + res.brightRatio.toFixed(1) + '× brighter at full speed than slow, at the same loudness');
+  ok(res.solos >= 1, 'a stunt (FULL SEND, a combo milestone, a big gap at ×8) plays the guitar solo');
+  ok(res.onBefore && !mutedOn, 'the mute button silences the music too');
+  ok(errs.length === 0, 'no errors (music)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
 // glide and coins
 {
   const { ctx, page, errs } = await open({ width: 1280, height: 800 });
