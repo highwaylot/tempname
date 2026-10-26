@@ -305,7 +305,6 @@ var TRICKS = {
   hop:   { label:"HOP",       flow:.05, pts:80 },
   edge:  { label:"EDGE",      flow:.05, pts:150 }
 };
-var EGG_SPECKS = [[-.5, -.3, .018], [.35, -.5, .014], [.6, .1, .02], [-.2, .35, .016], [.15, .1, .012], [-.65, .4, .014], [.4, .55, .017], [-.1, -.6, .012], [.05, .7, .015]];
 var TIERS = ["ROLLING", "FLOWING", "FULL SEND"];
 function trick(kind, extra){
   var k = TRICKS[kind];
@@ -571,7 +570,7 @@ function draw(){
   $("flowTier").textContent = TIERS[S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0] + (S.combo > 1 ? "  ×" + Math.min(8, S.combo) : "");
   $("score").textContent = "STYLE " + S.style.toLocaleString("en-US");
 }
-// The rider: a green egg on a skateboard, seen from behind, riding the
+// The rider: a smooth green egg on a skateboard, seen from behind, riding the
 // board nose-first down the tunnel. The board is a real 3D quad (nose ahead, tail behind) that yaws
 // toward where you're carving; the feet stand on it side by side, facing
 // forward, and the egg turns a little into the carve. Squashes on a tuck and a
@@ -639,11 +638,8 @@ function drawSkater(proj, me, lean, f){
   var eg = ctx.createRadialGradient(-rx * .35 + turn * .4, cyE - ry * .35, k * .02, 0, cyE, ry * 1.15);
   eg.addColorStop(0, "#9df27a"); eg.addColorStop(.55, "#3fbf4a"); eg.addColorStop(1, "#1b6e2a");
   egg(); ctx.fillStyle = eg; ctx.fill();
-  ctx.save(); egg(); ctx.clip();
-  // speckles, fixed to the shell
-  ctx.fillStyle = "rgba(20,70,25,.45)";
-  for(var i = 0; i < EGG_SPECKS.length; i++){ var sp2 = EGG_SPECKS[i]; ctx.beginPath(); ctx.arc(sp2[0] * rx, cyE + sp2[1] * ry, k * sp2[2], 0, TAU); ctx.fill(); }
-  ctx.restore();
+  // a soft shine up top, so the shell reads as smooth and round
+  ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.beginPath(); ctx.ellipse(-rx * .38 + turn * .3, cyE - ry * .42, rx * .16, ry * .24, -.35, 0, TAU); ctx.fill();
   // a magenta beanie on top, leaning into the turn
   ctx.fillStyle = "#ff2e88"; ctx.beginPath(); ctx.ellipse(turn * .5, cyE - ry * .86, rx * .62, ry * .26, 0, Math.PI, 0); ctx.fill();
   ctx.fillRect(turn * .5 - rx * .66, cyE - ry * .88, rx * 1.32, ry * .1);
