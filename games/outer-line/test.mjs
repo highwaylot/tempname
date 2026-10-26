@@ -115,6 +115,35 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await ctx.close();
 }
 
+// gaps you can see: the floor you ride is a lit surface at least 3:1 against
+// a hole, on every spot colour, measured on rendered pixels too
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S, cols = ['#c6ff00', '#2ee6ff', '#ff2e88'];
+    const ratio = c => (O.relLum(c) + .05) / .05;
+    const byColour = cols.map(c => +ratio(O.floorColor(c)).toFixed(2));
+    // rendered: a floor tile and a hole on the side under the rider, a few rows ahead
+    const cv = document.getElementById('c'), g = cv.getContext('2d'), dpr = cv.width / innerWidth, px = [];
+    for(const idx of [0, 4, 8]){
+      O.rideStop(idx); const st = S.st, G = S.G, tw = G.S / st.C;
+      let found = null;
+      for(let r = 20; r < st.len - 10 && !found; r++) for(let c = 0; c < st.cols && !found; c++)
+        if(c % st.C < st.C - 1 && !st.rows[r][c] && st.rows[r][c + 1] && !st.gap[r] && st.rows[r - 1][c] && st.rows[r - 1][c + 1]) found = { r, c };
+      S.z = (found.r - 6) * O.D; S.p = (found.c + 1) * tw; S.roll = O.upAt(G, S.p); S.rollV = 0; S.mode = 'still'; S.h = 0; S.shake = 0; O.draw();
+      // sample the centre of that hole and of the floor tile beside it, through the frame's own camera
+      const at = (col, row) => { const a = O.surf(G, (col + .5) * tw), q = S.cam.proj(a.x, a.y, (row + .5) * O.D), d = g.getImageData(Math.round(q[0] * dpr), Math.round(q[1] * dpr), 1, 1).data; return O.relLum([d[0], d[1], d[2]]); };
+      px.push({ spot: st.p.name, dark: +at(found.c, found.r).toFixed(4), light: +at((found.c + 1) % st.cols, found.r).toFixed(4) });
+      S.mode = 'ride';
+    }
+    return { byColour, px };
+  });
+  ok(res.byColour.every(r => r >= 3), 'floor vs hole contrast is at least 3:1 on every spot colour (' + res.byColour.join(', ') + '; it was about 1.1)');
+  ok(res.px.every(p => (p.light + .05) / (p.dark + .05) >= 3), 'rendered frames show it: a hole vs the floor tile beside it, 6 rows ahead (' + res.px.map(p => p.spot + ' ' + ((p.light + .05) / (p.dark + .05)).toFixed(1) + ':1').join(', ') + ')');
+  ok(errs.length === 0, 'no errors (gap contrast)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
 // 2-3. real-time play on desktop
 {
   const { ctx, page, errs } = await open({ width: 1280, height: 800 });

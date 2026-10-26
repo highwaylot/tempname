@@ -218,6 +218,7 @@ var SPOT_COLORS = ["#c6ff00", "#c6ff00", "#c6ff00", "#2ee6ff", "#2ee6ff", "#2ee6
 // carries momentum, and slides to a stop instead of snapping.
 var R = 3, D = 1.6, GRAV = 32, JUMP_V = 10.5;
 var ACC = 46, AIR_ACC = 26, FRICTION = 1.5, AIR_FRICTION = .25, VL_BASE = 6.5, VL_FLOW = 3;
+var FLOOR_L = 64, FLOOR_TINT = .2, FLOOR_WALL = .6, FLOOR_MIN_LUM = .15;
 var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
 // A station: rows of tiles, 1 = floor. One guaranteed path of `width`
@@ -687,6 +688,18 @@ function retry(){
 // ---------------------------------------------------------------- render
 var stars = [];
 (function(){ var r = mulberry32(7); for(var i = 0; i < 260; i++) stars.push([r() * TAU, r(), .5 + r() * 1.6, r()]); })();
+// The floor colour for a spot: grey tinted with the spot colour, raised until
+// its luminance is at least FLOOR_MIN_LUM, so the floor you ride stays at
+// least 3:1 against a black hole whatever the spot colour (magenta tints
+// come out darker than lime at the same mix).
+var floorCache = {};
+function relLum(c){ var l = c.map(function(v){ v /= 255; return v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }); return .2126 * l[0] + .7152 * l[1] + .0722 * l[2]; }
+function floorColor(hex){
+  if(floorCache[hex]) return floorCache[hex];
+  var rgb = hexRgb(hex), t = [0, 1, 2].map(function(i){ return FLOOR_L * (1 - FLOOR_TINT) + rgb[i] * FLOOR_TINT; });
+  for(var n = 0; n < 40 && relLum(t) < FLOOR_MIN_LUM; n++) t = t.map(function(v){ return Math.min(255, v * 1.04); });
+  return floorCache[hex] = t;
+}
 function hexRgb(h){ var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
 function draw(){
   var flow = S.st ? S.flowS : 0, sp = speedNow();
@@ -713,7 +726,7 @@ function draw(){
   // normal, so changing walls never jumps it
   var mx = me.x + Math.cos(S.roll) * camH, my = me.y + Math.sin(S.roll) * camH;
   var camX = mx * .8, camY = my * .8;
-  S.cam = { up:up, x:camX, y:camY, z:camZ, f:1 - .24 * flow };
+  S.cam = { up:up, x:camX, y:camY, z:camZ, f:1 - .24 * flow, proj:proj };
   function proj(x, y, z){
     var dz = z - camZ; if(dz < .15) return null;
     var dx = x - camX, dy = y - camY;
@@ -721,6 +734,11 @@ function draw(){
   }
   var r0 = Math.max(0, Math.floor(camZ / D)), r1 = Math.min(st.len + 8, r0 + 70);
   var rgb = hexRgb(S.color), NEAR = .4;
+  // The floor is a lit surface and a hole is black: a hole has to read as
+  // missing floor at a glance, so tiles are drawn edge to edge (no dark seams
+  // that look like small holes) in a light grey tinted with the spot colour,
+  // brightest on the side you ride, and holes are filled solid black.
+  var TILE = floorColor(S.color);
   // how much each side is "the floor" right now, from the smoothed roll, so
   // the highlight slides across with the camera instead of flipping
   var sideW = [];
@@ -728,7 +746,7 @@ function draw(){
   for(var r = r1; r >= r0; r--){
     // rows are clipped at a near plane instead of vanishing whole, so tiles
     // slide out of the bottom of the screen rather than popping
-    var z0 = Math.max(r * D, camZ + NEAR), z1 = r * D + D * .94, row = r < st.len ? st.rows[r] : null;
+    var z0 = Math.max(r * D, camZ + NEAR), z1 = r * D + D, row = r < st.len ? st.rows[r] : null;
     if(z1 <= z0) continue;
     var fd = (r * D - camZ) / (70 * D), fog = Math.max(0, 1 - fd); fog = fog * fog * (3 - 2 * fog);
     if(fog <= 0) continue;
@@ -740,34 +758,33 @@ function draw(){
     var nextRow = r + 1 < st.len ? st.rows[r + 1] : null;
     for(var c = 0; c < st.cols; c++){
       if(row && !row[c]){
-        // a single hole: a faint red outline so it reads as a pit, not as nothing (full gap rows stay open)
-        if(st.gap[r] || lineA < .05) continue;
-        var hA = surf(G, c * tw + tw * .1), hB = surf(G, (c + 1) * tw - tw * .1);
+        // a hole: solid black, so the stars behind the tunnel don't fill it in
+        var hA = surf(G, c * tw), hB = surf(G, (c + 1) * tw);
         var h0 = proj(hA.x, hA.y, z0), h1 = proj(hB.x, hB.y, z0), h2 = proj(hB.x, hB.y, z1), h3 = proj(hA.x, hA.y, z1);
         if(!h0 || !h1 || !h2 || !h3) continue;
         ctx.beginPath(); ctx.moveTo(h0[0], h0[1]); ctx.lineTo(h1[0], h1[1]); ctx.lineTo(h2[0], h2[1]); ctx.lineTo(h3[0], h3[1]); ctx.closePath();
-        ctx.strokeStyle = "rgba(255,68,51," + (.28 * fog * lineA).toFixed(3) + ")"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = "rgba(0,0,0," + (.92 * fog).toFixed(3) + ")"; ctx.fill();
         continue;
       }
-      var A = surf(G, c * tw + tw * .04), B = surf(G, (c + 1) * tw - tw * .04);
+      var A = surf(G, c * tw), B = surf(G, (c + 1) * tw);
       var q0 = proj(A.x, A.y, z0), q1 = proj(B.x, B.y, z0), q2 = proj(B.x, B.y, z1), q3 = proj(A.x, A.y, z1);
       if(!q0 || !q1 || !q2 || !q3) continue;
       var w = sideW[Math.floor(c / st.C)];
       ctx.beginPath(); ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.lineTo(q3[0], q3[1]); ctx.closePath();
       if(finish){ ctx.fillStyle = ((r + c) % 2) ? "rgba(244,244,240," + (.8 * fog).toFixed(3) + ")" : "rgba(8,8,12," + (.9 * fog).toFixed(3) + ")"; ctx.fill(); continue; }
-      var shade = Math.round(20 + 10 * w);
-      ctx.fillStyle = "rgba(" + shade + "," + shade + "," + (shade + 10) + "," + (.96 * fog).toFixed(3) + ")";
+      var lit = (FLOOR_WALL + (1 - FLOOR_WALL) * w) * fog;
+      ctx.fillStyle = "rgb(" + Math.round(TILE[0] * lit) + "," + Math.round(TILE[1] * lit) + "," + Math.round(TILE[2] * lit) + ")";
       ctx.fill();
-      if(gapNext){ ctx.fillStyle = "rgba(255,68,51," + (.34 * fog).toFixed(3) + ")"; ctx.fill(); }
-      else if(landing){ ctx.fillStyle = "rgba(198,255,0," + (.2 * fog).toFixed(3) + ")"; ctx.fill(); }
+      if(gapNext){ ctx.fillStyle = "rgba(255,68,51," + (.55 * fog).toFixed(3) + ")"; ctx.fill(); }
+      else if(landing){ ctx.fillStyle = "rgba(198,255,0," + (.35 * fog).toFixed(3) + ")"; ctx.fill(); }
       // lips: any edge of this tile that drops into a hole lights up red
       if(row){
         var lipA = (gapNext ? 1 : .8) * fog * Math.max(lineA, gapNext ? .6 : 0);
         if(lipA > .02){
           ctx.strokeStyle = "rgba(255,68,51," + Math.min(1, lipA).toFixed(3) + ")";
           if(nextRow && !nextRow[c]){ ctx.lineWidth = gapNext ? 3 + 1.5 * w : 2; ctx.beginPath(); ctx.moveTo(q3[0], q3[1]); ctx.lineTo(q2[0], q2[1]); ctx.stroke(); }
-          // side lips are loudest on the floor you're riding, quieter up the walls
-          ctx.strokeStyle = "rgba(255,68,51," + Math.min(1, lipA * (.3 + .7 * w)).toFixed(3) + ")";
+          // side lips are loudest on the floor you're riding, quiet up the walls
+          ctx.strokeStyle = "rgba(255,68,51," + Math.min(1, lipA * .8 * w * w).toFixed(3) + ")";
           ctx.lineWidth = 1.6;
           if(!row[(c - 1 + st.cols) % st.cols]){ ctx.beginPath(); ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q3[0], q3[1]); ctx.stroke(); }
           if(!row[(c + 1) % st.cols]){ ctx.beginPath(); ctx.moveTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.stroke(); }
@@ -1008,7 +1025,7 @@ checkProgress(true);
 renderMap(); renderLocker(); showScreen("mapScreen");
 requestAnimationFrame(frame);
 
-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
 // An embedding page that inlines the game sets window.__OL_START first.
 var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : /[?&]forever=1(&|$)/.test(location.search) ? "forever" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
 if(startWith === "daily") playDaily(false);
