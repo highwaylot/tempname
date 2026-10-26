@@ -21,7 +21,7 @@
   html, body{ margin:0; height:100%; background:var(--void); color:var(--ink); font-family:var(--heavy); overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; }
   [hidden]{ display:none !important; }
   #c{ position:fixed; inset:0; width:100%; height:100%; display:block; }
-  .beanie canvas, .unlocks canvas{ position:static; display:block; }
+  .beanie canvas, .unl canvas{ position:static; display:block; }
 
   /* tape label */
   .tape{ display:inline-block; background:var(--tape); color:#111; font:900 italic 13px var(--heavy); letter-spacing:.04em; text-transform:uppercase; padding:5px 10px 4px; transform:rotate(-2deg); box-shadow:2px 3px 0 rgba(0,0,0,.45); }
@@ -88,10 +88,15 @@
   .beanie .how{ font:700 10px/1.3 var(--mono); letter-spacing:.04em; color:var(--dim); text-align:center; }
   .beanie.locked{ cursor:default; }
   .beanie.locked canvas{ opacity:.25; filter:grayscale(1); }
-  .beanie.on{ outline:3px solid var(--lime); outline-offset:-3px; }
+  .beanie.on{ box-shadow:inset 0 0 0 3px var(--lime), 4px 4px 0 rgba(0,0,0,.55); }
+  .beanie:focus-visible{ outline:3px solid var(--ink); outline-offset:3px; }
+  .beanie.new:not(.on)::after{ content:"NEW"; position:absolute; right:-6px; top:-8px; background:var(--mag); color:#fff; font:900 italic 10px var(--heavy); padding:3px 6px; transform:rotate(6deg); }
   .beanie.on::after{ content:"ON"; position:absolute; right:-6px; top:-8px; background:var(--lime); color:#111; font:900 italic 10px var(--heavy); padding:3px 6px; transform:rotate(6deg); }
   .unlocks{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  .unlocks canvas{ width:56px; height:56px; background:#14141c; box-shadow:3px 3px 0 rgba(0,0,0,.5); }
+  .unlocks .tape{ flex-basis:100%; max-width:max-content; }
+  .unl{ margin:0; display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .unl canvas{ width:56px; height:56px; background:#14141c; box-shadow:3px 3px 0 rgba(0,0,0,.5); }
+  .unl figcaption{ font:900 italic 12px/1.1 var(--heavy); text-transform:uppercase; text-align:center; max-width:72px; color:var(--lime); }
   @media (max-width: 560px){ .hud-top{ right:108px; } .spots{ grid-template-columns:repeat(2, minmax(0, 1fr)); } .locker{ grid-template-columns:repeat(3, minmax(0, 1fr)); } }
   @media (prefers-reduced-motion: reduce){ .hint{ transition:none; } }
 </style>
@@ -342,16 +347,19 @@ var BEANIES = [
   { id:"daily",   name:"Daily Moon",  how:"land today's route, first ride",  look:{ base:"#3a3f8f", band:"#2ee6ff", pom:"#2ee6ff", moon:"#f4f4f0" } },
   { id:"gold",    name:"Gold",        how:"100,000 style in one ride",       look:{ base:"#f0b90b", band:"#b8860b", pom:"#ffe680", shine:true } }
 ];
-var BEANIE_BY = {}; BEANIES.forEach(function(b){ BEANIE_BY[b.id] = b; });
-var owned = store.get("beanies", ["og"]); if(owned.indexOf("og") < 0) owned.unshift("og");
-var worn = BEANIE_BY[store.get("beanie", "og")] ? store.get("beanie", "og") : "og";
+var BEANIE_BY = Object.create(null); BEANIES.forEach(function(b){ BEANIE_BY[b.id] = b; });
+// stored values are cleaned on load: known ids only, no repeats, OG always,
+// and the worn one must be owned
+var owned = ["og"];
+(function(raw){ if(Array.isArray(raw)) raw.forEach(function(id){ if(typeof id === "string" && BEANIE_BY[id] && owned.indexOf(id) < 0) owned.push(id); }); })(store.get("beanies", []));
+var worn = (function(w){ return typeof w === "string" && BEANIE_BY[w] && owned.indexOf(w) >= 0 ? w : "og"; })(store.get("beanie", "og"));
 var fresh = [];   // unlocked since the last results screen
 function unlock(id, quiet){
   if(owned.indexOf(id) >= 0 || !BEANIE_BY[id]) return;
   owned.push(id); store.set("beanies", owned);
   if(quiet) return;
   fresh.push(id);
-  if(S.mode === "ride"){ pops.push({ text:"NEW BEANIE: " + BEANIE_BY[id].name.toUpperCase(), t:0, x:0, rot:-.05, big:true, color:"#ff2e88" }); if(pops.length > 4) pops.shift(); SFX.tier(); }
+  if(S.mode === "ride"){ pops.push({ text:"NEW BEANIE!", sub:BEANIE_BY[id].name.toUpperCase(), t:0, x:0, rot:-.05, big:true, color:"#ff2e88" }); if(pops.length > 4) pops.shift(); SFX.tier(); }
 }
 // progress unlocks; quiet on load so returning riders get theirs without a parade
 function checkProgress(quiet){
@@ -360,7 +368,7 @@ function checkProgress(quiet){
   if(S.best >= 5) unlock("nightbus", quiet);
   if(S.best >= 10) unlock("flag", quiet);
 }
-function wear(id){ if(owned.indexOf(id) < 0) return; worn = id; store.set("beanie", id); renderLocker(); }
+function wear(id){ if(owned.indexOf(id) < 0) return; worn = id; store.set("beanie", id); unseen = unseen.filter(function(x){ return x !== id; }); renderLocker(id); }
 // A beanie on an egg top: band at y (its top edge), w half-width, h dome height.
 function drawBeanie(c, L, x, y, w, h, pomR){
   var dome = function(){ c.beginPath(); c.ellipse(x, y + h * .08, w * .94, h, 0, Math.PI, 0); c.closePath(); };
@@ -383,36 +391,46 @@ function drawBeanie(c, L, x, y, w, h, pomR){
 function beanieCanvas(id){
   var cv2 = document.createElement("canvas"), r = 2; cv2.width = cv2.height = 72 * r;
   var c = cv2.getContext("2d"); c.scale(r, r);
-  var rx = 26, ry = 34, cyE = 52;
+  var rx = 30, ry = 40, cyE = 70;   // head and shoulders, so the hat is the star
   var eg = c.createRadialGradient(36 - rx * .35, cyE - ry * .35, 1, 36, cyE, ry * 1.15);
   eg.addColorStop(0, "#9df27a"); eg.addColorStop(.55, "#3fbf4a"); eg.addColorStop(1, "#1b6e2a");
   c.fillStyle = eg; c.beginPath(); c.ellipse(36, cyE, rx, ry, 0, 0, TAU); c.fill();
   c.fillStyle = "rgba(255,255,255,.22)"; c.beginPath(); c.ellipse(36 - rx * .38, cyE - ry * .42, rx * .16, ry * .24, -.35, 0, TAU); c.fill();
-  drawBeanie(c, BEANIE_BY[id].look, 36, cyE - ry * .88, rx * .66, ry * .3, 4.5);
+  drawBeanie(c, BEANIE_BY[id].look, 36, cyE - ry * .84, rx * .82, ry * .4, 5.5);
+  cv2.setAttribute("aria-hidden", "true");
   return cv2;
 }
-function renderLocker(){
+var unseen = [];   // earned but not yet looked at in the locker
+function renderLocker(focusId){
   var box = $("locker"); if(!box) return;
+  var hint = touchy ? "tap to wear" : "click to wear";
   box.innerHTML = "";
   BEANIES.forEach(function(b){
     var have = owned.indexOf(b.id) >= 0, btn = document.createElement("button");
-    btn.type = "button"; btn.className = "beanie" + (have ? "" : " locked") + (worn === b.id ? " on" : "");
-    if(!have) btn.disabled = true;
-    btn.setAttribute("aria-label", b.name + (have ? (worn === b.id ? ", wearing" : ", tap to wear") : ", locked: " + b.how));
+    btn.type = "button"; btn.dataset.id = b.id;
+    btn.className = "beanie" + (have ? "" : " locked") + (worn === b.id ? " on" : "") + (unseen.indexOf(b.id) >= 0 ? " new" : "");
+    // locked cards stay focusable so keyboard riders can read how to earn them
+    if(!have) btn.setAttribute("aria-disabled", "true"); else btn.setAttribute("aria-pressed", worn === b.id ? "true" : "false");
+    btn.setAttribute("aria-label", have ? b.name + (worn === b.id ? ", wearing" : ", " + hint) : "Locked beanie: " + b.how);
     btn.appendChild(beanieCanvas(b.id));
     var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = have ? b.name : "???"; btn.appendChild(nm);
-    var how = document.createElement("span"); how.className = "how"; how.textContent = have ? (worn === b.id ? "wearing" : "tap to wear") : b.how; btn.appendChild(how);
+    var how = document.createElement("span"); how.className = "how"; how.textContent = have ? (worn === b.id ? "wearing" : hint) : b.how; btn.appendChild(how);
     if(have) btn.addEventListener("click", function(){ wear(b.id); });
     box.appendChild(btn);
   });
   $("lockerCount").textContent = owned.length + " / " + BEANIES.length;
+  if(focusId){ var f = box.querySelector('[data-id="' + focusId + '"]'); if(f) f.focus(); }
 }
 // "new beanie" strip on a results screen; empties the fresh list
 function showUnlocks(el){
   el = $(el); el.innerHTML = "";
   if(!fresh.length){ el.hidden = true; return; }
   var tape = document.createElement("span"); tape.className = "tape mag"; tape.textContent = fresh.length > 1 ? "new beanies" : "new beanie"; el.appendChild(tape);
-  fresh.forEach(function(id){ el.appendChild(beanieCanvas(id)); var t = document.createElement("span"); t.className = "keys"; t.innerHTML = "<b>" + BEANIE_BY[id].name + "</b>"; el.appendChild(t); });
+  fresh.forEach(function(id){
+    var fig = document.createElement("figure"); fig.className = "unl"; fig.appendChild(beanieCanvas(id));
+    var cap = document.createElement("figcaption"); cap.textContent = BEANIE_BY[id].name; fig.appendChild(cap); el.appendChild(fig);
+    if(unseen.indexOf(id) < 0) unseen.push(id);
+  });
   el.hidden = false; fresh = [];
 }
 function trick(kind, extra){
@@ -422,7 +440,7 @@ function trick(kind, extra){
   var mult = Math.min(8, S.combo);
   S.style += Math.round(k.pts * mult * (1 + S.flow));
   S.flow = Math.min(1, S.flow + k.flow);
-  pops.push({ text:(extra || k.label) + (S.combo > 1 ? "  ×" + mult : ""), t:0, x:(Math.random() - .5) * .18, rot:-.08 + Math.random() * .06, big:kind === "big" || kind === "xfer" });
+  pops.push({ text:(extra || k.label) + (S.combo > 1 ? "  ×" + S.combo : ""), t:0, x:(Math.random() - .5) * .18, rot:-.08 + Math.random() * .06, big:kind === "big" || kind === "xfer" });
   if(pops.length > 4) pops.shift();
   SFX.trick(S.combo);
   var tier = S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0;
@@ -678,10 +696,14 @@ function draw(){
     var size = (pp.big ? 46 : 32) * Math.min(1.4, Math.min(W, H) / 700 + .4);
     ctx.save();
     ctx.translate(W / 2 + pp.x * W, H * (.22 + (pops.length - 1 - j) * .075) - tt * 26);
-    ctx.rotate(pp.rot); ctx.scale(sc, sc); ctx.globalAlpha = al;
+    ctx.rotate(pp.rot);
     ctx.font = "italic 900 " + Math.round(size) + "px 'Arial Black', Impact, system-ui, sans-serif";
+    // never wider than the screen, pop and shadow included
+    var fit = Math.min(1, W * .92 / ((ctx.measureText(pp.text).width + 4) * 1.15));
+    ctx.scale(sc * fit, sc * fit); ctx.globalAlpha = al;
     ctx.fillStyle = "#ff2e88"; ctx.fillText(pp.text, 4, 4);
     ctx.fillStyle = pp.color === "#ff2e88" ? "#c6ff00" : "#f4f4f0"; ctx.fillText(pp.text, 0, 0);
+    if(pp.sub){ ctx.font = "italic 900 " + Math.round(size * .6) + "px 'Arial Black', Impact, system-ui, sans-serif"; ctx.fillStyle = "#f4f4f0"; ctx.fillText(pp.sub, 0, size * .85); }
     ctx.restore();
   }
   ctx.restore();
@@ -695,7 +717,7 @@ function draw(){
   $("progFill").style.width = (prog * 100).toFixed(1) + "%";
   $("spd").firstChild.nodeValue = String(Math.round(sp * 10));
   $("flowFill").style.width = (S.flow * 100).toFixed(1) + "%";
-  $("flowTier").textContent = TIERS[S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0] + (S.combo > 1 ? "  ×" + Math.min(8, S.combo) : "");
+  $("flowTier").textContent = TIERS[S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0] + (S.combo > 1 ? "  ×" + S.combo : "");
   $("score").textContent = "STYLE " + S.style.toLocaleString("en-US");
 }
 // The rider: Scramble, a smooth green egg on a skateboard, seen from behind, riding the
@@ -792,7 +814,13 @@ function renderMap(){
   $("keys").innerHTML = touchy ? "<b>hold</b> a side to carve · <b>tap</b> or <b>swipe up</b> to jump · <b>hold both</b> to tuck · walls become floors · chain tricks for speed"
     : "<b>← →</b> carve · <b>↑</b> jump · <b>↓</b> tuck · walls become floors · chain wall rides, gaps and hops to build speed";
 }
-function toMap(){ S.mode = "map"; S.st = null; S.daily = null; input.left = input.right = input.tuck = false; fresh = []; renderMap(); renderLocker(); showScreen("mapScreen"); }
+function toMap(){
+  // quitting the first ride of the day still uses it up, as a fall would
+  if(S.mode === "ride" && S.daily && S.dailyFirst && S.st){ store.set("daily", { key:S.daily.key, pct:Math.min(99, Math.floor(S.z / D / S.st.len * 100)), style:S.style }); S.dailyFirst = false; }
+  S.mode = "map"; S.st = null; S.daily = null; input.left = input.right = input.tuck = false;
+  fresh.forEach(function(id){ if(unseen.indexOf(id) < 0) unseen.push(id); }); fresh = [];
+  renderMap(); renderLocker(); showScreen("mapScreen");
+}
 function rideStop(i){ ac(); S.stopIdx = i; S.daily = null; startStation(STOPS[i]); }
 function arrive(){
   S.mode = "arrive"; SFX.arrive();
@@ -806,6 +834,7 @@ function arrive(){
   var last = S.stopIdx === STOPS.length - 1;
   $("arriveNext").firstChild.textContent = last ? "Back to Dockyard" : "Next: " + STOPS[S.stopIdx + 1].name;
   showUnlocks("arriveUnlocks");
+  $("arriveNext")[$("arriveUnlocks").hidden ? "removeAttribute" : "setAttribute"]("aria-describedby", "arriveUnlocks");
   setTimeout(function(){ showScreen("arriveScreen"); $("arriveNext").focus(); }, 380);
 }
 $("arriveNext").addEventListener("click", function(){ rideStop(S.stopIdx === STOPS.length - 1 ? 0 : S.stopIdx + 1); });
@@ -831,6 +860,7 @@ function finishDaily(pct){
   $("dailyPct").textContent = mine >= 100 ? "LANDED" : mine + "%";
   $("shareText").textContent = text;
   showUnlocks("dailyUnlocks");
+  $("copyShare")[$("dailyUnlocks").hidden ? "removeAttribute" : "setAttribute"]("aria-describedby", "dailyUnlocks");
   showScreen("dailyScreen");
 }
 $("copyShare").addEventListener("click", function(){

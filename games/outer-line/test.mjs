@@ -145,7 +145,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   ok(arr.owned.includes('lime') && /Lime Rib/.test(arr.strip || ''), 'landing Dockyard unlocks Lime Rib and the arrival card says so');
   // FULL SEND mid-ride earns Full Send with a callout
   await page.click('#arriveAgain'); await page.waitForTimeout(200);
-  const send = await page.evaluate(() => { const O = window.__ol, S = O.S; S.flow = .62; S.tier = 1; O.input.left = O.input.right = false; S.p += S.G.S; S.grounded = true; S.h = 0; S.wallT = -9; for(let i = 0; i < 40; i++) O.update(1 / 120); return { owned: O.owned(), pop: O.pops.some(p => /NEW BEANIE: FULL SEND/.test(p.text)) }; });
+  const send = await page.evaluate(() => { const O = window.__ol, S = O.S; S.flow = .62; S.tier = 1; O.input.left = O.input.right = false; S.p += S.G.S; S.grounded = true; S.h = 0; S.wallT = -9; for(let i = 0; i < 40; i++) O.update(1 / 120); return { owned: O.owned(), pop: O.pops.some(p => p.text === "NEW BEANIE!" && p.sub === "FULL SEND") }; });
   ok(send.owned.includes('send') && send.pop, 'hitting FULL SEND unlocks the Full Send beanie mid-ride, with a callout');
   // wear it, survive a reload; locked beanies can't be worn
   await page.keyboard.press('Escape'); await page.waitForTimeout(100);
