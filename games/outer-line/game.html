@@ -227,7 +227,7 @@ var FLOOR_L = 64, FLOOR_TINT = .2, FLOOR_WALL = .6, FLOOR_MIN_LUM = .15;
 // touches your speed. Uphills only follow a downhill and cost at most UP_SHARE
 // of what that downhill gave, so slowing down is rare. Top a hill fast enough
 // and you leave the ground: a crest.
-var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 26, CARRY_MAX = .5, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 1.5, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = .8, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
+var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 40, CARRY_MAX = .9, HILL_TOP = .6, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 1.8, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = 1.2, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
 var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
 // A station: rows of tiles, 1 = floor. One guaranteed path of `width`
@@ -239,7 +239,7 @@ var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, F
 function buildStation(p, seedOverride){
   var rng = mulberry32((seedOverride != null ? seedOverride : p.seed) * 2654435761 >>> 0);
   var cols = p.N * p.C, rows = [], path = Math.floor(rng() * cols), drift = 0, start = path, trail = [];
-  var tileW = 2 * R * Math.sin(Math.PI / p.N) / p.C, vTop = p.speed * (1 + FLOW_MAX) * TUCK;
+  var tileW = 2 * R * Math.sin(Math.PI / p.N) / p.C, vTop = p.speed * ((1 + FLOW_MAX) * TUCK + HILL_TOP);
   var keep = Math.ceil((2 * Math.sqrt(tileW / ACC) + .08) * vTop / D) + 1, hist = [];
   var START = 12, END = 8;
   for(var r = 0; r < p.len; r++){
@@ -347,7 +347,7 @@ function buildForever(seed){
       var r = rows.length, f = foreverAt(r), row = new Uint8Array(cols);
       if(r < START){ row.fill(1); rows.push(row); trail.push(path); wid.push(3); continue; }
       // after a sideways shift the old column stays long enough to step across at this speed
-      var keep = Math.ceil((2 * Math.sqrt(tileW / ACC) + .08) * f.speed * (1 + FLOW_MAX) * TUCK / D) + 1;
+      var keep = Math.ceil((2 * Math.sqrt(tileW / ACC) + .08) * f.speed * ((1 + FLOW_MAX) * TUCK + HILL_TOP) / D) + 1;
       if(r % 2 === 0){
         if(rng() < .35) drift = rng() < .5 ? -1 : 1;
         if(rng() < .3) drift = 0;
@@ -424,9 +424,9 @@ var pops = [];   // trick callouts drawn on the canvas
 
 // Speed follows flow and the tuck through a short ease, so a trick is a
 // surge rather than a jolt.
-// Carry lifts you toward the top speed a spot is built for (full flow, tucked)
-// but never past it, so every layout stays as fair as it was designed.
-function speedNow(){ if(!S.st) return 0; var b = S.st.p.speed; return Math.min(b * (1 + FLOW_MAX) * TUCK, b * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) + S.carry); }
+// Carry lifts you past the flat-ground top (full flow, tucked) by up to
+// HILL_TOP × base on a downhill; every layout is built for that top speed.
+function speedNow(){ if(!S.st) return 0; var b = S.st.p.speed; return Math.min(b * ((1 + FLOW_MAX) * TUCK + HILL_TOP), b * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) + S.carry); }
 
 function startStation(params, opts){
   opts = opts || {};
@@ -812,7 +812,7 @@ function draw(){
   var cx = W / 2 + shx, cy = H * .48 + shy - (S.st ? S.tilt : 0) * H * VIEW_TILT;
   // a wider lens as you speed up
   var rush = S.st ? clamp(S.carry / (S.st.p.speed * CARRY_MAX), 0, 1) : 0;
-  var f = Math.min(W, H) * .9 * (1 - .24 * flow - .08 * rush);
+  var f = Math.min(W, H) * .9 * (1 - .24 * flow - .16 * rush);
   var roll = S.st ? S.roll - Math.PI / 2 : 0;
   // stars stream past at speed
   for(var i = 0; i < stars.length; i++){
@@ -909,8 +909,8 @@ function draw(){
     }
   }
   // speed lines
-  var nLines = Math.round(10 + 70 * flow + 20 * S.tuckS + 30 * rush);
-  ctx.strokeStyle = "rgba(255,255,255," + (.06 + .18 * flow).toFixed(3) + ")"; ctx.lineWidth = 2;
+  var nLines = Math.round(10 + 70 * flow + 20 * S.tuckS + 60 * rush);
+  ctx.strokeStyle = "rgba(255,255,255," + (.06 + .18 * flow + .14 * rush).toFixed(3) + ")"; ctx.lineWidth = 2;
   ctx.beginPath();
   for(var k = 0; k < nLines; k++){
     var ang = (k * 2.399 + S.t * 3) % TAU, r1s = Math.max(W, H) * (.35 + ((k * .618 + S.linePh) % 1) * .5), r2s = r1s + 30 + sp * 3 * (.5 + flow);

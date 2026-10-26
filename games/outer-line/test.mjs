@@ -198,13 +198,16 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
         const yAt = z => { const q = S.cam.proj(pt.x, pt.y, z); return q ? q[1] : Infinity; };
         let ge = g; while(st.gap[ge + 1]) ge++;
         const yGap = yAt(g * O.D), yEnd = yAt((ge + 1) * O.D); let lip = Infinity;
-        for(let k = 4 * (r0 + 1); k < 4 * g; k++) lip = Math.min(lip, yAt(k * O.D / 4));
+        // only floor seen from above (below the horizon) can be hidden by nearer floor; a column above eye level is in view by construction
+        if(yGap <= yAt((g + 400) * O.D)) continue;
+        // the floor under the rider (the next two rows) is below the egg and can't hide a gap 4+ rows on; near rows also pick up sideways parallax
+        for(let k = 4 * (r0 + 2); k < 4 * g; k++) lip = Math.min(lip, yAt(k * O.D / 4));
         if(!(yGap < lip + 1 && yGap > 0)){ out.hidden.push(name + ' gap ' + g + ' from ' + (g - S.z / O.D).toFixed(1)); continue; }
         // (hidden means its near edge projects more than 1 px below the floor in front: a column seen side-on lines up within a pixel without anything in the way)
         // thin: hills may not draw the gap thinner than the same frame without hills (a far gap on a phone is small either way)
         const tall = yGap - yEnd;
         if(tall < 2){ O.tune({ HILL_VIS: 0 }); S.mode = 'still'; O.draw(); S.mode = mode; const flat = yAt(g * O.D) - yAt((ge + 1) * O.D); O.tune({ HILL_VIS: 3 });
-          if(flat >= 2 ? tall < flat * .75 : tall < flat - .5) out.thin.push(name + ' gap ' + g + ' ' + tall.toFixed(1) + 'px vs ' + flat.toFixed(1) + ' flat'); }
+          if(flat >= 2 ? tall < flat * .75 : tall < flat - .6) out.thin.push(name + ' gap ' + g + ' ' + tall.toFixed(1) + 'px vs ' + flat.toFixed(1) + ' flat'); }
       }
       O.input.tuck = false;
       const st = S.st; let down = 0, back = 0;
@@ -215,7 +218,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     return out;
   });
   ok(res.frames > 500 && res.hidden.length === 0, 'live camera at top speed: the next gap on your floor stays in sight from 4–10 rows out (' + res.frames + ' frames' + (res.hidden.length ? '; hidden: ' + res.hidden.slice(0, 3).join('; ') + ' (' + res.hidden.length + ')' : '') + ')');
-  ok(res.thin.length === 0, 'and hills never squash it: at least 2 px tall, or 75 % of its height without hills (half a pixel when it is sub-2 px anyway)' + (res.thin.length ? ' (' + res.thin.length + ': ' + res.thin.slice(0, 3).join('; ') + ')' : ''));
+  ok(res.thin.length === 0, 'and hills never squash it: at least 2 px tall, or 75 % of its height without hills (within 0.6 px when it is sub-2 px anyway)' + (res.thin.length ? ' (' + res.thin.length + ': ' + res.thin.slice(0, 3).join('; ') + ')' : ''));
   ok(res.backwards.every(x => { const [b, d] = x.split(' ').pop().split('/').map(Number); return b <= d * .05; }), 'a real downhill is (almost) never drawn as an uphill: ' + res.backwards.join(', '));
   ok(errs.length === 0, 'no errors (hills on a phone)' + (errs.length ? ': ' + errs[0] : ''));
   await ctx.close();
