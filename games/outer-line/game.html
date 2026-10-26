@@ -232,7 +232,7 @@ var FLOOR_L = 64, FLOOR_TINT = .2, FLOOR_WALL = .6, FLOOR_MIN_LUM = .15;
 // Coins hang where air takes you: arcs over jump-gaps, glide lines off crests,
 // rows down the downhills.
 var GLIDE_MAX = .8, GLIDE_FALL = 2.2, GLIDE_GRAV = .25, GLIDE_DRAG = .18, CREST_ROWS = 13, COIN_R = .55, COIN_CHAIN_T = .7;
-var glideTold = false;
+var glideTold = false, PACE = .85;
 var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 55, CARRY_MAX = 1.3, HILL_TOP = 1, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 2, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = 1.2, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
 var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
@@ -457,7 +457,9 @@ var pops = [];   // trick callouts drawn on the canvas
 // surge rather than a jolt.
 // Carry lifts you past the flat-ground top (full flow, tucked) by up to
 // HILL_TOP × base on a downhill; every layout is built for that top speed.
-function speedNow(){ if(!S.st) return 0; var b = S.st.p.speed; return Math.min(b * ((1 + FLOW_MAX) * TUCK + HILL_TOP), b * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) + S.carry); }
+// PACE scales all forward motion (founder: "80 out of 100, 68 would be perfect")
+function speedNow(){ return speedRaw() * PACE; }
+function speedRaw(){ if(!S.st) return 0; var b = S.st.p.speed; return Math.min(b * ((1 + FLOW_MAX) * TUCK + HILL_TOP), b * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) + S.carry); }
 
 function startStation(params, opts){
   opts = opts || {};
@@ -750,8 +752,8 @@ function update(dt){
   // crest: tip over the top of a hill fast and you fly (never into a gap)
   var row = Math.floor(S.z / D);
   if(row !== S.row){
-    for(var rr = S.row + 1; rr <= row; rr++) if(st.crest[rr] && S.grounded && sp > base * CREST_SPEED){
-      var vh = Math.min(clamp(4 + (sp - base * CREST_SPEED) * .8, 4, 11), GRAV * CREST_ROWS * D / (2 * sp));
+    for(var rr = S.row + 1; rr <= row; rr++) if(st.crest[rr] && S.grounded && sp > base * PACE * CREST_SPEED){
+      var vh = Math.min(clamp(4 + (sp / PACE - base * CREST_SPEED) * .8, 4, 11), GRAV * CREST_ROWS * D / (2 * sp));
       var land = rr + Math.round(2 * vh / GRAV * sp / D), clear = true;
       // flying over a gap is fine; landing in one is not
       for(var gk = land - 2; gk <= land + 2; gk++) if(st.gap[gk]) clear = false;
