@@ -39,7 +39,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
       let deaths = 0, steps = 0, lastDead = 0;
       while(S.mode === 'ride' && steps < 60 * 120){
         const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
-        const target = (st.trail[row] + st.width / 2) * tw;
+        const target = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw;
         let d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
         // steer like a skater: aim a sideways speed at the target and hold
         // whichever key closes the difference (momentum, not teleporting)
@@ -78,7 +78,8 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
       O.startStation({ name: 'Forever', forever: true, seed }, {});
       const G = S.G; let steps = 0;
       while(S.mode === 'ride' && S.z / O.D < DEEP && steps < 120 * 600){
-        const st = S.st, tw = G.S / st.C, row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+        // look ahead ~0.16 s, as a rider does at top speed (needed past row ~1,800 at 40 units/s)
+        const st = S.st, tw = G.S / st.C, row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * .6, O.speedNow() * .16)) / O.D));
         const target = (st.trail[row] + st.wid[row] / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
         const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
         O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
@@ -127,7 +128,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
         let n = 0, down = 0, up = 0, slow = 0, launched = 0, steps = 0, top = 0;
         while(S.mode === 'ride' && steps < 120 * 60){
           const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
-          const target = (st.trail[row] + st.width / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
+          const target = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
           const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
           O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
           if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
@@ -144,9 +145,9 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
       for(let g = 14; g < st.len; g++){
         if(!st.gap[g] || st.gap[g - 1]) continue;
         for(let back = 4; back <= 10; back++){
-          const r0 = g - back; S.z = r0 * O.D; S.p = (st.trail[r0] + st.width / 2) * tw; S.roll = O.upAt(G, S.p); S.rollV = 0;
+          const r0 = g - back; S.z = r0 * O.D; S.p = (st.trail[r0] + (st.wid ? st.wid[r0] : st.width) / 2) * tw; S.roll = O.upAt(G, S.p); S.rollV = 0;
           S.pitch = O.vgradeAt(S.z); S.h = 0; S.flowS = .5; S.mode = 'still'; O.draw();
-          const col = (st.trail[g] + st.width / 2) * tw, pt = O.surf(G, col);
+          const col = (st.trail[g] + (st.wid ? st.wid[g] : st.width) / 2) * tw, pt = O.surf(G, col);
           const yAt = z => { const q = S.cam.proj(pt.x, pt.y, z); return q ? q[1] : Infinity; };
           const yGap = yAt(g * O.D); let lip = Infinity;
           for(let k = 4 * (r0 + 1); k < 4 * g; k++) lip = Math.min(lip, yAt(k * O.D / 4));
@@ -272,6 +273,63 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await ctx.close();
 }
 
+// corridors: stripped to one or two lines, passable by construction, one new
+// shape per stop, in every mode, and hard-but-fair for a middle-skill rider
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S, out = { stops: [], bad: [] };
+    const check = (st, name) => {
+      const pr = st.pieceRow || [], cols = st.cols; let n = 0;
+      for(let r = 0; r < st.len; r++){
+        if(!pr[r]) continue; n++;
+        const row = st.rows[r], floor = row.reduce((a, v) => a + v, 0);
+        if(floor && floor / cols > .4) out.bad.push(name + ' row ' + r + ' is ' + floor + '/' + cols + ' floor');
+        const nx = st.rows[r + 1]; if(floor && pr[r + 1] && nx.some(v => v) && !row.some((v, c) => v && nx[c])) out.bad.push(name + ' row ' + r + ' has no floor in common with the next');
+      }
+      (st.pieces || []).forEach(pc => { let last = null, since = 99; for(let r = pc.start; r < pc.end; r++){ if(st.gap[r]) { last = null; continue; } const t = st.trail[r]; if(last != null && t !== last){ const step = Math.min((t - last + cols) % cols, (last - t + cols) % cols); if(step > 1 || since < pc.K.Kd - 1) out.bad.push(name + ' ' + pc.kind + ' row ' + r + ' line moves ' + step + ' after ' + since + ' rows (Kd ' + pc.K.Kd + ')'); since = 0; } else since++; last = t; } });
+      return n / st.len;
+    };
+    for(let i = 0; i < 10; i++){ O.rideStop(i); const st = S.st; out.stops.push({ name: st.p.name, share: check(st, st.p.name), kinds: (st.pieces || []).map(pc => pc.kind) }); }
+    let daily = 0; for(let n = 1; n <= 30; n++){ const st = O.buildStation(O.dailyParams(n)); check(st, 'route ' + n); daily += (st.pieces || []).length; } out.daily = daily;
+    O.startStation({ name: 'Forever', forever: true, seed: 3 }, {}); for(let k = 0; k < 10; k++) S.st.extend(300); check(S.st, 'forever'); out.forever = (S.st.pieces || []).map(pc => pc.kind);
+    // a middle-skill rider (reacts every ~0.17 s, aims within ±0.5 tile, varied jump timing), falls per minute inside corridors
+    let seed = 3; const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    out.mid = []; out.lines = 0; out.piecesRidden = 0;
+    for(let i = 0; i < 10; i++){
+      let inT = 0, inF = 0;
+      for(let run = 0; run < 4; run++){
+        O.rideStop(i); const G = S.G; let steps = 0, aimOff = 0, look = .6, jumpAt = .55, next = 0, lastDead = false;
+        while(S.mode === 'ride' && steps < 120 * 90){
+          const st = S.st, tw = G.S / st.C;
+          if(steps >= next){ next = steps + 21; aimOff = (rnd() - .5) * tw; look = .5 + rnd() * .5; jumpAt = .35 + rnd() * .86; }
+          const row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * look, O.speedNow() * .14 * look)) / O.D));
+          const target = (st.trail[row] + st.wid[row] / 2) * tw + aimOff, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
+          const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 6));
+          O.input.left = want - S.vl < -.6; O.input.right = want - S.vl > .6;
+          if(S.grounded && !O.tileAt(S.p, S.z + O.D * jumpAt)) O.input.jumpQ = .14;
+          O.update(1 / 120); steps++;
+          const inP = st.pieceRow && st.pieceRow[Math.floor(S.z / O.D)];
+          if(S.dead > 0 && !lastDead && inP) inF++; lastDead = S.dead > 0; if(S.dead === 0 && inP) inT += 1 / 120;
+        }
+        O.input.left = O.input.right = false; out.piecesRidden += (S.st.pieces || []).length; out.lines += S.lineCount || 0;
+      }
+      out.mid.push(inT ? inF / inT * 60 : 0);
+    }
+    return out;
+  });
+  const shares = res.stops.map(x => Math.round(x.share * 100));
+  ok(res.bad.length === 0, 'corridors are passable by construction: at most 40 % floor, every row shares floor with the next, the line moves one column at a time and never faster than the stop allows' + (res.bad.length ? ' (' + res.bad.length + ': ' + res.bad.slice(0, 3).join('; ') + ')' : ''));
+  ok(shares[0] === 0 && shares.every(x => x <= 42), 'Dockyard stays clean; at most ~40 % of any stop is stripped (' + shares.join('/') + ' %)');
+  const seen = new Set(); let order = true; res.stops.forEach((x, i) => { const fresh = x.kinds.filter(k => !seen.has(k)); if(fresh.length > 1) order = false; x.kinds.forEach(k => seen.add(k)); });
+  ok(order && seen.size === 6, 'one new corridor shape per stop, all six by Terminus (' + res.stops.map(x => x.kinds.join('+') || '–').join(', ') + ')');
+  ok(res.daily >= 30 && res.daily <= 60 && res.forever.length >= 8, 'every mode has them: ' + res.daily + ' corridors over 30 daily routes, ' + res.forever.length + ' in 3,400 rows of Forever');
+  ok(res.lines >= res.piecesRidden * .8, 'clearing a corridor without a fall scores LINE (' + res.lines + ' of ' + res.piecesRidden + ' corridors for the middle-skill rider)');
+  ok(res.mid.slice(2, 7).every(x => x <= 1.5) && res.mid.every(x => x <= 2.5), 'not punishing: a middle-skill rider falls ' + res.mid.map(x => x.toFixed(1)).join('/') + ' times a minute inside corridors (caps: 1.5 on stops 3–7, 2.5 on 8–10)');
+  ok(errs.length === 0, 'no errors (corridors)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
 // forgiveness: a late press still jumps, holding jump at an edge jumps, and a
 // fall on a spot respawns at the last gap landing with style and coins kept
 {
@@ -293,7 +351,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     O.input.jumpHeld = false; out.held = !died;
     // checkpoint: clear a gap, collect, then fall later and respawn at the landing
     O.rideStop(2); { const st = S.st, G = S.G, tw = G.S / st.C; let steps = 0;
-      while(S.mode === 'ride' && !S.check && steps < 120 * 30){ const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D)); const t = (st.trail[row] + st.width / 2) * tw, d = ((t - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2; const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7)); O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4; if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15; O.update(1 / 120); steps++; }
+      while(S.mode === 'ride' && !S.check && steps < 120 * 30){ const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D)); const t = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw, d = ((t - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2; const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7)); O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4; if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15; O.update(1 / 120); steps++; }
       O.input.left = O.input.right = false;
       const cz = S.check && S.check.z, style = S.style; S.z = cz + 20 * O.D; S.grounded = false; S.h = -1.3; S.vh = -5; S.fellOff = true; S.sunk = true;
       for(let i = 0; i < 200 && !(S.dead === 0 && S.falls > 0); i++) O.update(1 / 120);
@@ -352,10 +410,10 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     for(let i = 0; i < 10; i++){
       O.rideStop(i); const st = S.st, G = S.G, tw = G.S / st.C; let steps = 0;
       const gapStarts = st.gap.filter((g, r) => g && !st.gap[r - 1]).length, arcs = new Set(st.coins.filter(c => c.grp[0] === 'g').map(c => c.grp)).size;
-      const crests = st.crest.filter((c, r) => c && r < st.len - 8).length, crestLines = new Set(st.coins.filter(c => c.grp[0] === 'c').map(c => c.grp)).size;
+      const crests = st.crest.filter((c, r) => c && r < st.len - 8 && !(st.pieceRow && st.pieceRow.slice(r, r + 16).some(Boolean))).length, crestLines = new Set(st.coins.filter(c => c.grp[0] === 'c').map(c => c.grp)).size;
       while(S.mode === 'ride' && steps < 120 * 60){
         const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
-        const target = (st.trail[row] + st.width / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
+        const target = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
         const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
         O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
         if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
@@ -435,7 +493,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     let prev = null, prevUp = null, prevDu = 0, maxStep = 0, maxJerk = 0, sides = 0, side = S.side;
     for (let i = 0; i < 60 * 12 && S.mode === 'ride'; i++) {
       const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
-      const target = (st.trail[row] + st.width / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
+      const target = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
       const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
       O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
       if (S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;

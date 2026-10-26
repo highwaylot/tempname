@@ -211,9 +211,9 @@ var STOPS = [
   { name:"Lantern Market", N:8, C:2, len:190, speed:12.0, holes:.42, gapEvery:18, gapLen:2, width:2, seed:53 },
   { name:"Orbit Park",     N:8, C:2, len:200, speed:12.5, holes:.54, gapEvery:16, gapLen:3, width:2, seed:67 },
   { name:"Glass Bridge",   N:8, C:2, len:210, speed:13.0, holes:.62, gapEvery:15, gapLen:3, width:1, seed:71 },
-  { name:"Deep Siding",    N:6, C:3, len:220, speed:13.5, holes:.62, gapEvery:14, gapLen:3, width:1, seed:83 },
-  { name:"Comet Yard",     N:8, C:2, len:230, speed:14.0, holes:.70, gapEvery:13, gapLen:3, width:1, seed:97 },
-  { name:"Terminus",       N:6, C:3, len:260, speed:14.5, holes:.72, gapEvery:12, gapLen:3, width:1, seed:101 }
+  { name:"Deep Siding",    N:6, C:3, len:250, speed:13.5, holes:.62, gapEvery:14, gapLen:3, width:1, seed:83 },
+  { name:"Comet Yard",     N:8, C:2, len:270, speed:14.0, holes:.70, gapEvery:13, gapLen:3, width:1, seed:97 },
+  { name:"Terminus",       N:6, C:3, len:300, speed:14.5, holes:.72, gapEvery:12, gapLen:3, width:1, seed:101 }
 ];
 var SPOT_COLORS = ["#c6ff00", "#c6ff00", "#c6ff00", "#2ee6ff", "#2ee6ff", "#2ee6ff", "#ff2e88", "#ff2e88", "#ff2e88", "#ff2e88"];
 
@@ -274,10 +274,119 @@ function buildStation(p, seedOverride){
     }
     rows.push(row); trail.push(path);
   }
-  var st = { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:rows.length, start:start, trail:trail, width:p.width, gap:markGaps(rows) };
+  var st = { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:rows.length, start:start, trail:trail, width:p.width, wid:trail.map(function(){ return p.width; }) };
+  if(p.pieces) layPieces(st, p.pieces);
+  st.gap = markGaps(rows); runUps(st, 0, rows.length);
   addHills(st, hillGen((seedOverride != null ? seedOverride : p.seed) + 101), rows.length - END);
   makeCoins(st, mulberry32(((seedOverride != null ? seedOverride : p.seed) + 202) * 2654435761 >>> 0), 0, rows.length - END);
   return st;
+}
+
+// ---------------------------------------------------------------- corridors
+// Founder (2026-10-26): later on, corridors "stripped to hell, just one or two
+// lines … more complicated, but not sickeningly hard … interesting corridors
+// you have to manoeuvre, on all the modes". A corridor overrides a stretch of
+// rows: a full-floor run-up (checkpoint at its start), the piece (void except
+// one or two lines, no random holes, no surprise gaps, no crest launches), and
+// a full-floor breather. Passable by construction (the "line rule"):
+//  * a line is 1 tile straight; it moves one column at most every Kd rows,
+//    Kd chosen so the sideways speed it asks for is ≤ 60 % of the slowest
+//    steering top speed at this stop's top forward speed;
+//  * each row also keeps the line's columns from the previous E rows
+//    (E = a quarter second): bends get a 2-wide elbow, a late rider has floor;
+//  * hops (stones) only between straight stones that share a column.
+// Order follows teach → test → twist, one new shape per stop (sawtooth:
+// a breather after every piece, at most ~40 % of a stop stripped).
+function lineK(speed, N, C){
+  var tileW = 2 * R * Math.sin(Math.PI / N) / C, vTop = speed * ((1 + FLOW_MAX) * TUCK + HILL_TOP), rps = vTop * PACE / D;
+  var keep = Math.ceil((2 * Math.sqrt(tileW / ACC) + .08) * vTop / D) + 1, E = Math.ceil(.25 * rps);
+  return { keep:keep, E:E, Kd:Math.max(E, 3, Math.ceil(rps * tileW / (.6 * VL_BASE))) };
+}
+// a piece as rows of lines: { lines:[[startCol, width], …], tr: trail line, gap, alt: line index carrying reward coins }
+function pieceSpec(kind, o, c0, cols, C, K){
+  var out = [], push = function(lines, tr, gap, alt){ out.push({ lines:lines, tr:tr || 0, gap:!!gap, alt:alt }); };
+  var walk = function(c, steps, dir, hold, w){ for(var s = 0; s < steps; s++){ for(var k = 0; k < K.Kd; k++) push([[c, w]]); c += dir; } for(var h = 0; h < hold; h++) push([[c, w]]); return c; };
+  var i, c;
+  if(kind === "rail"){   // a funnel into a needle (a teaser stops at 3 wide)
+    for(i = 0; i < K.keep; i++) push([[c0 - 2, 5]]);
+    for(i = 0; i < K.keep; i++) push([[c0 - 1, 3]]);
+    for(i = 0; i < o.ln; i++) push(o.teaser ? [[c0 - 1, 3]] : [[c0, 1]]);
+  }
+  else if(kind === "slalom"){   // weave A columns each way, holding 4 rows at each side
+    for(i = 0; i < 4; i++) push([[c0 - 1, 3]]);
+    c = c0; for(var cy = 0; cy < o.cycles; cy++){ c = walk(c, o.A, 1, 4, 1); c = walk(c, o.A, -1, 4, 1); }
+  }
+  else if(kind === "fork"){   // split ±d, run, rejoin; the trail takes one branch, coins ride the other
+    for(i = 0; i < 2; i++) push([[c0, 1]]);
+    var a = c0, b = c0;
+    for(var st2 = 0; st2 < 3; st2++){ var dirA = st2 === 0 ? 1 : st2 === 2 ? -1 : 0, n = st2 === 1 ? 1 : o.d;
+      for(var s = 0; s < n; s++){ for(var k = 0; k < (st2 === 1 ? K.keep + 4 : K.Kd); k++) push([[a, 1], [b, 1]], 0, false, 1); a += dirA; b -= dirA; } }
+    for(i = 0; i < 2; i++) push([[c0, 1]]);
+  }
+  else if(kind === "cork"){   // one line winding round the tunnel, a short straight pause after each side
+    for(i = 0; i < 4; i++) push([[c0 - 1, 3]]);
+    c = c0; for(var sd = 0; sd < o.sides; sd++) c = walk(c, C, o.dir, 3, 1);
+  }
+  else if(kind === "twin"){   // two rails a side apart; crossovers swap the trail between them
+    var A = c0, B = c0 + C, onA = true;
+    for(i = 0; i < 6; i++) push([[A, 1], [B, 1]], 0);
+    for(var ph = 0; ph < o.phases; ph++){
+      var x = onA ? A : B, dir = onA ? 1 : -1;
+      for(var s2 = 0; s2 < C; s2++){ for(var k2 = 0; k2 < K.Kd; k2++) push([[A, 1], [B, 1], [x, 1]], 2); x += dir; }
+      onA = !onA;
+      for(i = 0; i < K.keep + 4; i++) push([[A, 1], [B, 1]], onA ? 0 : 1);
+    }
+  }
+  else if(kind === "stones"){   // 2-wide stones, each shifted a column (neighbours share one), G-row hops between
+    var L = Math.max(12 - o.G, K.keep);
+    for(var sk = 0; sk < o.n; sk++){
+      var sc = o.s > 0 ? c0 + sk : c0 - sk - 1;
+      for(i = 0; i < L; i++) push([[sc, 2]]);
+      if(sk < o.n - 1) for(i = 0; i < o.G; i++) push([], 0, true);
+    }
+  }
+  return out;
+}
+// lay a piece into rows at `start`: run-up, piece, breather. Returns the row after the breather.
+function applyPiece(st, start, kind, o){
+  var cols = st.cols, K = lineK(o.speed || st.p.speed, st.N, st.C), pad = K.keep + 2, br = K.keep + 4;
+  var wrap = function(c){ return ((c % cols) + cols) % cols; };
+  var c0 = st.trail[start], spec = pieceSpec(kind, o, c0, cols, st.C, K), end = start + spec.length;
+  st.wid = st.wid || []; st.pieceRow = st.pieceRow || []; st.cp = st.cp || []; st.pieceEnd = st.pieceEnd || []; st.pieceCoins = st.pieceCoins || [];
+  for(var r = start - pad; r < end + br; r++){ if(r < 0 || r >= st.rows.length) continue; if(r < start || r >= end){ st.rows[r].fill(1); if(st.wid[r] == null) st.wid[r] = st.width; } }
+  st.cp[start - pad] = 1;
+  for(var j = 0; j < spec.length; j++){
+    var rr = start + j, row = st.rows[rr]; row.fill(0); st.pieceRow[rr] = 1;
+    if(!spec[j].gap) for(var e = Math.max(0, j - K.E); e <= j; e++){ if(spec[e].gap) continue; spec[e].lines.forEach(function(l){ for(var w = 0; w < l[1]; w++) row[wrap(l[0] + w)] = 1; }); }
+    var tl = spec[j].lines[spec[j].tr] || spec[Math.max(0, j - 1)].lines[0] || [c0, 1];
+    if(spec[j].gap){ for(var f = j + 1; f < spec.length; f++) if(!spec[f].gap){ tl = spec[f].lines[0]; break; } }
+    st.trail[rr] = wrap(tl[0]); st.wid[rr] = tl[1];
+    // coins: along a single line every 3 rows; a reward branch every 2
+    if(!spec[j].gap && j % 3 === 1) st.pieceCoins.push({ r:rr + .5, col:wrap(tl[0]), w:tl[1], grp:"p" + start });
+    if(spec[j].alt != null && j % 2 === 0){ var al = spec[j].lines[spec[j].alt]; st.pieceCoins.push({ r:rr + .5, col:wrap(al[0]), w:al[1], grp:"a" + start }); }
+  }
+  for(var b = end; b < end + br && b < st.rows.length; b++) st.trail[b] = st.trail[Math.min(st.rows.length - 1, end + br)];
+  st.pieceEnd[end] = start; (st.pieces = st.pieces || []).push({ kind:kind, start:start, end:end, o:o, K:K });
+  return end + br;
+}
+// per stop: which pieces, where (fraction of the stop), with what settings
+var STOP_PIECES = [
+  [],
+  [["rail", .5, { teaser:1, ln:10 }]],
+  [["rail", .55, { ln:8 }]],
+  [["rail", .35, { ln:8 }], ["slalom", .7, { A:1, cycles:2 }]],
+  [["slalom", .33, { A:2, cycles:1 }], ["fork", .7, { d:1 }]],
+  [["cork", .45, { sides:3, dir:1 }]],
+  [["twin", .45, { phases:2 }]],
+  [["stones", .33, { G:2, n:3, s:1 }], ["fork", .72, { d:2 }]],
+  [["fork", .3, { d:1 }], ["slalom", .66, { A:2, cycles:2 }]],
+  [["stones", .33, { G:3, n:4, s:-1 }], ["cork", .68, { sides:2, dir:-1 }]]
+];
+STOPS.forEach(function(s2, i){ s2.pieces = STOP_PIECES[i]; });
+function layPieces(st, list){
+  var from = Infinity;
+  list.forEach(function(pc){ var start = Math.round(st.len * pc[1]); from = Math.min(from, start - 20); applyPiece(st, start, pc[0], pc[2]); });
+  return from;
 }
 // gap[r] = 1 when row r is a full gap (every tile gone): those get a red lip before and a lime landing after
 // Hills: a grade per row (negative is downhill), eased between segments, the
@@ -321,8 +430,8 @@ function addHills(st, gen, flatFrom, upto){
     // and in the run-up to a hold (beyond the 10 rows you get to see a gap from)
     // any visual uphill eases off, so a hold always starts level or downhill
     var vprev = r ? st.vgrade[r - 1] : 0, vt = st.grade[r], hold = false, pre = false;
-    for(var ga = r - GAP_AFTER; ga <= r + GAP_FLAT; ga++) if(st.gap[ga]){ hold = true; break; }
-    if(!hold) for(ga = r + GAP_FLAT + 1; ga <= r + GAP_FLAT + GAP_PRE; ga++) if(st.gap[ga]){ pre = true; break; }
+    for(var ga = r - GAP_AFTER; ga <= r + GAP_FLAT; ga++) if(st.gap[ga] || (st.pieceRow && st.pieceRow[ga])){ hold = true; break; }
+    if(!hold) for(ga = r + GAP_FLAT + 1; ga <= r + GAP_FLAT + GAP_PRE; ga++) if(st.gap[ga] || (st.pieceRow && st.pieceRow[ga])){ pre = true; break; }
     if(hold) vt = Math.min(Math.max(vt, vprev), Math.max(vprev, 0));
     else if(pre) vt = Math.min(vt, 0);
     st.vgrade[r] = vprev + (vt - vprev) * .3;
@@ -343,7 +452,7 @@ function makeCoins(st, rng, from, upto){
       for(var i = 0; i <= n; i++){ var t = i / n; add(a0 + (a1 - a0) * t, .35 + 1.25 * Math.sin(Math.PI * t), "g" + r); }
     }
     // a glide line off every crest: high and long, only for those who bring speed and hold glide
-    if(st.crest[r]){
+    if(st.crest[r] && !(st.pieceRow && st.pieceRow.slice(r, r + 16).some(Boolean))){
       for(var j = 0; j < 9; j++){ var cr = r + 2 + j * 1.4; if(st.gap[Math.floor(cr)] && j > 5) break; add(cr, 2.1 - j * .17, "c" + r); }
     }
     // a row of coins down some downhills
@@ -351,11 +460,28 @@ function makeCoins(st, rng, from, upto){
       for(var k = 0; k < 6; k++){ var dr = r + 1 + k; if(dr >= st.len || st.gap[dr]) break; add(dr + .5, .35, "d" + r); }
     }
   }
+  (st.pieceCoins || []).forEach(function(pc){ if(pc.r >= from && pc.r < upto) st.coins.push({ r:pc.r, lat:(pc.col + pc.w / 2) * tw, h:.35, grp:pc.grp, got:false }); });
   st.coinsTo = upto;
 }
 function gradeAt(z){ var st = S.st, r = z / D, i = Math.floor(r); if(!st.grade || i < 0) return 0; if(i >= st.grade.length - 1) return st.grade[st.grade.length - 1] || 0; return st.grade[i] + (st.grade[i + 1] - st.grade[i]) * (r - i); }
 function heightAt(z, real){ var st = S.st, r = z / D, i = Math.floor(r), h = real ? st.hgt : st.vhgt; if(!h || i < 0) return 0; if(i >= h.length - 1) return h[h.length - 1]; return h[i] + (h[i + 1] - h[i]) * (r - i); }
 function vgradeAt(z){ var st = S.st, r = z / D, i = Math.floor(r), g = st.vgrade; if(!g || i < 0) return 0; if(i >= g.length - 1) return g[g.length - 1] || 0; return g[i] + (g[i + 1] - g[i]) * (r - i); }
+// A clean run-up into every jump: for RUNUP rows before a jump-gap the path
+// gets a tile of shoulder each side, so no hole beside the line tempts an
+// early hop that would come down in the gap (and a rider a little off-centre
+// still has floor at speed).
+var RUNUP = JUMP_ROWS + 3;   // longer than a jump, so a hop just before it can't land in the gap
+function runUps(st, from, to){
+  var cols = st.cols;
+  for(var g = Math.max(1, from); g < to; g++){
+    if(!st.gap[g] || st.gap[g - 1]) continue;
+    for(var r = Math.max(0, g - RUNUP); r < g; r++){
+      if(st.gap[r] || (st.pieceRow && st.pieceRow[r])) continue;
+      var w = st.wid ? st.wid[r] : st.width;
+      for(var c = -1; c <= w; c++) st.rows[r][((st.trail[r] + c) % cols + cols) % cols] = 1;
+    }
+  }
+}
 function markGaps(rows, from, gap){
   gap = gap || [];
   for(var r = from || 0; r < rows.length; r++){ var any = 0; for(var c = 0; c < rows[r].length; c++) if(rows[r][c]){ any = 1; break; } gap[r] = any ? 0 : 1; }
@@ -402,7 +528,30 @@ function buildForever(seed){
       }
       rows.push(row); trail.push(path); wid.push(f.width);
     }
-    st.len = rows.length; markGaps(rows, from, st.gap); addHills(st, st.hillGen || hillGen(seed + 101), null, st.len - GAP_FLAT - GAP_PRE - 2);
+    st.len = rows.length;
+    // corridors: unlocked by distance, spaced 260 → 120 rows apart, laid only where hills aren't computed yet
+    st.pieceRng = st.pieceRng || mulberry32((seed + 303) * 2654435761 >>> 0); st.nextPiece = st.nextPiece || 360;
+    var pfrom = from, done = st.grade ? st.grade.length : 0;
+    for(var guard = 0; guard < 8; guard++){
+      var at = st.nextPiece, ft = foreverAt(at), t = ft.t, pr = st.pieceRng, opts = [];
+      if(t >= .12) opts.push(["rail", { ln:8 + Math.round(12 * t) }]);
+      if(t >= .2) opts.push(["slalom", { A:1, cycles:1 }]);
+      if(t >= .3) opts.push(["stones", { G:ft.gapLen, n:3, s:pr() < .5 ? 1 : -1 }]);
+      if(t >= .4) opts.push(["fork", { d:1 }]);
+      if(t >= .45) opts.push(["slalom", { A:2, cycles:1 }]);
+      if(t >= .5) opts.push(["cork", { sides:1, dir:pr() < .5 ? 1 : -1 }]);
+      if(t >= .6) opts.push(["twin", { phases:t >= .8 ? 2 : 1 }]);
+      if(t >= .75) opts.push(["slalom", { A:3, cycles:1 }]);
+      if(!opts.length){ st.nextPiece = at + 120; continue; }
+      var ch = pr() < .5 ? opts[opts.length - 1] : opts[Math.max(0, opts.length - 1 - Math.floor(pr() * 3))];
+      ch[1].speed = foreverAt(at + 80).speed;
+      var K2 = lineK(ch[1].speed, st.N, st.C), size = pieceSpec(ch[0], ch[1], 0, cols, st.C, K2).length;
+      if(at - K2.keep - 2 < Math.max(done, 20)){ st.nextPiece = Math.max(done, 20) + K2.keep + 3; continue; }   // its run-up already has hills: slide it on
+      if(at + size + K2.keep + 4 > rows.length - 30) break;
+      var after = applyPiece(st, at, ch[0], ch[1]); pfrom = Math.min(pfrom, at - K2.keep - 2);
+      st.nextPiece = after + Math.round(260 - 140 * t);
+    }
+    markGaps(rows, Math.max(0, Math.min(from, pfrom)), st.gap); runUps(st, Math.max(0, Math.min(from, pfrom)), rows.length); addHills(st, st.hillGen || hillGen(seed + 101), null, st.len - GAP_FLAT - GAP_PRE - 2);
     st.coinRng = st.coinRng || mulberry32((seed + 202) * 2654435761 >>> 0);
     makeCoins(st, st.coinRng, st.coinsTo || 0, st.grade.length - 16);
   };
@@ -420,6 +569,10 @@ function dailyParams(n){
   var r = mulberry32(n * 7919 >>> 0);
   var p = { name:"Route " + n, N: r() < .5 ? 6 : 8, C:0, len:220, speed:12 + r() * 1.5, holes:.5 + r() * .15, gapEvery:15, gapLen:2 + (r() < .5 ? 1 : 0), width:1, seed:n * 104729 };
   p.C = p.N === 8 ? 2 : 3;
+  // gentle corridors only (a fall on the first daily ride ends it): 1 or 2 per route
+  var q = mulberry32(n * 31337 + 7 >>> 0), pool = [["rail", { ln:10 + Math.floor(q() * 7) }], ["slalom", { A:1 + (q() < .5 ? 1 : 0), cycles:1 }], ["fork", { d:1 }], ["stones", { G:p.gapLen, n:3, s:q() < .5 ? 1 : -1 }], ["twin", { phases:1 }]];
+  var pick = function(){ return pool[Math.floor(q() * pool.length)]; }, two = q() < .5, a1 = pick();
+  p.pieces = two ? [[a1[0], .35, a1[1]], (function(b){ return [b[0], .7, b[1]]; })(pick())] : [[a1[0], .5, a1[1]]];
   return p;
 }
 
@@ -483,7 +636,7 @@ function startStation(params, opts){
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
-  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.coins = 0; S.coinChain = 0; S.coinT = -9; S.coinsSeen = {}; S.check = null; S.spawnT = 0; S.pushT = .06; S.pushPh = 0; S.falls = 0; S.flowAtFall = 0; input.jumpQ = 0;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.coins = 0; S.coinChain = 0; S.coinT = -9; S.coinsSeen = {}; S.lineCount = 0; S.pieceIn = 0; S.pieceFalls0 = 0; S.check = null; S.spawnT = 0; S.pushT = .06; S.pushPh = 0; S.falls = 0; S.flowAtFall = 0; input.jumpQ = 0;
   if(S.st.coins) S.st.coins.forEach(function(c){ c.got = false; });
   S.roll = upAt(S.G, S.p); S.side = surf(S.G, S.p).s;
   S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
@@ -513,6 +666,7 @@ var TRICKS = {
   big:   { label:"BIG GAP",   flow:.16, pts:400 },
   xfer:  { label:"TRANSFER",  flow:.10, pts:250 },
   hop:   { label:"HOP",       flow:.05, pts:80 },
+  line:  { label:"LINE",      flow:.1,  pts:300 },
   crest: { label:"CREST",     flow:.08, pts:220 },
   edge:  { label:"EDGE",      flow:.05, pts:150 }
 };
@@ -858,8 +1012,15 @@ function update(dt){
       var vh = Math.min(clamp(4 + (sp / PACE - base * CREST_SPEED) * .8, 4, 11), GRAV * CREST_ROWS * D / (2 * sp));
       var land = rr + Math.round(2 * vh / GRAV * sp / D), clear = true;
       // flying over a gap is fine; landing in one is not
-      for(var gk = land - 2; gk <= land + 2; gk++) if(st.gap[gk]) clear = false;
+      for(var gk = land - 4; gk <= land + 4; gk++) if(st.gap[gk]) clear = false;   // ±4: speed changes in the air move the real landing a few rows
+      if(st.pieceRow) for(gk = rr - 4; gk <= land + 4; gk++) if(st.pieceRow[gk]) clear = false;   // never launch into or over a corridor
       if(clear){ S.grounded = false; S.vh = vh; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; trick("crest"); SFX.jump(); woosh(1.3); break; }
+    }
+    for(var cr2 = S.row + 1; cr2 <= row; cr2++){
+      if(st.cp && st.cp[cr2]) S.check = { z:cr2 * D, p:(st.trail[cr2] + (st.wid ? st.wid[cr2] : st.width) / 2) * (G.S / st.C) };
+      if(st.pieceRow && st.pieceRow[cr2] && !st.pieceRow[cr2 - 1] && !S.pieceIn){ S.pieceIn = cr2; S.pieceFalls0 = S.falls; }
+      if(st.pieceEnd && st.pieceEnd[cr2] != null) S.check = { z:cr2 * D, p:(st.trail[cr2] + (st.wid ? st.wid[cr2] : st.width) / 2) * (G.S / st.C) };   // out of a corridor: never ride it twice for a fall after it
+      if(st.pieceEnd && st.pieceEnd[cr2] != null && S.pieceIn){ if(S.falls === S.pieceFalls0){ trick("line"); S.lineCount = (S.lineCount || 0) + 1; } S.pieceIn = 0; }
     }
     S.row = row;
   }
@@ -972,7 +1133,7 @@ function respawn(){
   var c = S.check, G = S.G;
   S.z = c.z; S.p = c.p; S.vl = 0; S.h = 0; S.vh = 0; S.grounded = true; S.dead = 0; S.carry = 0; S.flow = S.flowS = S.flowAtFall * .5;
   S.landT = 9; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false;
-  S.roll = upAt(G, S.p); S.rollV = 0; S.side = surf(G, S.p).s; S.row = Math.floor(S.z / D); S.spawnT = S.t; S.falls++;
+  S.roll = upAt(G, S.p); S.rollV = 0; S.side = surf(G, S.p).s; S.row = Math.floor(S.z / D); S.spawnT = S.t; S.falls++; S.pieceIn = 0;
   input.jumpQ = 0; pops.length = 0;
 }
 
