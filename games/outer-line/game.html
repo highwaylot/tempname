@@ -219,6 +219,12 @@ var SPOT_COLORS = ["#c6ff00", "#c6ff00", "#c6ff00", "#2ee6ff", "#2ee6ff", "#2ee6
 var R = 3, D = 1.6, GRAV = 32, JUMP_V = 10.5;
 var ACC = 46, AIR_ACC = 26, FRICTION = 1.5, AIR_FRICTION = .25, VL_BASE = 6.5, VL_FLOW = 3;
 var FLOOR_L = 64, FLOOR_TINT = .2, FLOOR_WALL = .6, FLOOR_MIN_LUM = .15;
+// Hills. Downhills feed CARRY (extra speed on top of flow; a tuck feeds it
+// faster), flats bleed it off slowly, and an uphill spends it before it ever
+// touches your speed. Uphills only follow a downhill and cost at most UP_SHARE
+// of what that downhill gave, so slowing down is rare. Top a hill fast enough
+// and you leave the ground: a crest.
+var JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 26, CARRY_MAX = .5, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 1.5, UP_SHARE = .6, CREST_SPEED = 1.25, BEND_K = .8, HILL_VIS = 3, GAP_FLAT = 10;
 var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
 // A station: rows of tiles, 1 = floor. One guaranteed path of `width`
@@ -251,9 +257,56 @@ function buildStation(p, seedOverride){
     }
     rows.push(row); trail.push(path);
   }
-  return { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:rows.length, start:start, trail:trail, width:p.width, gap:markGaps(rows) };
+  var st = { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:rows.length, start:start, trail:trail, width:p.width, gap:markGaps(rows) };
+  addHills(st, hillGen((seedOverride != null ? seedOverride : p.seed) + 101), rows.length - END);
+  return st;
 }
 // gap[r] = 1 when row r is a full gap (every tile gone): those get a red lip before and a lime landing after
+// Hills: a grade per row (negative is downhill), eased between segments, the
+// height it adds up to, and crests (where an uphill tips into a downhill).
+// owed.v is the downhill actually ridden since the last uphill (sum of -grade
+// per row), kept by addHills, so an uphill is sized from what you really got.
+function hillGen(seed){
+  var rng = mulberry32((seed * 2246822519 + 7) >>> 0), kind = "flat", left = 18, raw = 0;
+  var gen = function(owed){
+    if(left <= 0){
+      // downhill most of the time; an uphill only straight after a downhill
+      kind = kind === "down" ? (rng() < .65 ? "up" : "flat") : kind === "up" ? "down" : (rng() < .7 ? "down" : "flat");
+      if(kind === "down"){ left = 10 + Math.floor(rng() * 14); raw = -(.08 + rng() * .1); }
+      // an uphill costs at most UP_SHARE of what the downhill gave, counting
+      // only what carry can actually hold (OWED_CAP), so you crest it still rolling
+      else if(kind === "up"){ left = 8 + Math.floor(rng() * 7); raw = Math.min(.14, Math.min(owed.v, OWED_CAP) * UP_SHARE / left); owed.v = 0; }
+      else { left = 6 + Math.floor(rng() * 14); raw = 0; owed.v = 0; }   // a flat bleeds carry, so start counting again
+    }
+    left--; return raw;
+  };
+  return gen;
+}
+// Physics gets the full hills. What you SEE is drawn from a visual copy of the
+// slope (vgrade/vhgt): only a drop that starts or steepens hides the floor
+// beyond it, so for GAP_FLAT rows before a jump-gap the visual slope may hold
+// or rise but never bend over (no crest, no new drop), then eases back.
+// A gap is never hidden over the top of a hill; the speed you feel is unchanged.
+function addHills(st, gen, flatFrom, upto){
+  st.grade = st.grade || []; st.hgt = st.hgt || [0]; st.crest = st.crest || []; st.hillGen = gen; st.owed = st.owed || { v:0 };
+  st.vgrade = st.vgrade || []; st.vhgt = st.vhgt || [0];
+  for(var r = st.grade.length; r < (upto != null ? upto : st.len); r++){
+    var prev = r ? st.grade[r - 1] : 0;
+    var raw = r < 12 || (flatFrom != null && r >= flatFrom) ? 0 : gen(st.owed);
+    var g = prev + (raw - prev) * .3;
+    st.grade[r] = Math.abs(g) < .002 ? 0 : g;
+    if(st.grade[r] < 0) st.owed.v += -st.grade[r];
+    var vprev = r ? st.vgrade[r - 1] : 0, vt = st.grade[r];
+    for(var ga = r + 1; ga <= r + GAP_FLAT; ga++) if(st.gap[ga]){ vt = Math.max(vt, vprev); break; }   // never bend over: no crest, no new drop
+    st.vgrade[r] = vt === st.grade[r] ? vprev + (vt - vprev) * .3 : vt;
+    st.vhgt[r + 1] = st.vhgt[r] + st.vgrade[r] * D;
+    st.hgt[r + 1] = st.hgt[r] + st.grade[r] * D;   // height falls on a downhill (grade < 0)
+    st.crest[r] = r > 0 && st.grade[r - 1] > .01 && st.grade[r] <= .01 ? 1 : 0;
+  }
+}
+function gradeAt(z){ var st = S.st, r = z / D, i = Math.floor(r); if(!st.grade || i < 0) return 0; if(i >= st.grade.length - 1) return st.grade[st.grade.length - 1] || 0; return st.grade[i] + (st.grade[i + 1] - st.grade[i]) * (r - i); }
+function heightAt(z, real){ var st = S.st, r = z / D, i = Math.floor(r), h = real ? st.hgt : st.vhgt; if(!h || i < 0) return 0; if(i >= h.length - 1) return h[h.length - 1]; return h[i] + (h[i + 1] - h[i]) * (r - i); }
+function vgradeAt(z){ var st = S.st, r = z / D, i = Math.floor(r), g = st.vgrade; if(!g || i < 0) return 0; if(i >= g.length - 1) return g[g.length - 1] || 0; return g[i] + (g[i + 1] - g[i]) * (r - i); }
 function markGaps(rows, from, gap){
   gap = gap || [];
   for(var r = from || 0; r < rows.length; r++){ var any = 0; for(var c = 0; c < rows[r].length; c++) if(rows[r][c]){ any = 1; break; } gap[r] = any ? 0 : 1; }
@@ -300,7 +353,7 @@ function buildForever(seed){
       }
       rows.push(row); trail.push(path); wid.push(f.width);
     }
-    st.len = rows.length; markGaps(rows, from, st.gap);
+    st.len = rows.length; markGaps(rows, from, st.gap); addHills(st, st.hillGen || hillGen(seed + 101), null, st.len - GAP_FLAT - 2);
   };
   st.extend(400);
   return st;
@@ -351,7 +404,7 @@ addEventListener("resize", resize); resize();
 var S = {
   mode:"map", st:null, G:null, stopIdx:0, daily:null, dailyFirst:false,
   p:0, vl:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, rollV:0, side:0, t:0, arrived:false,
-  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
+  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, carry:0, pitch:0, row:0, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
   best: store.get("best", 0), bestStyle: store.get("bestStyle", {})
 };
 var input = { left:false, right:false, tuck:false, jumpQ:0 };
@@ -359,7 +412,9 @@ var pops = [];   // trick callouts drawn on the canvas
 
 // Speed follows flow and the tuck through a short ease, so a trick is a
 // surge rather than a jolt.
-function speedNow(){ return S.st ? S.st.p.speed * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) : 0; }
+// Carry lifts you toward the top speed a spot is built for (full flow, tucked)
+// but never past it, so every layout stays as fair as it was designed.
+function speedNow(){ if(!S.st) return 0; var b = S.st.p.speed; return Math.min(b * (1 + FLOW_MAX) * TUCK, b * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) + S.carry); }
 
 function startStation(params, opts){
   opts = opts || {};
@@ -367,7 +422,7 @@ function startStation(params, opts){
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
-  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; input.jumpQ = 0;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.row = 0; input.jumpQ = 0;
   S.roll = upAt(S.G, S.p); S.side = surf(S.G, S.p).s;
   S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
   S.label = opts.label || ("STOP " + String(S.stopIdx + 1).padStart(2, "0") + " · " + params.name);
@@ -396,6 +451,7 @@ var TRICKS = {
   big:   { label:"BIG GAP",   flow:.16, pts:400 },
   xfer:  { label:"TRANSFER",  flow:.10, pts:250 },
   hop:   { label:"HOP",       flow:.05, pts:80 },
+  crest: { label:"CREST",     flow:.08, pts:220 },
   edge:  { label:"EDGE",      flow:.05, pts:150 }
 };
 var TIERS = ["ROLLING", "FLOWING", "FULL SEND"];
@@ -616,7 +672,26 @@ function update(dt){
   S.tuckS += ((input.tuck && S.grounded ? 1 : 0) - S.tuckS) * Math.min(1, dt * 6);
   S.leanS += (clamp(S.vl / (VL_BASE + VL_FLOW), -1, 1) - S.leanS) * Math.min(1, dt * 10);
   if(S.dead > 0){ S.dead -= dt; S.h -= 16 * dt; S.z += speedNow() * (.2 + .8 * Math.pow(S.dead / DEATH_T, 2)) * dt; S.shake = Math.max(S.shake, .3); if(S.dead <= 0) retry(); return; }
+  // hills: downhill feeds carry, uphill spends it first, flats bleed it slowly
+  var base = st.p.speed, gr = gradeAt(S.z), gain = -gr * SLOPE_G * (gr < 0 && input.tuck && S.grounded ? DOWN_TUCK : 1) * (S.grounded ? 1 : .3);
+  S.carry += gain * dt;
+  if(Math.abs(gr) < .01) S.carry -= Math.max(0, S.carry) * CARRY_DECAY * dt;   // bleeds on the flat only
+  if(gr <= .01 && S.carry < 0) S.carry -= S.carry * 1.5 * dt;   // a dip below base recovers once the uphill ends
+  S.carry = clamp(S.carry, CARRY_MIN * base, CARRY_MAX * base);
+  S.pitch += (vgradeAt(S.z) - S.pitch) * Math.min(1, dt * 3);
   var sp = speedNow(); S.z += sp * dt; S.topSpeed = Math.max(S.topSpeed, sp);
+  // crest: tip over the top of a hill fast and you fly (never into a gap)
+  var row = Math.floor(S.z / D);
+  if(row !== S.row){
+    for(var rr = S.row + 1; rr <= row; rr++) if(st.crest[rr] && S.grounded && sp > base * CREST_SPEED){
+      var vh = Math.min(clamp(3 + (sp - base * CREST_SPEED) * .6, 3, 8), GRAV * JUMP_ROWS * D / (2 * sp));
+      var land = rr + Math.round(2 * vh / GRAV * sp / D), clear = true;
+      // flying over a gap is fine; landing in one is not
+      for(var gk = land - 2; gk <= land + 2; gk++) if(st.gap[gk]) clear = false;
+      if(clear){ S.grounded = false; S.vh = vh; S.airGap = false; S.airSide = false; S.airT = 0; trick("crest"); SFX.jump(); break; }
+    }
+    S.row = row;
+  }
   if(S.comboT > 0){ S.comboT -= dt; if(S.comboT <= 0) S.combo = 0; }
   S.flow = Math.max(0, S.flow - FLOW_DECAY * dt * (S.comboT > 0 ? .3 : 1));
   if(S.flow < .33) S.tier = 0; else if(S.flow < .66) S.tier = Math.min(S.tier, 1);
@@ -636,7 +711,9 @@ function update(dt){
     if(input.jumpQ > 0){
       // a jump right as you land is a hop: it keeps the line going
       if(S.landT < .16 && S.airT > .25) trick("hop");
-      S.grounded = false; S.vh = JUMP_V; input.jumpQ = 0; S.airGap = false; S.airSide = false; S.airT = 0; SFX.jump();
+      // a jump covers at most JUMP_ROWS rows: fast, it's a lower, flatter ollie,
+      // so speed never carries you over one gap and into the next
+      S.grounded = false; S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))); input.jumpQ = 0; S.airGap = false; S.airSide = false; S.airT = 0; SFX.jump();
     }
     else if(!tileAt(S.p, S.z)){ S.grounded = false; S.vh = 0; S.airGap = false; S.airSide = false; S.airT = 0; }
   }
@@ -708,7 +785,8 @@ function draw(){
   var shx = S.shake * 7 * (Math.sin(S.t * 41) + Math.sin(S.t * 27.3 + 1.7)) / 2, shy = S.shake * 7 * (Math.sin(S.t * 37.1 + .6) + Math.sin(S.t * 23.9 + 2.9)) / 2;
   var cx = W / 2 + shx, cy = H * .48 + shy;
   // a wider lens as you speed up
-  var f = Math.min(W, H) * .9 * (1 - .24 * flow);
+  var rush = S.st ? clamp(S.carry / (S.st.p.speed * CARRY_MAX), 0, 1) : 0;
+  var f = Math.min(W, H) * .9 * (1 - .24 * flow - .08 * rush);
   var roll = S.st ? S.roll - Math.PI / 2 : 0;
   // stars stream past at speed
   for(var i = 0; i < stars.length; i++){
@@ -726,10 +804,16 @@ function draw(){
   // normal, so changing walls never jumps it
   var mx = me.x + Math.cos(S.roll) * camH, my = me.y + Math.sin(S.roll) * camH;
   var camX = mx * .8, camY = my * .8;
-  S.cam = { up:up, x:camX, y:camY, z:camZ, f:1 - .24 * flow, proj:proj };
+  // hills bend the tunnel: points move along the view's up by how far the
+  // ground has risen or fallen since the rider, less a share of the slope
+  // the rider is on (so a long downhill still reads as one)
+  var hz0 = heightAt(S.z), pit = S.pitch;
+  function bendAt(z){ return (heightAt(z) - hz0 - BEND_K * pit * (z - S.z)) * HILL_VIS; }
+  S.cam = { up:up, x:camX, y:camY, z:camZ, f:1 - .24 * flow, proj:proj, bendAt:bendAt };
   function proj(x, y, z){
     var dz = z - camZ; if(dz < .15) return null;
-    var dx = x - camX, dy = y - camY;
+    var bend = bendAt(z);
+    var dx = x + ux * bend - camX, dy = y + uy * bend - camY;
     return [cx + f * (dx * rx + dy * ry) / dz, cy - f * (dx * ux + dy * uy) / dz + f * .06, dz];
   }
   var r0 = Math.max(0, Math.floor(camZ / D)), r1 = Math.min(st.len + 8, r0 + 70);
@@ -799,7 +883,7 @@ function draw(){
     }
   }
   // speed lines
-  var nLines = Math.round(10 + 70 * flow + 20 * S.tuckS);
+  var nLines = Math.round(10 + 70 * flow + 20 * S.tuckS + 30 * rush);
   ctx.strokeStyle = "rgba(255,255,255," + (.06 + .18 * flow).toFixed(3) + ")"; ctx.lineWidth = 2;
   ctx.beginPath();
   for(var k = 0; k < nLines; k++){
@@ -875,7 +959,7 @@ function drawSkater(proj, me, lean, f){
   if(poly(deck(.07))){ ctx.fillStyle = "#3a4d00"; ctx.fill(); }
   if(poly(deck(.1))){ ctx.fillStyle = "#c6ff00"; ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1; ctx.stroke(); }
   // feet side by side on the deck, the left a touch behind the right
-  var crouch = .28 * S.tuckS + (S.landT < .15 ? (1 - S.landT / .15) * .3 : 0);
+  var crouch = .28 * S.tuckS + (S.landT < .15 ? (1 - S.landT / .15) * .3 : 0) + clamp(-S.pitch * .8, 0, .12);
   var air = S.grounded ? 0 : 1;
   var fb = bp(-.08, -.075, .1), ff = bp(.08, .075, .1); if(!fb || !ff) return;
   var rot = lean * .35;
@@ -1025,7 +1109,7 @@ checkProgress(true);
 renderMap(); renderLocker(); showScreen("mapScreen");
 requestAnimationFrame(frame);
 
-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { vgradeAt:vgradeAt, tune:function(o){ if(o.BEND_K != null) BEND_K = o.BEND_K; if(o.HILL_VIS != null) HILL_VIS = o.HILL_VIS; if(o.GAP_FLAT != null) GAP_FLAT = o.GAP_FLAT; }, gradeAt:gradeAt, heightAt:heightAt, floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
 // An embedding page that inlines the game sets window.__OL_START first.
 var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : /[?&]forever=1(&|$)/.test(location.search) ? "forever" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
 if(startWith === "daily") playDaily(false);

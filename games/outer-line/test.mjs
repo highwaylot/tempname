@@ -115,6 +115,61 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await ctx.close();
 }
 
+// hills: downhill is common, slowing down is rare, crests launch, and no
+// jump-gap ever hides behind the top of a hill
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S, out = { stops: [], hidden: [] };
+    for(let i = 0; i < O.STOPS.length; i++){
+      for(const noFlow of [false, true]){
+        O.rideStop(i); const st = S.st, G = S.G, tw = G.S / st.C;
+        let n = 0, down = 0, up = 0, slow = 0, launched = 0, steps = 0, top = 0;
+        while(S.mode === 'ride' && steps < 120 * 60){
+          const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+          const target = (st.trail[row] + st.width / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
+          const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
+          O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
+          if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
+          if(noFlow){ S.flow = 0; S.flowS = 0; }
+          O.update(1 / 120); steps++; n++;
+          const g = O.gradeAt(S.z); if(g < -.02) down++; if(g > .02) up++; if(S.carry < -.01) slow++;
+          if(O.pops.some(p => p.text.startsWith('CREST') && p.t < .009)) launched++;
+          top = Math.max(top, S.carry);
+        }
+        out.stops.push({ name: st.p.name, noFlow, down: down / n, up: up / n, slow: slow / n, launched, arrived: S.arrived });
+      }
+      // sight lines: from 4 to 10 rows before each jump-gap, the gap's near edge projects above every floor row in between
+      O.rideStop(i); const st = S.st, G = S.G, tw = G.S / st.C;
+      for(let g = 14; g < st.len; g++){
+        if(!st.gap[g] || st.gap[g - 1]) continue;
+        for(let back = 4; back <= 10; back++){
+          const r0 = g - back; S.z = r0 * O.D; S.p = (st.trail[r0] + st.width / 2) * tw; S.roll = O.upAt(G, S.p); S.rollV = 0;
+          S.pitch = O.vgradeAt(S.z); S.h = 0; S.flowS = .5; S.mode = 'still'; O.draw();
+          const col = (st.trail[g] + st.width / 2) * tw, pt = O.surf(G, col);
+          const yAt = z => { const q = S.cam.proj(pt.x, pt.y, z); return q ? q[1] : Infinity; };
+          const yGap = yAt(g * O.D); let lip = Infinity;
+          for(let k = 4 * (r0 + 1); k < 4 * g; k++) lip = Math.min(lip, yAt(k * O.D / 4));
+          if(pt.s !== O.surf(G, S.p).s) continue;   // only the floor you're riding: a gap up a wall is seen across the tunnel
+          if(!(yGap < lip && yGap > 0)) out.hidden.push(st.p.name + ' gap ' + g + ' from ' + back + ' back');
+        }
+      }
+      S.mode = 'ride';
+    }
+    return out;
+  });
+  const flow = res.stops.filter(r => !r.noFlow), none = res.stops.filter(r => r.noFlow);
+  const pct = x => Math.round(x * 100);
+  ok(res.stops.every(r => r.arrived), 'with hills, the autopilot still lands every spot, with and without flow');
+  ok(flow.filter(r => r.down > .2).length >= 9, 'downhill is common: ' + flow.map(r => pct(r.down)).join('/') + ' % of each spot');
+  ok(flow.some(r => r.up > .05), 'uphills exist (' + flow.map(r => pct(r.up)).join('/') + ' %)');
+  ok(res.stops.every(r => r.slow < .02), 'slowing down is rare: time spent below flow speed ' + Math.max(...res.stops.map(r => pct(r.slow))) + ' % at most, even with no flow at all');
+  ok(flow.reduce((a, r) => a + r.launched, 0) >= 3, 'crests launch you when you bring speed (' + flow.reduce((a, r) => a + r.launched, 0) + ' across the spots)');
+  ok(res.hidden.length === 0, 'every jump-gap on your floor is in sight from 10 rows out (half a second at top speed); no hill hides one' + (res.hidden.length ? ': ' + res.hidden.slice(0, 4).join('; ') + ' (' + res.hidden.length + ')' : ''));
+  ok(errs.length === 0, 'no errors (hills)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
 // gaps you can see: the floor you ride is a lit surface at least 3:1 against
 // a hole, on every spot colour, measured on rendered pixels too
 {
