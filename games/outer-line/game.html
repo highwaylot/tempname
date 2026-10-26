@@ -570,35 +570,58 @@ function draw(){
   $("flowTier").textContent = TIERS[S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0] + (S.combo > 1 ? "  ×" + Math.min(8, S.combo) : "");
   $("score").textContent = "STYLE " + S.style.toLocaleString("en-US");
 }
-// The skater, seen from behind: board, legs, hoodie, head. Leans into the
-// carve, crouches on a tuck and a landing, throws its arms up in the air.
+// The skater, seen from behind, riding the board nose-first down the
+// tunnel. The board is a real 3D quad (nose ahead, tail behind) that yaws
+// toward where you're carving; the feet stand on it side by side, facing
+// forward, and the body turns a little into the carve. Crouches on a tuck and a
+// landing, throws its arms up in the air.
 function drawSkater(proj, me, lean, f){
-  var upC = upAt(S.G, S.p), px = me.x + Math.cos(upC) * Math.max(-3, S.h), py = me.y + Math.sin(upC) * Math.max(-3, S.h);
-  var P = proj(px, py, S.z); if(!P) return;
+  var upC = upAt(S.G, S.p), hh = Math.max(-3, S.h), ux = Math.cos(upC), uy = Math.sin(upC);
+  var bx = me.x + ux * hh, by = me.y + uy * hh, bz = S.z;
+  var P = proj(bx, by, bz); if(!P) return;
   var k = f / P[2] * .82;   // pixels per world unit at the rider, drawn a touch small so the track stays readable
   // a soft shadow on the floor below, so you can read where you'll land
   var Q = S.h > .05 && tileAt(S.p, S.z) ? proj(me.x, me.y, S.z) : null;
   if(Q){
     var ks = f / Q[2] * .82, sa = Math.max(0, .45 - S.h * .12);
-    ctx.fillStyle = "rgba(0,0,0," + sa.toFixed(3) + ")"; ctx.beginPath(); ctx.ellipse(Q[0], Q[1], ks * .4, ks * .12, -lean * .35, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0," + sa.toFixed(3) + ")"; ctx.beginPath(); ctx.ellipse(Q[0], Q[1], ks * .2, ks * .3, 0, 0, TAU); ctx.fill();
   }
+  // heading: forward speed against sideways speed, from the eased lean
+  var a = surf(S.G, S.p - .02), b = surf(S.G, S.p + .02), Lx = b.x - a.x, Ly = b.y - a.y, Ll = Math.hypot(Lx, Ly) || 1; Lx /= Ll; Ly /= Ll;
+  var yaw = Math.atan2(lean * (VL_BASE + VL_FLOW), Math.max(1, speedNow())) * .55 + (S.dead > 0 ? S.t * 9 : 0);
+  var sy = Math.sin(yaw), cy = Math.cos(yaw);
+  // a point on the board: fo along the board, si across it, up above the floor
+  function bp(fo, si, up){ return proj(bx + Lx * (sy * fo + cy * si) + ux * up, by + Ly * (sy * fo + cy * si) + uy * up, bz + cy * fo - sy * si); }
+  function poly(pts){ for(var i = 0; i < pts.length; i++) if(!pts[i]) return false; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for(var j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0], pts[j][1]); ctx.closePath(); return true; }
+  var g = ctx.createRadialGradient(P[0], P[1], k * .05, P[0], P[1], k * .7);
+  g.addColorStop(0, "rgba(198,255,0,.18)"); g.addColorStop(1, "rgba(198,255,0,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(P[0], P[1], k * .45, k * .55, 0, 0, TAU); ctx.fill();
+  // wheels, then the deck's dark edge, then the deck with kicked-up nose and tail
+  ctx.fillStyle = "#111";
+  [[.3, .09], [.3, -.09], [-.3, .09], [-.3, -.09]].forEach(function(w){ var q = bp(w[0], w[1], .035); if(q){ ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(1, f / q[2] * .82 * .045), 0, TAU); ctx.fill(); } });
+  var HW = .12, deck = function(up){ return [bp(-.5, 0, up + .06), bp(-.4, -HW, up), bp(.4, -HW, up), bp(.5, 0, up + .06), bp(.4, HW, up), bp(-.4, HW, up)]; };
+  if(poly(deck(.07))){ ctx.fillStyle = "#3a4d00"; ctx.fill(); }
+  if(poly(deck(.1))){ ctx.fillStyle = "#c6ff00"; ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1; ctx.stroke(); }
+  // feet side by side on the deck, the left a touch behind the right
   var crouch = (input.tuck && S.grounded ? .28 : 0) + (S.landT < .15 ? (1 - S.landT / .15) * .3 : 0);
   var air = S.grounded ? 0 : 1;
+  var fb = bp(-.08, -.075, .1), ff = bp(.08, .075, .1); if(!fb || !ff) return;
+  var rot = lean * .35;
   ctx.save();
   ctx.translate(P[0], P[1]);
-  ctx.rotate(lean * .35 + (S.dead > 0 ? S.t * 9 : 0));
-  var g = ctx.createRadialGradient(0, 0, k * .05, 0, 0, k * .8);
-  g.addColorStop(0, "rgba(198,255,0,.35)"); g.addColorStop(1, "rgba(198,255,0,0)");
-  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, k * .8, k * .3, 0, 0, TAU); ctx.fill();
-  // board, from behind: the deck edge and two wheels
-  var bw = k * .62, bh = k * .07;
-  ctx.fillStyle = "#c6ff00"; ctx.fillRect(-bw / 2, -bh, bw, bh);
-  ctx.fillStyle = "#111"; ctx.beginPath(); ctx.arc(-bw * .32, k * .02, k * .045, 0, TAU); ctx.arc(bw * .32, k * .02, k * .045, 0, TAU); ctx.fill();
-  // legs
-  var hip = -k * (.62 - crouch * .5), knee = -k * (.32 - crouch * .15);
+  ctx.rotate(rot + (S.dead > 0 ? S.t * 9 : 0));
+  // the feet, in this rotated frame
+  var cr = Math.cos(-rot), sr = Math.sin(-rot);
+  function loc(q){ var dx = q[0] - P[0], dy = q[1] - P[1]; return [dx * cr - dy * sr, dx * sr + dy * cr]; }
+  var FB = loc(fb), FF = loc(ff), turn = sy * k * .12;
+  // legs: left foot to left hip, right to right, knees bent out on a crouch
+  var hip = -k * (.62 - crouch * .5), mid = (FB[0] + FF[0]) / 2 + turn * .5;
   ctx.strokeStyle = "#1d1d26"; ctx.lineWidth = k * .1; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(-k * .14, -bh); ctx.lineTo(-k * .16 - crouch * k * .12, knee); ctx.lineTo(-k * .07, hip);
-  ctx.moveTo(k * .14, -bh); ctx.lineTo(k * .16 + crouch * k * .12, knee); ctx.lineTo(k * .07, hip); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(FB[0], FB[1]); ctx.lineTo((FB[0] + mid) / 2 - k * (.05 + crouch * .14), (FB[1] + hip) / 2); ctx.lineTo(mid - k * .06, hip);
+  ctx.moveTo(FF[0], FF[1]); ctx.lineTo((FF[0] + mid) / 2 + k * (.05 + crouch * .14), (FF[1] + hip) / 2); ctx.lineTo(mid + k * .06, hip);
+  ctx.stroke();
+  ctx.translate(mid, 0);
   // hoodie
   var sh = hip - k * .42;
   ctx.fillStyle = "#ff2e88";
@@ -609,8 +632,8 @@ function drawSkater(proj, me, lean, f){
   ctx.beginPath(); ctx.moveTo(-k * .18, armY); ctx.lineTo(-k * .18 - reach, armY + lift + lean * k * .1);
   ctx.moveTo(k * .18, armY); ctx.lineTo(k * .18 + reach, armY + (air ? lift : k * (.1 + lean * .12)) - lean * k * .1); ctx.stroke();
   // head and beanie
-  ctx.fillStyle = "#f4d2b0"; ctx.beginPath(); ctx.arc(0, sh - k * .14, k * .12, 0, TAU); ctx.fill();
-  ctx.fillStyle = "#c6ff00"; ctx.beginPath(); ctx.arc(0, sh - k * .17, k * .125, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = "#f4d2b0"; ctx.beginPath(); ctx.arc(turn, sh - k * .14, k * .12, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#c6ff00"; ctx.beginPath(); ctx.arc(turn, sh - k * .17, k * .125, Math.PI, 0); ctx.fill();
   ctx.restore();
 }
 
