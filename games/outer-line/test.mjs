@@ -151,7 +151,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
           const yGap = yAt(g * O.D); let lip = Infinity;
           for(let k = 4 * (r0 + 1); k < 4 * g; k++) lip = Math.min(lip, yAt(k * O.D / 4));
           if(pt.s !== O.surf(G, S.p).s) continue;   // only the floor you're riding: a gap up a wall is seen across the tunnel
-          if(!(yGap < lip && yGap > 0)) out.hidden.push(st.p.name + ' gap ' + g + ' from ' + back + ' back');
+          if(!(yGap < lip + 1 && yGap > 0)) out.hidden.push(st.p.name + ' gap ' + g + ' from ' + back + ' back');
         }
       }
       S.mode = 'ride';
@@ -167,6 +167,57 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   ok(flow.reduce((a, r) => a + r.launched, 0) >= 3, 'crests launch you when you bring speed (' + flow.reduce((a, r) => a + r.launched, 0) + ' across the spots)');
   ok(res.hidden.length === 0, 'every jump-gap on your floor is in sight from 10 rows out (half a second at top speed); no hill hides one' + (res.hidden.length ? ': ' + res.hidden.slice(0, 4).join('; ') + ' (' + res.hidden.length + ')' : ''));
   ok(errs.length === 0, 'no errors (hills)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
+// hills, as you actually see them on a phone, with the live (easing) camera:
+// the next gap on your floor is in sight and drawn at least 2 px tall from 4–10
+// rows out, every frame, on busy spots, the daily and deep Forever at top
+// speed; and a real downhill is never drawn as an uphill
+{
+  const { ctx, page, errs } = await open({ width: 390, height: 844 }, true);
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S, out = { frames: 0, hidden: [], thin: [], backwards: [] };
+    const rides = [['Halo Junction', () => O.rideStop(2)], ['Quarry Steps', () => O.rideStop(3)], ['Comet Yard', () => O.rideStop(8)], ['Terminus', () => O.rideStop(9)],
+      ['daily #1', () => O.startStation(O.dailyParams(1), {})], ['forever 1000', () => O.startStation({ name: 'Forever', forever: true, seed: 1000 }, {})], ['forever 1001', () => O.startStation({ name: 'Forever', forever: true, seed: 1001 }, {})]];
+    for(const [name, start] of rides){
+      start(); const G = S.G; let steps = 0;
+      while(S.mode === 'ride' && steps < 120 * 150 && S.z / O.D < 3000){
+        const st = S.st, tw = G.S / st.C, w = st.wid ? st.wid : null, row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+        const target = (st.trail[row] + (w ? w[row] : st.width) / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
+        const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
+        O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4; O.input.tuck = true;
+        if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
+        O.update(1 / 120); steps++;
+        if(steps % 4 || S.dead > 0) continue;
+        const r0 = Math.floor(S.z / O.D); let g = -1;
+        for(let k = r0 + 4; k <= r0 + 10; k++) if(st.gap[k] && !st.gap[k - 1]){ g = k; break; }
+        if(g < 0) continue;
+        const pt = O.surf(G, (st.trail[g] + (w ? w[g] : st.width) / 2) * tw); if(pt.s !== O.surf(G, S.p).s) continue;
+        const mode = S.mode; S.mode = 'still'; O.draw(); S.mode = mode; out.frames++;
+        const yAt = z => { const q = S.cam.proj(pt.x, pt.y, z); return q ? q[1] : Infinity; };
+        let ge = g; while(st.gap[ge + 1]) ge++;
+        const yGap = yAt(g * O.D), yEnd = yAt((ge + 1) * O.D); let lip = Infinity;
+        for(let k = 4 * (r0 + 1); k < 4 * g; k++) lip = Math.min(lip, yAt(k * O.D / 4));
+        if(!(yGap < lip + 1 && yGap > 0)){ out.hidden.push(name + ' gap ' + g + ' from ' + (g - S.z / O.D).toFixed(1)); continue; }
+        // (hidden means its near edge projects more than 1 px below the floor in front: a column seen side-on lines up within a pixel without anything in the way)
+        // thin: hills may not draw the gap thinner than the same frame without hills (a far gap on a phone is small either way)
+        const tall = yGap - yEnd;
+        if(tall < 2){ O.tune({ HILL_VIS: 0 }); S.mode = 'still'; O.draw(); S.mode = mode; const flat = yAt(g * O.D) - yAt((ge + 1) * O.D); O.tune({ HILL_VIS: 3 });
+          if(flat >= 2 ? tall < flat * .75 : tall < flat - .5) out.thin.push(name + ' gap ' + g + ' ' + tall.toFixed(1) + 'px vs ' + flat.toFixed(1) + ' flat'); }
+      }
+      O.input.tuck = false;
+      const st = S.st; let down = 0, back = 0;
+      for(let r = 0; r < st.vgrade.length; r++) if(st.grade[r] < -.02){ down++; if(st.vgrade[r] > .02) back++; }
+      out.backwards.push(name + ' ' + back + '/' + down);
+      S.mode = 'ride';
+    }
+    return out;
+  });
+  ok(res.frames > 500 && res.hidden.length === 0, 'live camera at top speed: the next gap on your floor stays in sight from 4–10 rows out (' + res.frames + ' frames' + (res.hidden.length ? '; hidden: ' + res.hidden.slice(0, 3).join('; ') + ' (' + res.hidden.length + ')' : '') + ')');
+  ok(res.thin.length === 0, 'and hills never squash it: at least 2 px tall, or 75 % of its height without hills (half a pixel when it is sub-2 px anyway)' + (res.thin.length ? ' (' + res.thin.length + ': ' + res.thin.slice(0, 3).join('; ') + ')' : ''));
+  ok(res.backwards.every(x => { const [b, d] = x.split(' ').pop().split('/').map(Number); return b <= d * .05; }), 'a real downhill is (almost) never drawn as an uphill: ' + res.backwards.join(', '));
+  ok(errs.length === 0, 'no errors (hills on a phone)' + (errs.length ? ': ' + errs[0] : ''));
   await ctx.close();
 }
 
