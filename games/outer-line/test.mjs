@@ -199,7 +199,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
         let ge = g; while(st.gap[ge + 1]) ge++;
         const yGap = yAt(g * O.D), yEnd = yAt((ge + 1) * O.D); let lip = Infinity;
         // only floor seen from above (below the horizon) can be hidden by nearer floor; a column above eye level is in view by construction
-        if(yGap <= yAt((g + 400) * O.D)) continue;
+        { const c = S.cam, ux = Math.cos(c.up), uy = Math.sin(c.up); if((pt.x - c.x) * ux + (pt.y - c.y) * uy + c.bendAt(g * O.D) > -.05) continue; }
         // the floor under the rider (the next two rows) is below the egg and can't hide a gap 4+ rows on; near rows also pick up sideways parallax
         for(let k = 4 * (r0 + 2); k < 4 * g; k++) lip = Math.min(lip, yAt(k * O.D / 4));
         if(!(yGap < lip + 1 && yGap > 0)){ out.hidden.push(name + ' gap ' + g + ' from ' + (g - S.z / O.D).toFixed(1)); continue; }
@@ -269,6 +269,39 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   ok(res.jump === 4, 'jumping the same hole still clears it at every speed (' + res.jump + '/4)');
   ok(res.brush === res.n, 'a carve that brushes the side of a hole survives (' + res.brush + '/' + res.n + ')');
   ok(errs.length === 0, 'no errors (holes)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
+// glide and coins
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S, out = { stops: [], chainMax: 0 };
+    for(let i = 0; i < 10; i++){
+      O.rideStop(i); const st = S.st, G = S.G, tw = G.S / st.C; let steps = 0;
+      const gapStarts = st.gap.filter((g, r) => g && !st.gap[r - 1]).length, arcs = new Set(st.coins.filter(c => c.grp[0] === 'g').map(c => c.grp)).size;
+      const crests = st.crest.filter((c, r) => c && r < st.len - 8).length, crestLines = new Set(st.coins.filter(c => c.grp[0] === 'c').map(c => c.grp)).size;
+      while(S.mode === 'ride' && steps < 120 * 60){
+        const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+        const target = (st.trail[row] + st.width / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
+        const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
+        O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
+        if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
+        O.update(1 / 120); steps++; out.chainMax = Math.max(out.chainMax, S.coinChain);
+      }
+      out.stops.push({ name: st.p.name, coins: S.coins, total: st.coins.length, gapStarts, arcs, crests, crestLines });
+    }
+    const air = held => { O.rideStop(0); const st = S.st; for(let k = 20; k < 60; k++) st.rows[k].fill(1); S.z = 22 * O.D; S.flow = S.flowS = 0; S.carry = 0; S.grounded = true; S.h = 0; O.input.jumpQ = .15; O.input.jumpHeld = held; const z0 = S.z; let t = 0; do { O.update(1 / 120); t++; } while((!S.grounded && t < 600) || t < 3); O.input.jumpHeld = false; return { rows: (S.z - z0) / O.D, carry: S.carry }; };
+    out.plain = air(false); out.glide = air(true);
+    O.rideStop(0); { const st = S.st, G = S.G, tw = G.S / st.C, r = 40, c = st.trail[r] + 1; for(let k = r - 3; k <= r + 3; k++) st.rows[k].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * tw; S.z = (r - 2) * O.D; S.grounded = true; S.h = 0; O.input.jumpHeld = true; let died = false; for(let i = 0; i < 120; i++){ S.vl = 0; O.update(1 / 120); if(S.dead > 0){ died = true; break; } } O.input.jumpHeld = false; out.edge = died; }
+    return out;
+  });
+  ok(res.stops.every(s => s.arcs === s.gapStarts && s.crestLines === s.crests), 'every jump-gap has a coin arc and every crest a glide line (' + res.stops.map(s => s.arcs + '/' + s.gapStarts + ' ' + s.crestLines + '/' + s.crests).join(', ') + ')');
+  ok(res.stops.every(s => s.coins > 0), 'coins can be collected on every spot without gliding (' + res.stops.map(s => s.coins + '/' + s.total).join(' ') + ')');
+  ok(res.chainMax >= 5, 'coins chain (longest chain ×' + res.chainMax + ', so the dings climb)');
+  ok(res.glide.rows > res.plain.rows * 1.5 && res.glide.carry < res.plain.carry, 'holding glide stretches a jump (' + res.plain.rows.toFixed(1) + ' → ' + res.glide.rows.toFixed(1) + ' rows) and costs speed');
+  ok(res.edge, 'gliding can\'t rescue rolling off an edge into a hole');
+  ok(errs.length === 0, 'no errors (glide and coins)' + (errs.length ? ': ' + errs[0] : ''));
   await ctx.close();
 }
 

@@ -227,7 +227,13 @@ var FLOOR_L = 64, FLOOR_TINT = .2, FLOOR_WALL = .6, FLOOR_MIN_LUM = .15;
 // touches your speed. Uphills only follow a downhill and cost at most UP_SHARE
 // of what that downhill gave, so slowing down is rare. Top a hill fast enough
 // and you leave the ground: a crest.
-var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 40, CARRY_MAX = .9, HILL_TOP = .6, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 1.8, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = 1.2, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
+// Glide: hold jump in the air (after a jump or a crest, never after rolling off
+// an edge) to fall slowly, for up to GLIDE_MAX seconds per air; it costs carry.
+// Coins hang where air takes you: arcs over jump-gaps, glide lines off crests,
+// rows down the downhills.
+var GLIDE_MAX = .8, GLIDE_FALL = 2.2, GLIDE_GRAV = .25, GLIDE_DRAG = .18, CREST_ROWS = 13, COIN_R = .55, COIN_CHAIN_T = .7;
+var glideTold = false;
+var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 55, CARRY_MAX = 1.3, HILL_TOP = 1, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 2, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = 1.2, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
 var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
 // A station: rows of tiles, 1 = floor. One guaranteed path of `width`
@@ -262,6 +268,7 @@ function buildStation(p, seedOverride){
   }
   var st = { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:rows.length, start:start, trail:trail, width:p.width, gap:markGaps(rows) };
   addHills(st, hillGen((seedOverride != null ? seedOverride : p.seed) + 101), rows.length - END);
+  makeCoins(st, mulberry32(((seedOverride != null ? seedOverride : p.seed) + 202) * 2654435761 >>> 0), 0, rows.length - END);
   return st;
 }
 // gap[r] = 1 when row r is a full gap (every tile gone): those get a red lip before and a lime landing after
@@ -316,6 +323,28 @@ function addHills(st, gen, flatFrom, upto){
     st.crest[r] = r > 0 && st.grade[r - 1] > .01 && st.grade[r] <= .01 ? 1 : 0;
   }
 }
+function makeCoins(st, rng, from, upto){
+  st.coins = st.coins || []; var tw = 2 * R * Math.sin(Math.PI / st.N) / st.C;
+  var mid = function(r){ return (st.trail[r] + (st.wid ? st.wid[r] : st.width) / 2) * tw; };
+  var add = function(r, h, grp){ if(r >= 0 && r < st.len) st.coins.push({ r:r, lat:mid(Math.max(0, Math.min(st.len - 1, Math.floor(r)))), h:h, grp:grp, got:false }); };
+  for(var r = Math.max(14, from); r < upto; r++){
+    // an arc over every jump-gap, the height of a good jump
+    if(st.gap[r] && !st.gap[r - 1]){
+      var e = r; while(st.gap[e + 1]) e++;
+      var a0 = r - 1.2, a1 = e + 1.8, n = Math.round((a1 - a0) * 1.6);
+      for(var i = 0; i <= n; i++){ var t = i / n; add(a0 + (a1 - a0) * t, .35 + 1.25 * Math.sin(Math.PI * t), "g" + r); }
+    }
+    // a glide line off every crest: high and long, only for those who bring speed and hold glide
+    if(st.crest[r]){
+      for(var j = 0; j < 9; j++){ var cr = r + 2 + j * 1.4; if(st.gap[Math.floor(cr)] && j > 5) break; add(cr, 2.1 - j * .17, "c" + r); }
+    }
+    // a row of coins down some downhills
+    if(st.grade[r] < -.08 && st.grade[r - 1] >= -.08 && rng() < .6){
+      for(var k = 0; k < 6; k++){ var dr = r + 1 + k; if(dr >= st.len || st.gap[dr]) break; add(dr + .5, .35, "d" + r); }
+    }
+  }
+  st.coinsTo = upto;
+}
 function gradeAt(z){ var st = S.st, r = z / D, i = Math.floor(r); if(!st.grade || i < 0) return 0; if(i >= st.grade.length - 1) return st.grade[st.grade.length - 1] || 0; return st.grade[i] + (st.grade[i + 1] - st.grade[i]) * (r - i); }
 function heightAt(z, real){ var st = S.st, r = z / D, i = Math.floor(r), h = real ? st.hgt : st.vhgt; if(!h || i < 0) return 0; if(i >= h.length - 1) return h[h.length - 1]; return h[i] + (h[i + 1] - h[i]) * (r - i); }
 function vgradeAt(z){ var st = S.st, r = z / D, i = Math.floor(r), g = st.vgrade; if(!g || i < 0) return 0; if(i >= g.length - 1) return g[g.length - 1] || 0; return g[i] + (g[i + 1] - g[i]) * (r - i); }
@@ -366,6 +395,8 @@ function buildForever(seed){
       rows.push(row); trail.push(path); wid.push(f.width);
     }
     st.len = rows.length; markGaps(rows, from, st.gap); addHills(st, st.hillGen || hillGen(seed + 101), null, st.len - GAP_FLAT - GAP_PRE - 2);
+    st.coinRng = st.coinRng || mulberry32((seed + 202) * 2654435761 >>> 0);
+    makeCoins(st, st.coinRng, st.coinsTo || 0, st.grade.length - 16);
   };
   st.extend(400);
   return st;
@@ -416,10 +447,10 @@ addEventListener("resize", resize); resize();
 var S = {
   mode:"map", st:null, G:null, stopIdx:0, daily:null, dailyFirst:false,
   p:0, vl:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, rollV:0, side:0, t:0, arrived:false,
-  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, carry:0, pitch:0, tilt:0, row:0, fellOff:false, sunk:false, holeT:0, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
+  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, carry:0, pitch:0, tilt:0, row:0, fellOff:false, sunk:false, holeT:0, glideT:0, gliding:false, coins:0, coinChain:0, coinT:-9, coinsSeen:{}, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
   best: store.get("best", 0), bestStyle: store.get("bestStyle", {})
 };
-var input = { left:false, right:false, tuck:false, jumpQ:0 };
+var input = { left:false, right:false, tuck:false, jumpQ:0, jumpHeld:false, glide:false };
 var pops = [];   // trick callouts drawn on the canvas
 
 // Speed follows flow and the tuck through a short ease, so a trick is a
@@ -434,7 +465,8 @@ function startStation(params, opts){
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
-  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; input.jumpQ = 0;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.coins = 0; S.coinChain = 0; S.coinT = -9; S.coinsSeen = {}; input.jumpQ = 0;
+  if(S.st.coins) S.st.coins.forEach(function(c){ c.got = false; });
   S.roll = upAt(S.G, S.p); S.side = surf(S.G, S.p).s;
   S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
   S.label = opts.label || ("STOP " + String(S.stopIdx + 1).padStart(2, "0") + " · " + params.name);
@@ -599,7 +631,27 @@ function tone(f0, f1, dur, type, vol, delay){
   o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + .02);
 }
 var SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+// Bell Theory's coin ding, remixed: a triangle blip that sweeps up 1.6×
+// over a soft low thump, here climbing a pentatonic ladder as coins chain,
+// with a little arpeggio every fifth; and its glint, the quiet high cue when
+// a reward comes into view.
+function blip(f, dur, type, vol, delay){ tone(f, f * 1.6, dur, type, vol, delay); }
+function thump(f, dur, vol){
+  var a = ac(); if(!a) return;
+  var t = a.currentTime, o = a.createOscillator(), lp = a.createBiquadFilter(), g = a.createGain();
+  o.type = "square"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(Math.max(120, f * .7), t + dur);
+  lp.type = "lowpass"; lp.frequency.value = 1400; lp.Q.value = .7;
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(lp); lp.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + .02);
+}
+var PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28];
 var SFX = {
+  coin: function(n){
+    var f = 660 * Math.pow(2, PENTA[Math.min(PENTA.length - 1, n - 1)] / 12);
+    blip(f, .16, "triangle", .1); thump(220, .11, .12);
+    if(n > 1 && n % 5 === 0) [1, 1.5, 2].forEach(function(m, i){ blip(f * m, .14, "sine", .06, .05 + i * .06); });
+  },
+  glint: function(){ blip(1320, .05, "sine", .03); },
   jump: function(){ tone(380, 620, .1, "triangle", .08); },
   land: function(hard){ tone(hard ? 160 : 220, 90, hard ? .14 : .08, "sine", hard ? .2 : .12); },
   side: function(){ tone(1500, 1700, .03, "sine", .03); },
@@ -621,7 +673,7 @@ function keyDown(code, repeat){
   if(code === "ArrowLeft" || code === "KeyA"){ input.left = true; return true; }
   if(code === "ArrowRight" || code === "KeyD"){ input.right = true; return true; }
   if(code === "ArrowDown" || code === "KeyS"){ input.tuck = true; return true; }
-  if(code === "ArrowUp" || code === "Space" || code === "KeyW"){ if(!repeat && S.mode === "ride" && !(S.dead > 0)) input.jumpQ = .14; return true; }
+  if(code === "ArrowUp" || code === "Space" || code === "KeyW"){ if(!repeat && S.mode === "ride" && !(S.dead > 0)) input.jumpQ = .14; input.jumpHeld = true; return true; }
   if(code === "Escape" && S.mode === "ride"){ toMap(); return true; }
   return false;
 }
@@ -629,6 +681,7 @@ function keyUp(code){
   if(code === "ArrowLeft" || code === "KeyA") input.left = false;
   if(code === "ArrowRight" || code === "KeyD") input.right = false;
   if(code === "ArrowDown" || code === "KeyS") input.tuck = false;
+  if(code === "ArrowUp" || code === "Space" || code === "KeyW") input.jumpHeld = false;
 }
 addEventListener("keydown", function(e){
   // outside a ride, keys aimed at a menu button work the button
@@ -636,7 +689,7 @@ addEventListener("keydown", function(e){
   if(keyDown(e.code, e.repeat)) e.preventDefault();
 });
 addEventListener("keyup", function(e){ keyUp(e.code); });
-function releaseAll(){ input.left = input.right = input.tuck = false; }
+function releaseAll(){ input.left = input.right = input.tuck = input.jumpHeld = input.glide = false; }
 addEventListener("blur", releaseAll);
 addEventListener("message", function(e){
   var m = e.data && e.data.olKey; if(!m || e.source !== window.parent) return;
@@ -648,7 +701,7 @@ var ptrs = {};
 function steerFromPtrs(){
   var l = false, r = false;
   for(var id in ptrs){ if(ptrs[id].x < W / 2) l = true; else r = true; }
-  input.tuck = l && r; input.left = l && !r; input.right = r && !l;
+  input.tuck = l && r; input.glide = l && r; input.left = l && !r; input.right = r && !l;
 }
 cv.addEventListener("pointerdown", function(e){
   if(S.mode !== "ride") return;
@@ -698,7 +751,7 @@ function update(dt){
   var row = Math.floor(S.z / D);
   if(row !== S.row){
     for(var rr = S.row + 1; rr <= row; rr++) if(st.crest[rr] && S.grounded && sp > base * CREST_SPEED){
-      var vh = Math.min(clamp(3 + (sp - base * CREST_SPEED) * .6, 3, 8), GRAV * JUMP_ROWS * D / (2 * sp));
+      var vh = Math.min(clamp(4 + (sp - base * CREST_SPEED) * .8, 4, 11), GRAV * CREST_ROWS * D / (2 * sp));
       var land = rr + Math.round(2 * vh / GRAV * sp / D), clear = true;
       // flying over a gap is fine; landing in one is not
       for(var gk = land - 2; gk <= land + 2; gk++) if(st.gap[gk]) clear = false;
@@ -727,6 +780,7 @@ function update(dt){
       if(S.landT < .16 && S.airT > .25) trick("hop");
       // a jump covers at most JUMP_ROWS rows: fast, it's a lower, flatter ollie,
       // so speed never carries you over one gap and into the next
+      if(!glideTold){ glideTold = true; hint(touchy ? "in the air: hold both sides to glide" : "in the air: keep holding ↑ to glide", 2200); }
       S.grounded = false; S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))); input.jumpQ = 0; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; SFX.jump();
     }
     else if(!tileAt(S.p, S.z)){ S.grounded = false; S.vh = 0; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = true; S.holeT = 0; S.sunk = false; }
@@ -735,7 +789,14 @@ function update(dt){
     S.airT += dt;
     var under = tileAt(S.p, S.z);
     if(!under) S.airGap = true;
-    S.vh -= GRAV * dt; S.h += S.vh * dt;
+    // glide: hold jump on the way down
+    S.gliding = !S.fellOff && S.vh < 0 && S.glideT < GLIDE_MAX && (input.jumpHeld || input.glide);
+    if(S.gliding){
+      S.glideT += dt; S.vh -= GRAV * GLIDE_GRAV * dt; S.vh = Math.max(S.vh, -GLIDE_FALL);
+      S.carry -= GLIDE_DRAG * base * dt;
+    }
+    else S.vh -= GRAV * dt;
+    S.h += S.vh * dt;
     // a hole you don't jump is a fall: roll off an edge and you get HOLE_GRACE
     // seconds (a carve that brushes a hole's side) to be back over floor, which
     // no forward crossing of a row fits inside at any speed; after that the far
@@ -748,13 +809,32 @@ function update(dt){
     if(S.h <= 0 && S.vh < 0){
       if(under && S.h > -.35 && !S.sunk){
         var hard = S.vh < -12;
-        S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; S.fellOff = false; S.sunk = false; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
+        S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; S.fellOff = false; S.sunk = false; S.glideT = 0; S.gliding = false; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
         if(S.airGap){ var rowsCleared = Math.round(S.airT * sp / D); trick(rowsCleared >= 5 ? "big" : "gap"); }
         if(S.airSide) trick("xfer");
       }
       else if(S.h < -1.2){ S.dead = DEATH_T; S.flow = 0; S.combo = 0; S.comboT = 0; SFX.fall(); }
     }
     if(S.h > R * .9){ S.h = R * .9; S.vh = Math.min(S.vh, 0); }
+  }
+  // coins: pick up anything you pass through; chains climb a ladder of dings
+  if(st.coins){
+    var zr = S.z / D, tw2 = G.S / st.C;
+    for(var ci = 0; ci < st.coins.length; ci++){
+      var cn = st.coins[ci]; if(cn.got || Math.abs(cn.r - zr) > .45) continue;
+      var dl = ((cn.lat - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
+      if(Math.abs(dl) < tw2 * COIN_R + .2 && Math.abs(Math.max(0, S.h) - cn.h) < .8){
+        cn.got = true; S.coins++;
+        S.coinChain = S.t - S.coinT < COIN_CHAIN_T ? S.coinChain + 1 : 1; S.coinT = S.t;
+        S.style += 40 * Math.min(8, S.coinChain); S.flow = Math.min(1, S.flow + .012);
+        SFX.coin(S.coinChain);
+      }
+    }
+    // the glint: a coin group's first coin coming into view, once
+    for(var gi = 0; gi < st.coins.length; gi++){
+      var cg = st.coins[gi]; if(cg.got || S.coinsSeen[cg.grp]) continue;
+      if(cg.r - zr < 28 && cg.r > zr){ S.coinsSeen[cg.grp] = 1; SFX.glint(); }
+    }
   }
   var sf = surf(G, S.p);
   if(sf.s !== S.side){
@@ -917,6 +997,22 @@ function draw(){
     ctx.moveTo(cx + Math.cos(ang) * r1s, cy + Math.sin(ang) * r1s); ctx.lineTo(cx + Math.cos(ang) * r2s, cy + Math.sin(ang) * r2s);
   }
   ctx.stroke();
+  if(st.coins){
+    var zr2 = S.z / D, spin = S.t * 6;
+    for(var di = st.coins.length - 1; di >= 0; di--){
+      var c2 = st.coins[di]; if(c2.got || c2.r < zr2 - 1 || c2.r > zr2 + 45) continue;
+      var cz = c2.r * D, sp2 = surf(G, c2.lat), un = upAt(G, c2.lat), cx2 = sp2.x + Math.cos(un) * c2.h, cy2 = sp2.y + Math.sin(un) * c2.h;
+      var Pc = proj(cx2, cy2, cz); if(!Pc) continue;
+      var kc = f / Pc[2] * .82, rr2 = Math.max(1.5, kc * .32), fogc = clamp(1 - (cz - S.z) / (70 * D), 0, 1);
+      var wob = Math.abs(Math.cos(spin + c2.r * .7));
+      ctx.globalAlpha = fogc * .35; ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(Pc[0], Pc[1], rr2 * 1.8, 0, TAU); ctx.fill();
+      ctx.globalAlpha = fogc;
+      ctx.fillStyle = "#b8860b"; ctx.beginPath(); ctx.ellipse(Pc[0], Pc[1], rr2 * Math.max(.18, wob), rr2, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.ellipse(Pc[0] - rr2 * .08 * wob, Pc[1], rr2 * .8 * Math.max(.14, wob), rr2 * .8, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.beginPath(); ctx.ellipse(Pc[0] - rr2 * .25 * wob, Pc[1] - rr2 * .3, rr2 * .14 * Math.max(.3, wob), rr2 * .22, 0, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
   drawSkater(proj, me, lean, f);
   // callouts
   ctx.save(); ctx.textAlign = "center";
@@ -948,7 +1044,7 @@ function draw(){
   $("spd").firstChild.nodeValue = String(Math.round(sp * 10));
   $("flowFill").style.width = (S.flow * 100).toFixed(1) + "%";
   $("flowTier").textContent = TIERS[S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0] + (S.combo > 1 ? "  ×" + S.combo : "");
-  $("score").textContent = "STYLE " + S.style.toLocaleString("en-US");
+  $("score").textContent = "STYLE " + S.style.toLocaleString("en-US") + "  ·  ◎ " + S.coins;
   var gNow = gradeAt(S.z), sl = $("slope"), slTxt = gNow < -.03 ? "▼ DOWNHILL " + Math.round(-gNow * 100) + "%" : gNow > .03 ? "▲ UPHILL " + Math.round(gNow * 100) + "%" : "";
   if(sl.textContent !== slTxt){ sl.textContent = slTxt; sl.className = "slope" + (gNow < -.03 ? " down" : gNow > .03 ? " up" : ""); }
 }
@@ -1009,10 +1105,12 @@ function drawSkater(proj, me, lean, f){
   // the egg: squashes on a landing or a tuck, stretches in the air
   var sq = 1 + crouch * .35 - air * .08, rx = k * .27 * sq, ry = k * .36 / sq, cyE = hip - ry * .92;
   // stubby arms, out for balance, up in the air
-  var armY = cyE - ry * .05, lift = air ? -k * .26 : k * (.06 - lean * .1);
+  var armY = cyE - ry * .05, lift = S.gliding ? -k * .02 : air ? -k * .26 : k * (.06 - lean * .1);
+  if(S.gliding){ ctx.strokeStyle = "rgba(46,230,255,.35)"; ctx.lineWidth = k * .03; ctx.beginPath(); ctx.moveTo(-rx - k * .38, armY + k * .04); ctx.lineTo(-rx - k * .7, armY + k * .1); ctx.moveTo(rx + k * .38, armY + k * .04); ctx.lineTo(rx + k * .7, armY + k * .1); ctx.stroke(); }
   ctx.strokeStyle = "#2f9e3e"; ctx.lineWidth = k * .075;
-  ctx.beginPath(); ctx.moveTo(-rx * .9, armY); ctx.lineTo(-rx - k * .2, armY + lift + lean * k * .08);
-  ctx.moveTo(rx * .9, armY); ctx.lineTo(rx + k * .2, armY + (air ? lift : k * (.06 + lean * .1)) - lean * k * .08); ctx.stroke();
+  var reach = S.gliding ? k * .38 : k * .2;
+  ctx.beginPath(); ctx.moveTo(-rx * .9, armY); ctx.lineTo(-rx - reach, armY + lift + lean * k * .08);
+  ctx.moveTo(rx * .9, armY); ctx.lineTo(rx + reach, armY + (air ? lift : k * (.06 + lean * .1)) - lean * k * .08); ctx.stroke();
   // egg shape: wider at the bottom, narrower at the top
   function egg(){ ctx.beginPath(); ctx.moveTo(0, cyE - ry);
     ctx.bezierCurveTo(rx * .75, cyE - ry, rx, cyE - ry * .1, rx, cyE + ry * .25);
@@ -1061,7 +1159,7 @@ function arrive(){
   checkProgress(false);
   if(!S.bestStyle[S.stopIdx] || S.style > S.bestStyle[S.stopIdx]){ S.bestStyle[S.stopIdx] = S.style; store.set("bestStyle", S.bestStyle); }
   $("arriveName").textContent = STOPS[S.stopIdx].name;
-  $("arriveStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo]]
+  $("arriveStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo], ["coins", S.coins + " / " + (S.st.coins ? S.st.coins.length : 0)]]
     .map(function(x){ return '<div class="stat"><b>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join("");
   var last = S.stopIdx === STOPS.length - 1;
   $("arriveNext").firstChild.textContent = last ? "Back to Dockyard" : "Next: " + STOPS[S.stopIdx + 1].name;
@@ -1089,7 +1187,7 @@ function finishForever(){
   else if(S.style > (rec.style || 0)) store.set("forever", { m:rec.m, style:S.style });
   $("foreverHead").textContent = newBest ? "forever · new best" : "forever";
   $("foreverDist").textContent = m.toLocaleString("en-US") + " M";
-  $("foreverStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo], ["your best", Math.max(m, rec.m || 0).toLocaleString("en-US") + " m"]]
+  $("foreverStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo], ["coins", S.coins], ["your best", Math.max(m, rec.m || 0).toLocaleString("en-US") + " m"]]
     .map(function(x){ return '<div class="stat"><b>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join("");
   showUnlocks("foreverUnlocks");
   showScreen("foreverScreen"); $("foreverAgain").focus();
@@ -1137,7 +1235,7 @@ checkProgress(true);
 renderMap(); renderLocker(); showScreen("mapScreen");
 requestAnimationFrame(frame);
 
-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { vgradeAt:vgradeAt, tune:function(o){ if(o.BEND_K != null) BEND_K = o.BEND_K; if(o.HILL_VIS != null) HILL_VIS = o.HILL_VIS; if(o.GAP_FLAT != null) GAP_FLAT = o.GAP_FLAT; }, gradeAt:gradeAt, heightAt:heightAt, floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { makeCoins:makeCoins, vgradeAt:vgradeAt, tune:function(o){ if(o.BEND_K != null) BEND_K = o.BEND_K; if(o.HILL_VIS != null) HILL_VIS = o.HILL_VIS; if(o.GAP_FLAT != null) GAP_FLAT = o.GAP_FLAT; }, gradeAt:gradeAt, heightAt:heightAt, floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
 // An embedding page that inlines the game sets window.__OL_START first.
 var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : /[?&]forever=1(&|$)/.test(location.search) ? "forever" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
 if(startWith === "daily") playDaily(false);
