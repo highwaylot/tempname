@@ -3,7 +3,8 @@
 // founder asked for no new videos): stills from the real game instead.
 //   games/outer-line/dist/
 //     index.html  the page          play.html  the game (one file)
-//     ride.jpg    hero still         map.jpg    line map still
+//     ride.jpg    hero still         map.jpg    spot list still
+//     beanies.jpg Scramble's locker, every beanie earned
 //     card-16x9.jpg, og.jpg, icon-512.png, game.json
 //   node games/outer-line/make.mjs
 import fs from 'node:fs';
@@ -26,8 +27,19 @@ const page = await b.newPage({ viewport: { width: 1280, height: 800 }, deviceSca
 await page.goto('file://' + path.join(here, 'game.html') + '?test=1');
 await page.waitForFunction(() => window.__ol);
 await page.screenshot({ path: path.join(out, 'map.png') });
+// Scramble's locker with every beanie earned, for the page
+const lockerBox = await page.evaluate(() => {
+  const O = window.__ol; O.BEANIES.forEach(b => O.unlock(b.id, true)); O.wear('send'); O.renderLocker();
+  const h = document.querySelector('.locker-head'), l = document.getElementById('locker'); h.scrollIntoView({ block: 'center' });
+  const a = h.getBoundingClientRect(), z = l.getBoundingClientRect();
+  return { x: Math.floor(z.left) - 16, y: Math.floor(a.top) - 16, width: Math.ceil(z.width) + 32, height: Math.ceil(z.bottom - a.top) + 32 };
+});
+await page.screenshot({ path: path.join(out, 'beanies.png'), clip: lockerBox });
+await page.evaluate(() => { localStorage.clear(); });
+await page.goto('file://' + path.join(here, 'game.html') + '?test=1');
+await page.waitForFunction(() => window.__ol);
 await page.evaluate(() => {
-  const O = window.__ol, S = O.S; O.rideStop(4);
+  const O = window.__ol, S = O.S; ['send', 'combo', 'gold'].forEach(id => O.unlock(id, true)); O.rideStop(4);
   const st = S.st, G = S.G, tw = G.S / st.C;
   for(let i = 0; i < 120 * 12 && S.mode === 'ride'; i++){
     const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
@@ -50,25 +62,27 @@ await b.close();
 
 ff('-i', path.join(out, 'ride.png'), '-q:v', '3', path.join(out, 'ride.jpg'));
 ff('-i', path.join(out, 'map.png'), '-q:v', '3', path.join(out, 'map.jpg'));
+ff('-i', path.join(out, 'beanies.png'), '-q:v', '3', path.join(out, 'beanies.jpg'));
 ff('-i', path.join(out, 'ride.png'), '-vf', 'crop=420:420:430:300,scale=512:512', path.join(out, 'icon-512.png'));
 const card = (w, h, dst) => ff('-i', path.join(out, 'ride.png'), '-filter_complex',
   `[0]scale=${w}:-1,crop=${w}:${h},eq=brightness=-0.06,drawbox=x=0:y=ih-10:w=iw*0.4:h=10:color=0xc6ff00:t=fill,drawbox=x=iw*0.4:y=ih-10:w=iw*0.3:h=10:color=0x2ee6ff:t=fill,drawbox=x=iw*0.7:y=ih-10:w=iw*0.3:h=10:color=0xff2e88:t=fill`,
   '-q:v', '3', path.join(out, dst));
 card(1280, 720, 'card-16x9.jpg');
 card(1200, 630, 'og.jpg');
-fs.rmSync(path.join(out, 'ride.png')); fs.rmSync(path.join(out, 'map.png'));
+fs.rmSync(path.join(out, 'ride.png')); fs.rmSync(path.join(out, 'map.png')); fs.rmSync(path.join(out, 'beanies.png'));
 
 fs.writeFileSync(path.join(out, 'game.json'), JSON.stringify({
   slug: 'outer-line', title: 'Outer Line', studio: 'Trip and Route',
   tagline: 'Walls are floors. Tricks are speed.',
-  short: 'An egg on a skateboard in the space metro. Walls are floors, tricks are speed.',
-  description: 'You\'re an egg on a skateboard, skating the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that keeps getting faster. One route a day, the same for everyone.',
+  short: 'Scramble, an egg on a skateboard, in the space metro. Tricks are speed.',
+  description: 'You\'re Scramble, an egg on a skateboard, skating the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that keeps getting faster. One route a day, the same for everyone.',
   status: 'preview', platforms: { web: 'play.html' },
   controls: { keys: '← → carve, ↑ jump (or Space), ↓ tuck, Esc for the spots', touch: 'hold a side to carve, tap or swipe up to jump, hold both to tuck' },
   orientation: 'any', aspect: '16:9', tags: ['skate', 'runner', 'tunnel', 'momentum', 'daily', 'egg'],
   ageNote: 'No chat, no accounts, no ads, no data leaves the device in this preview.',
   scheme: 'daily',
   daily: { resetsAt: '00:00 UTC', epoch: '2026-10-25', attempts: 'first ride counts, practice after' },
-  assets: { card: 'card-16x9.jpg', og: 'og.jpg', icon: 'icon-512.png', hero: 'ride.jpg', map: 'map.jpg' }
+  character: { name: 'Scramble', unlockables: '9 beanies, earned in play' },
+  assets: { card: 'card-16x9.jpg', og: 'og.jpg', icon: 'icon-512.png', hero: 'ride.jpg', map: 'map.jpg', beanies: 'beanies.jpg' }
 }, null, 2) + '\n');
 console.log(fs.readdirSync(out).map(f => f + ' ' + Math.round(fs.statSync(path.join(out, f)).size / 1024) + ' kB').join('\n'));
