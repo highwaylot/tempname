@@ -305,6 +305,7 @@ var TRICKS = {
   hop:   { label:"HOP",       flow:.05, pts:80 },
   edge:  { label:"EDGE",      flow:.05, pts:150 }
 };
+var EGG_SPECKS = [[-.5, -.3, .018], [.35, -.5, .014], [.6, .1, .02], [-.2, .35, .016], [.15, .1, .012], [-.65, .4, .014], [.4, .55, .017], [-.1, -.6, .012], [.05, .7, .015]];
 var TIERS = ["ROLLING", "FLOWING", "FULL SEND"];
 function trick(kind, extra){
   var k = TRICKS[kind];
@@ -570,11 +571,11 @@ function draw(){
   $("flowTier").textContent = TIERS[S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0] + (S.combo > 1 ? "  ×" + Math.min(8, S.combo) : "");
   $("score").textContent = "STYLE " + S.style.toLocaleString("en-US");
 }
-// The skater, seen from behind, riding the board nose-first down the
-// tunnel. The board is a real 3D quad (nose ahead, tail behind) that yaws
+// The rider: a green egg on a skateboard, seen from behind, riding the
+// board nose-first down the tunnel. The board is a real 3D quad (nose ahead, tail behind) that yaws
 // toward where you're carving; the feet stand on it side by side, facing
-// forward, and the body turns a little into the carve. Crouches on a tuck and a
-// landing, throws its arms up in the air.
+// forward, and the egg turns a little into the carve. Squashes on a tuck and a
+// landing, stretches and throws its arms up in the air.
 function drawSkater(proj, me, lean, f){
   var upC = upAt(S.G, S.p), hh = Math.max(-3, S.h), ux = Math.cos(upC), uy = Math.sin(upC);
   var bx = me.x + ux * hh, by = me.y + uy * hh, bz = S.z;
@@ -614,26 +615,39 @@ function drawSkater(proj, me, lean, f){
   var cr = Math.cos(-rot), sr = Math.sin(-rot);
   function loc(q){ var dx = q[0] - P[0], dy = q[1] - P[1]; return [dx * cr - dy * sr, dx * sr + dy * cr]; }
   var FB = loc(fb), FF = loc(ff), turn = sy * k * .12;
-  // legs: left foot to left hip, right to right, knees bent out on a crouch
-  var hip = -k * (.62 - crouch * .5), mid = (FB[0] + FF[0]) / 2 + turn * .5;
-  ctx.strokeStyle = "#1d1d26"; ctx.lineWidth = k * .1; ctx.lineCap = "round";
+  // legs: short and springy, left foot to left hip, right to right
+  var hip = -k * (.36 - crouch * .22), mid = (FB[0] + FF[0]) / 2 + turn * .5;
+  ctx.strokeStyle = "#1d1d26"; ctx.lineWidth = k * .085; ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(FB[0], FB[1]); ctx.lineTo((FB[0] + mid) / 2 - k * (.05 + crouch * .14), (FB[1] + hip) / 2); ctx.lineTo(mid - k * .06, hip);
-  ctx.moveTo(FF[0], FF[1]); ctx.lineTo((FF[0] + mid) / 2 + k * (.05 + crouch * .14), (FF[1] + hip) / 2); ctx.lineTo(mid + k * .06, hip);
+  ctx.moveTo(FB[0], FB[1]); ctx.lineTo((FB[0] + mid) / 2 - k * (.04 + crouch * .1), (FB[1] + hip) / 2); ctx.lineTo(mid - k * .09, hip);
+  ctx.moveTo(FF[0], FF[1]); ctx.lineTo((FF[0] + mid) / 2 + k * (.04 + crouch * .1), (FF[1] + hip) / 2); ctx.lineTo(mid + k * .09, hip);
   ctx.stroke();
   ctx.translate(mid, 0);
-  // hoodie
-  var sh = hip - k * .42;
-  ctx.fillStyle = "#ff2e88";
-  ctx.beginPath(); ctx.moveTo(-k * .17, hip + k * .02); ctx.lineTo(k * .17, hip + k * .02); ctx.lineTo(k * .2, sh); ctx.quadraticCurveTo(0, sh - k * .08, -k * .2, sh); ctx.closePath(); ctx.fill();
-  // arms: out for balance, up in the air
-  var armY = sh + k * .06, reach = k * (.32 + air * .05), lift = air ? -k * .32 : k * (.1 - lean * .12);
-  ctx.strokeStyle = "#ff2e88"; ctx.lineWidth = k * .085;
-  ctx.beginPath(); ctx.moveTo(-k * .18, armY); ctx.lineTo(-k * .18 - reach, armY + lift + lean * k * .1);
-  ctx.moveTo(k * .18, armY); ctx.lineTo(k * .18 + reach, armY + (air ? lift : k * (.1 + lean * .12)) - lean * k * .1); ctx.stroke();
-  // head and beanie
-  ctx.fillStyle = "#f4d2b0"; ctx.beginPath(); ctx.arc(turn, sh - k * .14, k * .12, 0, TAU); ctx.fill();
-  ctx.fillStyle = "#c6ff00"; ctx.beginPath(); ctx.arc(turn, sh - k * .17, k * .125, Math.PI, 0); ctx.fill();
+  // the egg: squashes on a landing or a tuck, stretches in the air
+  var sq = 1 + crouch * .35 - air * .08, rx = k * .27 * sq, ry = k * .36 / sq, cyE = hip - ry * .92;
+  // stubby arms, out for balance, up in the air
+  var armY = cyE - ry * .05, lift = air ? -k * .26 : k * (.06 - lean * .1);
+  ctx.strokeStyle = "#2f9e3e"; ctx.lineWidth = k * .075;
+  ctx.beginPath(); ctx.moveTo(-rx * .9, armY); ctx.lineTo(-rx - k * .2, armY + lift + lean * k * .08);
+  ctx.moveTo(rx * .9, armY); ctx.lineTo(rx + k * .2, armY + (air ? lift : k * (.06 + lean * .1)) - lean * k * .08); ctx.stroke();
+  // egg shape: wider at the bottom, narrower at the top
+  function egg(){ ctx.beginPath(); ctx.moveTo(0, cyE - ry);
+    ctx.bezierCurveTo(rx * .75, cyE - ry, rx, cyE - ry * .1, rx, cyE + ry * .25);
+    ctx.bezierCurveTo(rx, cyE + ry * .8, rx * .55, cyE + ry, 0, cyE + ry);
+    ctx.bezierCurveTo(-rx * .55, cyE + ry, -rx, cyE + ry * .8, -rx, cyE + ry * .25);
+    ctx.bezierCurveTo(-rx, cyE - ry * .1, -rx * .75, cyE - ry, 0, cyE - ry); ctx.closePath(); }
+  var eg = ctx.createRadialGradient(-rx * .35 + turn * .4, cyE - ry * .35, k * .02, 0, cyE, ry * 1.15);
+  eg.addColorStop(0, "#9df27a"); eg.addColorStop(.55, "#3fbf4a"); eg.addColorStop(1, "#1b6e2a");
+  egg(); ctx.fillStyle = eg; ctx.fill();
+  ctx.save(); egg(); ctx.clip();
+  // speckles, fixed to the shell
+  ctx.fillStyle = "rgba(20,70,25,.45)";
+  for(var i = 0; i < EGG_SPECKS.length; i++){ var sp2 = EGG_SPECKS[i]; ctx.beginPath(); ctx.arc(sp2[0] * rx, cyE + sp2[1] * ry, k * sp2[2], 0, TAU); ctx.fill(); }
+  ctx.restore();
+  // a magenta beanie on top, leaning into the turn
+  ctx.fillStyle = "#ff2e88"; ctx.beginPath(); ctx.ellipse(turn * .5, cyE - ry * .86, rx * .62, ry * .26, 0, Math.PI, 0); ctx.fill();
+  ctx.fillRect(turn * .5 - rx * .66, cyE - ry * .88, rx * 1.32, ry * .1);
+  ctx.beginPath(); ctx.arc(turn * .5, cyE - ry * 1.12, k * .04, 0, TAU); ctx.fill();
   ctx.restore();
 }
 
