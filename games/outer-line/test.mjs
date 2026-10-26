@@ -272,6 +272,43 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await ctx.close();
 }
 
+// forgiveness: a late press still jumps, holding jump at an edge jumps, and a
+// fall on a spot respawns at the last gap landing with style and coins kept
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S, out = {};
+    const setup = () => { O.rideStop(0); const st = S.st, G = S.G, tw = G.S / st.C, r = 40, c = st.trail[r] + 1; for(let k = r - 3; k <= r + 6; k++) st.rows[k].fill(1); st.rows[r].fill(0); st.rows[r + 1].fill(0); S.p = (c + .5) * tw; S.z = (r - 2) * O.D; S.vl = 0; S.grounded = true; S.h = 0; S.dead = 0; O.input.jumpQ = 0; O.input.jumpHeld = false; return r; };
+    // late by 80 ms
+    let r = setup(), off = -1, died = false;
+    for(let i = 0; i < 240; i++){ if(!S.grounded && off < 0) off = i; if(off >= 0 && i - off === 10) O.input.jumpQ = .14; O.update(1 / 120); if(S.dead > 0){ died = true; break; } if(S.z > (r + 4) * O.D && S.grounded) break; }
+    out.late80 = !died;
+    // late by 200 ms: too late
+    r = setup(); off = -1; died = false;
+    for(let i = 0; i < 240; i++){ if(!S.grounded && off < 0) off = i; if(off >= 0 && i - off === 24) O.input.jumpQ = .14; O.update(1 / 120); if(S.dead > 0){ died = true; break; } if(S.z > (r + 4) * O.D && S.grounded) break; }
+    out.late200 = died;
+    // holding jump through to the edge
+    r = setup(); O.input.jumpHeld = true; died = false;
+    for(let i = 0; i < 240; i++){ O.update(1 / 120); if(S.dead > 0){ died = true; break; } if(S.z > (r + 4) * O.D && S.grounded) break; }
+    O.input.jumpHeld = false; out.held = !died;
+    // checkpoint: clear a gap, collect, then fall later and respawn at the landing
+    O.rideStop(2); { const st = S.st, G = S.G, tw = G.S / st.C; let steps = 0;
+      while(S.mode === 'ride' && !S.check && steps < 120 * 30){ const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D)); const t = (st.trail[row] + st.width / 2) * tw, d = ((t - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2; const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7)); O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4; if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15; O.update(1 / 120); steps++; }
+      O.input.left = O.input.right = false;
+      const cz = S.check && S.check.z, style = S.style; S.z = cz + 20 * O.D; S.grounded = false; S.h = -1.3; S.vh = -5; S.fellOff = true; S.sunk = true;
+      for(let i = 0; i < 200 && !(S.dead === 0 && S.falls > 0); i++) O.update(1 / 120);
+      out.check = { had: cz != null, back: Math.abs(S.z - cz) < .01, mode: S.mode, styleKept: S.style >= style, falls: S.falls };
+    }
+    return out;
+  });
+  ok(res.late80, 'a jump pressed 80 ms after rolling off the edge still jumps (coyote time)');
+  ok(res.late200, 'a press 200 ms late is too late: you fall');
+  ok(res.held, 'holding jump as you reach an edge jumps');
+  ok(res.check.had && res.check.back && res.check.mode === 'ride' && res.check.styleKept && res.check.falls === 1, 'a fall on a spot respawns you at the last gap landing, style kept (' + JSON.stringify(res.check) + ')');
+  ok(errs.length === 0, 'no errors (forgiveness)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
 // glide and coins
 {
   const { ctx, page, errs } = await open({ width: 1280, height: 800 });
@@ -293,14 +330,14 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     }
     const air = held => { O.rideStop(0); const st = S.st; for(let k = 20; k < 60; k++) st.rows[k].fill(1); S.z = 22 * O.D; S.flow = S.flowS = 0; S.carry = 0; S.grounded = true; S.h = 0; O.input.jumpQ = .15; O.input.jumpHeld = held; const z0 = S.z; let t = 0; do { O.update(1 / 120); t++; } while((!S.grounded && t < 600) || t < 3); O.input.jumpHeld = false; return { rows: (S.z - z0) / O.D, carry: S.carry }; };
     out.plain = air(false); out.glide = air(true);
-    O.rideStop(0); { const st = S.st, G = S.G, tw = G.S / st.C, r = 40, c = st.trail[r] + 1; for(let k = r - 3; k <= r + 3; k++) st.rows[k].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * tw; S.z = (r - 2) * O.D; S.grounded = true; S.h = 0; O.input.jumpHeld = true; let died = false; for(let i = 0; i < 120; i++){ S.vl = 0; O.update(1 / 120); if(S.dead > 0){ died = true; break; } } O.input.jumpHeld = false; out.edge = died; }
+    O.rideStop(0); { const st = S.st, G = S.G, tw = G.S / st.C, r = 40, c = st.trail[r] + 1; for(let k = r - 3; k <= r + 3; k++) st.rows[k].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * tw; S.z = (r - 2) * O.D; S.grounded = true; S.h = 0; O.input.jumpHeld = false; let died = false, off = -1; for(let i = 0; i < 120; i++){ S.vl = 0; O.update(1 / 120); if(!S.grounded && off < 0) off = i; if(off >= 0 && i - off > 18) O.input.jumpHeld = true; if(S.dead > 0){ died = true; break; } } O.input.jumpHeld = false; out.edge = died; }
     return out;
   });
   ok(res.stops.every(s => s.arcs === s.gapStarts && s.crestLines === s.crests), 'every jump-gap has a coin arc and every crest a glide line (' + res.stops.map(s => s.arcs + '/' + s.gapStarts + ' ' + s.crestLines + '/' + s.crests).join(', ') + ')');
   ok(res.stops.every(s => s.coins > 0), 'coins can be collected on every spot without gliding (' + res.stops.map(s => s.coins + '/' + s.total).join(' ') + ')');
   ok(res.chainMax >= 5, 'coins chain (longest chain ×' + res.chainMax + ', so the dings climb)');
   ok(res.glide.rows > res.plain.rows * 1.5 && res.glide.carry < res.plain.carry, 'holding glide stretches a jump (' + res.plain.rows.toFixed(1) + ' → ' + res.glide.rows.toFixed(1) + ' rows) and costs speed');
-  ok(res.edge, 'gliding can\'t rescue rolling off an edge into a hole');
+  ok(res.edge, 'rolling off an edge without jumping can\'t be rescued by gliding once the 0.12 s jump window has passed');
   ok(errs.length === 0, 'no errors (glide and coins)' + (errs.length ? ': ' + errs[0] : ''));
   await ctx.close();
 }

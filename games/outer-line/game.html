@@ -233,6 +233,10 @@ var FLOOR_L = 64, FLOOR_TINT = .2, FLOOR_WALL = .6, FLOOR_MIN_LUM = .15;
 // rows down the downhills.
 var GLIDE_MAX = .8, GLIDE_FALL = 2.2, GLIDE_GRAV = .25, GLIDE_DRAG = .18, CREST_ROWS = 13, COIN_R = .55, COIN_CHAIN_T = .7;
 var glideTold = false, PACE = .85;
+// Forgiveness that keeps the rules honest: a jump pressed up to COYOTE seconds
+// after rolling off an edge still jumps; holding jump as you reach an edge
+// jumps; and on spots and practice a fall respawns you at the last gap landing.
+var COYOTE = .12;
 var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 55, CARRY_MAX = 1.3, HILL_TOP = 1, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 2, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = 1.2, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
 var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
@@ -459,6 +463,14 @@ var pops = [];   // trick callouts drawn on the canvas
 // HILL_TOP × base on a downhill; every layout is built for that top speed.
 // PACE scales all forward motion (founder: "80 out of 100, 68 would be perfect")
 function speedNow(){ return speedRaw() * PACE; }
+function doJump(){
+  if(!glideTold){ glideTold = true; hint(touchy ? "in the air: hold both sides to glide" : "in the air: keep holding ↑ to glide", 2200); }
+  if(S.landT < .16 && S.airT > .25) trick("hop");   // a jump right as you land is a hop: it keeps the line going
+  // a jump covers at most JUMP_ROWS rows: fast, it's a lower, flatter ollie,
+  // so speed never carries you over one gap and into the next
+  S.grounded = false; S.h = Math.max(S.h, 0); S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))); input.jumpQ = 0;
+  S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; SFX.jump();
+}
 function speedRaw(){ if(!S.st) return 0; var b = S.st.p.speed; return Math.min(b * ((1 + FLOW_MAX) * TUCK + HILL_TOP), b * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) + S.carry); }
 
 function startStation(params, opts){
@@ -467,7 +479,7 @@ function startStation(params, opts){
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
-  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.coins = 0; S.coinChain = 0; S.coinT = -9; S.coinsSeen = {}; input.jumpQ = 0;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.coins = 0; S.coinChain = 0; S.coinT = -9; S.coinsSeen = {}; S.check = null; S.spawnT = 0; S.falls = 0; S.flowAtFall = 0; input.jumpQ = 0;
   if(S.st.coins) S.st.coins.forEach(function(c){ c.got = false; });
   S.roll = upAt(S.G, S.p); S.side = surf(S.G, S.p).s;
   S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
@@ -777,16 +789,13 @@ function update(dt){
   if(input.jumpQ > 0) input.jumpQ -= dt;
   S.landT += dt;
   if(S.grounded){
-    if(input.jumpQ > 0){
-      // a jump right as you land is a hop: it keeps the line going
-      if(S.landT < .16 && S.airT > .25) trick("hop");
-      // a jump covers at most JUMP_ROWS rows: fast, it's a lower, flatter ollie,
-      // so speed never carries you over one gap and into the next
-      if(!glideTold){ glideTold = true; hint(touchy ? "in the air: hold both sides to glide" : "in the air: keep holding ↑ to glide", 2200); }
-      S.grounded = false; S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))); input.jumpQ = 0; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; SFX.jump();
+    if(input.jumpQ > 0) doJump();
+    else if(!tileAt(S.p, S.z)){
+      if(input.jumpHeld) doJump();   // holding jump at an edge jumps
+      else { S.grounded = false; S.vh = 0; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = true; S.holeT = 0; S.sunk = false; }
     }
-    else if(!tileAt(S.p, S.z)){ S.grounded = false; S.vh = 0; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = true; S.holeT = 0; S.sunk = false; }
   }
+  if(!S.grounded && S.fellOff && S.airT < COYOTE && (input.jumpQ > 0 || input.jumpHeld)) doJump();
   if(!S.grounded){
     S.airT += dt;
     var under = tileAt(S.p, S.z);
@@ -812,10 +821,10 @@ function update(dt){
       if(under && S.h > -.35 && !S.sunk){
         var hard = S.vh < -12;
         S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; S.fellOff = false; S.sunk = false; S.glideT = 0; S.gliding = false; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
-        if(S.airGap){ var rowsCleared = Math.round(S.airT * sp / D); trick(rowsCleared >= 5 ? "big" : "gap"); }
+        if(S.airGap){ var rowsCleared = Math.round(S.airT * sp / D); trick(rowsCleared >= 5 ? "big" : "gap"); S.check = { z:Math.floor(S.z / D) * D, p:S.p }; }
         if(S.airSide) trick("xfer");
       }
-      else if(S.h < -1.2){ S.dead = DEATH_T; S.flow = 0; S.combo = 0; S.comboT = 0; SFX.fall(); }
+      else if(S.h < -1.2){ S.flowAtFall = S.flow; S.dead = DEATH_T; S.flow = 0; S.combo = 0; S.comboT = 0; SFX.fall(); }
     }
     if(S.h > R * .9){ S.h = R * .9; S.vh = Math.min(S.vh, 0); }
   }
@@ -864,8 +873,17 @@ function update(dt){
 function retry(){
   if(S.st && S.st.forever){ finishForever(); return; }
   if(S.daily && S.dailyFirst){ finishDaily(Math.min(99, Math.floor(S.z / D / S.st.len * 100))); return; }
+  if(S.check){ respawn(); return; }
   var p = S.daily ? S.daily.p : STOPS[S.stopIdx];
   startStation(p, { seed:S.daily ? S.daily.p.seed : null, color:S.color, label:S.label });
+}
+// back at the last gap landing: style and coins kept, flow halved, a quick fade in
+function respawn(){
+  var c = S.check, G = S.G;
+  S.z = c.z; S.p = c.p; S.vl = 0; S.h = 0; S.vh = 0; S.grounded = true; S.dead = 0; S.carry = 0; S.flow = S.flowS = S.flowAtFall * .5;
+  S.landT = 9; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false;
+  S.roll = upAt(G, S.p); S.rollV = 0; S.side = surf(G, S.p).s; S.row = Math.floor(S.z / D); S.spawnT = S.t; S.falls++;
+  input.jumpQ = 0; pops.length = 0;
 }
 
 // ---------------------------------------------------------------- render
@@ -1036,7 +1054,7 @@ function draw(){
   ctx.restore();
   // a short dip to black hides the cut from a fall back to the start
   if(S.mode === "ride"){
-    var fade = S.dead > 0 ? clamp((FADE_T - S.dead) / FADE_T, 0, 1) : clamp(1 - S.t / FADE_T, 0, 1);
+    var fade = S.dead > 0 ? clamp((FADE_T - S.dead) / FADE_T, 0, 1) : clamp(1 - (S.t - (S.spawnT || 0)) / FADE_T, 0, 1);
     if(fade > 0){ fade = fade * fade * (3 - 2 * fade); ctx.fillStyle = "rgba(8,8,12," + fade.toFixed(3) + ")"; ctx.fillRect(0, 0, W, H); }
   }
   // HUD numbers
@@ -1161,7 +1179,7 @@ function arrive(){
   checkProgress(false);
   if(!S.bestStyle[S.stopIdx] || S.style > S.bestStyle[S.stopIdx]){ S.bestStyle[S.stopIdx] = S.style; store.set("bestStyle", S.bestStyle); }
   $("arriveName").textContent = STOPS[S.stopIdx].name;
-  $("arriveStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo], ["coins", S.coins + " / " + (S.st.coins ? S.st.coins.length : 0)]]
+  $("arriveStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo], ["coins", S.coins + " / " + (S.st.coins ? S.st.coins.length : 0)], ["falls", S.falls]]
     .map(function(x){ return '<div class="stat"><b>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join("");
   var last = S.stopIdx === STOPS.length - 1;
   $("arriveNext").firstChild.textContent = last ? "Back to Dockyard" : "Next: " + STOPS[S.stopIdx + 1].name;
