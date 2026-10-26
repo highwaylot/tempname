@@ -69,6 +69,52 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await ctx.close();
 }
 
+// forever: survivable deep past the end of the ramp, gaps marked, one fall ends it
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S, DEEP = 4000, out = { runs: 0, falls: [], gaps: 0, minRows: Infinity, topBase: 0 };
+    for(let seed = 1; seed <= 20; seed++){
+      O.startStation({ name: 'Forever', forever: true, seed }, {});
+      const G = S.G; let steps = 0;
+      while(S.mode === 'ride' && S.z / O.D < DEEP && steps < 120 * 600){
+        const st = S.st, tw = G.S / st.C, row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+        const target = (st.trail[row] + st.wid[row] / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
+        const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
+        O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
+        if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
+        O.update(1 / 120); steps++;
+      }
+      O.input.left = O.input.right = false;
+      out.runs++;
+      if(S.mode !== 'ride' || S.dead > 0) out.falls.push(seed);
+      out.minRows = Math.min(out.minRows, Math.floor(S.z / O.D));
+      out.gaps += S.st.gap.filter((g, i) => g && !S.st.gap[i - 1] && i < S.z / O.D).length;
+      out.topBase = Math.max(out.topBase, S.st.p.speed);
+    }
+    // gap marks agree with the rows on a built stop
+    const t = O.buildStation(O.STOPS[9]); let markOk = true;
+    for(let r = 0; r < t.len; r++) if(!!t.gap[r] !== t.rows[r].every(v => !v)) markOk = false;
+    out.markOk = markOk;
+    return out;
+  });
+  ok(res.falls.length === 0 && res.minRows >= 4000, 'forever: autopilot survives 20 random runs 4,000 rows deep, past the end of the ramp (' + res.gaps + ' jump-gaps, base speed up to ' + res.topBase.toFixed(1) + ', falls on seeds: ' + (res.falls.join(', ') || 'none') + ')');
+  ok(res.markOk, 'every fully empty row is marked as a jump-gap (and nothing else is)');
+  // one fall ends the run on its card and saves the best; the bar races it next time
+  await page.evaluate(() => { localStorage.removeItem('outerline.forever'); window.__ol.S.mode = 'ride'; document.getElementById('foreverMap').click(); });
+  await page.click('#playForever'); await page.waitForTimeout(300);
+  const ride = await page.evaluate(() => ({ forever: !!window.__ol.S.st.forever, label: document.getElementById('stnName').textContent, bar: document.getElementById('progFill').style.width }));
+  await page.evaluate(() => { const S = window.__ol.S; S.z = 512; S.grounded = false; S.h = -1.3; S.vh = -5; });
+  await page.waitForTimeout(1400);
+  const end = await page.evaluate(() => ({ shown: !document.getElementById('foreverScreen').hidden, dist: document.getElementById('foreverDist').textContent, head: document.getElementById('foreverHead').textContent, rec: JSON.parse(localStorage.getItem('outerline.forever') || '{}') }));
+  ok(ride.forever && /^FOREVER/.test(ride.label) && parseFloat(ride.bar) === 0, 'Forever starts an endless ride; with no best yet the bar is empty (' + ride.label + ', bar ' + ride.bar + ')');
+  ok(end.shown && /new best/.test(end.head) && end.rec.m >= 512 && /M$/.test(end.dist), 'one fall ends the run on its card and saves the best (' + end.dist + ')');
+  await page.click('#foreverAgain'); await page.waitForTimeout(200);
+  ok(await page.evaluate(() => /BEST/.test(document.getElementById('stnName').textContent)), 'the next run shows the best to beat');
+  ok(errs.length === 0, 'no errors (forever)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
 // 2-3. real-time play on desktop
 {
   const { ctx, page, errs } = await open({ width: 1280, height: 800 });

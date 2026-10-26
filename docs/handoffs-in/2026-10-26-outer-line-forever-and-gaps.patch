@@ -1,0 +1,233 @@
+--- game.html
++++ game.html
+@@ -61,6 +61,7 @@
+   .btn > span{ display:inline-block; transform:skewX(10deg); }
+   .btn.go{ background:var(--lime); color:#0b0b0b; border-color:var(--lime); box-shadow:5px 5px 0 var(--mag); }
+   .btn.mag{ border-color:var(--mag); color:var(--mag); }
++  .btn.cyan{ border-color:var(--cyan); color:var(--cyan); }
+   .btn:active{ transform:skewX(-10deg) translate(3px, 3px); box-shadow:2px 2px 0 rgba(0,0,0,.5); }
+   .spots{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:14px; }
+   .spot{ appearance:none; text-align:left; border:0; padding:14px 14px 12px; background:#14141c; color:var(--ink); cursor:pointer; position:relative; transform:rotate(var(--r, 0deg)); box-shadow:4px 4px 0 rgba(0,0,0,.55); display:flex; flex-direction:column; gap:6px; min-height:104px; font-family:var(--heavy); }
+@@ -128,6 +129,7 @@
+     <div class="row">
+       <button type="button" class="btn go" id="playNext"><span>Drop in</span></button>
+       <button type="button" class="btn mag" id="playDaily"><span>Today's route</span></button>
++      <button type="button" class="btn cyan" id="playForever"><span>Forever</span></button>
+     </div>
+     <p class="keys" id="keys"></p>
+     <div class="spots" id="spots"></div>
+@@ -165,6 +167,20 @@
+   </div>
+ </section>
+ 
++<section class="screen" id="foreverScreen" hidden>
++  <div class="page">
++    <span class="tape" id="foreverHead">forever</span>
++    <p class="big" id="foreverDist">—</p>
++    <div class="stats" id="foreverStats"></div>
++    <div class="unlocks" id="foreverUnlocks" hidden></div>
++    <div class="row">
++      <button type="button" class="btn go" id="foreverAgain"><span>Again</span></button>
++      <button type="button" class="btn" id="foreverMap"><span>Spots</span></button>
++    </div>
++    <p class="keys">One line that never ends. It starts easy and gets meaner the further you get. One fall and that's the run.</p>
++  </div>
++</section>
++
+ <div class="toast" id="toast" hidden></div>
+ 
+ <script>
+@@ -234,7 +250,57 @@
+     }
+     rows.push(row); trail.push(path);
+   }
+-  return { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:rows.length, start:start, trail:trail, width:p.width };
++  return { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:rows.length, start:start, trail:trail, width:p.width, gap:markGaps(rows) };
++}
++// gap[r] = 1 when row r is a full gap (every tile gone): those get a red lip before and a lime landing after
++function markGaps(rows, from, gap){
++  gap = gap || [];
++  for(var r = from || 0; r < rows.length; r++){ var any = 0; for(var c = 0; c < rows[r].length; c++) if(rows[r][c]){ any = 1; break; } gap[r] = any ? 0 : 1; }
++  return gap;
++}
++
++// Forever: one line that never ends. Rows are built ahead of you as you ride, and
++// everything ramps with distance: more holes, narrower safe path, gaps closer
++// together and longer, more speed. RAMP rows to reach the meanest settings.
++var RAMP = 2400;
++function foreverAt(r){
++  var t = Math.min(1, r / RAMP);
++  return { t:t, holes:.10 + .62 * t, width: t < .3 ? 3 : t < .65 ? 2 : 1, gapEvery: Math.round(30 - 17 * t), gapLen: t < .25 ? 1 : t < .6 ? 2 : 3, speed:10 + 5.5 * t };
++}
++function buildForever(seed){
++  var p = { name:"Forever", N:6, C:3, speed:10, width:3, seed:seed, forever:true };
++  var rng = mulberry32(seed * 2654435761 >>> 0), cols = p.N * p.C, rows = [], trail = [];
++  var path = Math.floor(rng() * cols), start = path, drift = 0, hist = [], sinceGap = 0;
++  var tileW = 2 * R * Math.sin(Math.PI / p.N) / p.C, START = 14;
++  var st = { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:0, start:start, trail:trail, width:3, gap:[], forever:true };
++  st.extend = function(n){
++    var from = rows.length;
++    for(var k = 0; k < n; k++){
++      var r = rows.length, f = foreverAt(r), row = new Uint8Array(cols);
++      if(r < START){ row.fill(1); rows.push(row); trail.push(path); continue; }
++      // after a sideways shift the old column stays long enough to step across at this speed
++      var keep = Math.ceil((2 * Math.sqrt(tileW / ACC) + .08) * f.speed * (1 + FLOW_MAX) * TUCK / D) + 1;
++      if(r % 2 === 0){
++        if(rng() < .35) drift = rng() < .5 ? -1 : 1;
++        if(rng() < .3) drift = 0;
++        path = (path + drift + cols) % cols;
++      }
++      for(var c = 0; c < cols; c++) row[c] = rng() < f.holes ? 0 : 1;
++      hist.push(path); while(hist.length > keep) hist.shift();
++      for(var hi = 0; hi < hist.length; hi++) for(var w = 0; w < f.width; w++) row[(hist[hi] + w) % cols] = 1;
++      sinceGap++;
++      if(sinceGap >= f.gapEvery && r > START + 6){
++        rows.push(row); trail.push(path);
++        for(var g = 0; g < f.gapLen; g++){ rows.push(new Uint8Array(cols)); trail.push(path); }
++        var land = new Uint8Array(cols); land.fill(1); rows.push(land); trail.push(path);
++        k += f.gapLen + 1; sinceGap = 0; continue;
++      }
++      rows.push(row); trail.push(path);
++    }
++    st.len = rows.length; markGaps(rows, from, st.gap);
++  };
++  st.extend(400);
++  return st;
+ }
+ 
+ // Today's route: the same for everyone; UTC day, #1 = 2026-10-25.
+@@ -294,7 +360,7 @@
+ 
+ function startStation(params, opts){
+   opts = opts || {};
+-  S.st = buildStation(params, opts.seed);
++  S.st = params.forever ? buildForever(params.seed) : buildStation(params, opts.seed);
+   S.G = geom(S.st.N);
+   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
+   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
+@@ -536,6 +602,10 @@
+   if(S.mode !== "ride") return;
+   S.t += dt;
+   var st = S.st, G = S.G, tw = G.S / st.C;
++  if(st.forever){
++    if(st.len - S.z / D < 180) st.extend(300);
++    st.p.speed = foreverAt(S.z / D).speed;
++  }
+   S.flowS += (S.flow - S.flowS) * Math.min(1, dt * 4);
+   // stars and speed lines advance by accumulated phase, so a speed change
+   // changes how fast they stream, never where they are
+@@ -606,6 +676,7 @@
+   if(!S.arrived && S.z / D >= st.len - 2){ S.arrived = true; arrive(); }
+ }
+ function retry(){
++  if(S.st && S.st.forever){ finishForever(); return; }
+   if(S.daily && S.dailyFirst){ finishDaily(Math.min(99, Math.floor(S.z / D / S.st.len * 100))); return; }
+   var p = S.daily ? S.daily.p : STOPS[S.stopIdx];
+   startStation(p, { seed:S.daily ? S.daily.p.seed : null, color:S.color, label:S.label });
+@@ -661,9 +732,21 @@
+     if(fog <= 0) continue;
+     // lines thinner than a few pixels on screen shimmer, so far rows fade them out
+     var px = f * D / Math.max(.5, r * D - camZ), lineA = clamp((px - 3) / 9, 0, 1);
+-    var finish = r >= st.len - 8, seam = r % 8 === 0;
++    var finish = !st.forever && r >= st.len - 8, seam = r % 8 === 0;
++    // reading the floor at speed: the row before a jump-gap is a red lip, the row after it lands lime
++    var gapNext = r + 1 < st.len && st.gap[r + 1], landing = r > 0 && st.gap[r - 1] && row && !st.gap[r];
++    var nextRow = r + 1 < st.len ? st.rows[r + 1] : null;
+     for(var c = 0; c < st.cols; c++){
+-      if(row && !row[c]) continue;
++      if(row && !row[c]){
++        // a single hole: a faint red outline so it reads as a pit, not as nothing (full gap rows stay open)
++        if(st.gap[r] || lineA < .05) continue;
++        var hA = surf(G, c * tw + tw * .1), hB = surf(G, (c + 1) * tw - tw * .1);
++        var h0 = proj(hA.x, hA.y, z0), h1 = proj(hB.x, hB.y, z0), h2 = proj(hB.x, hB.y, z1), h3 = proj(hA.x, hA.y, z1);
++        if(!h0 || !h1 || !h2 || !h3) continue;
++        ctx.beginPath(); ctx.moveTo(h0[0], h0[1]); ctx.lineTo(h1[0], h1[1]); ctx.lineTo(h2[0], h2[1]); ctx.lineTo(h3[0], h3[1]); ctx.closePath();
++        ctx.strokeStyle = "rgba(255,68,51," + (.28 * fog * lineA).toFixed(3) + ")"; ctx.lineWidth = 1; ctx.stroke();
++        continue;
++      }
+       var A = surf(G, c * tw + tw * .04), B = surf(G, (c + 1) * tw - tw * .04);
+       var q0 = proj(A.x, A.y, z0), q1 = proj(B.x, B.y, z0), q2 = proj(B.x, B.y, z1), q3 = proj(A.x, A.y, z1);
+       if(!q0 || !q1 || !q2 || !q3) continue;
+@@ -673,6 +756,23 @@
+       var shade = Math.round(20 + 10 * w);
+       ctx.fillStyle = "rgba(" + shade + "," + shade + "," + (shade + 10) + "," + (.96 * fog).toFixed(3) + ")";
+       ctx.fill();
++      if(gapNext){ ctx.fillStyle = "rgba(255,68,51," + (.34 * fog).toFixed(3) + ")"; ctx.fill(); }
++      else if(landing){ ctx.fillStyle = "rgba(198,255,0," + (.2 * fog).toFixed(3) + ")"; ctx.fill(); }
++      // lips: any edge of this tile that drops into a hole lights up red
++      if(row){
++        var lipA = (gapNext ? 1 : .8) * fog * Math.max(lineA, gapNext ? .6 : 0);
++        if(lipA > .02){
++          ctx.strokeStyle = "rgba(255,68,51," + Math.min(1, lipA).toFixed(3) + ")";
++          if(nextRow && !nextRow[c]){ ctx.lineWidth = gapNext ? 3 + 1.5 * w : 2; ctx.beginPath(); ctx.moveTo(q3[0], q3[1]); ctx.lineTo(q2[0], q2[1]); ctx.stroke(); }
++          // side lips are loudest on the floor you're riding, quieter up the walls
++          ctx.strokeStyle = "rgba(255,68,51," + Math.min(1, lipA * (.3 + .7 * w)).toFixed(3) + ")";
++          ctx.lineWidth = 1.6;
++          if(!row[(c - 1 + st.cols) % st.cols]){ ctx.beginPath(); ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q3[0], q3[1]); ctx.stroke(); }
++          if(!row[(c + 1) % st.cols]){ ctx.beginPath(); ctx.moveTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.stroke(); }
++          // the lips replaced the current path: trace the tile again for its normal outline below
++          ctx.beginPath(); ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.lineTo(q3[0], q3[1]); ctx.closePath();
++        }
++      }
+       var glow = (.32 + .43 * w) * fog * (seam ? 1.6 : 1) * (seam ? Math.max(lineA, .35) : lineA);
+       if(glow < .01) continue;
+       ctx.strokeStyle = seam ? "rgba(255,46,136," + Math.min(1, glow).toFixed(3) + ")" : "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + glow.toFixed(3) + ")";
+@@ -713,7 +813,7 @@
+     if(fade > 0){ fade = fade * fade * (3 - 2 * fade); ctx.fillStyle = "rgba(8,8,12," + fade.toFixed(3) + ")"; ctx.fillRect(0, 0, W, H); }
+   }
+   // HUD numbers
+-  var prog = Math.min(1, S.z / D / st.len);
++  var prog = st.forever ? Math.min(1, S.z / Math.max(1, (store.get("forever", {}).m || 0))) : Math.min(1, S.z / D / st.len);
+   $("progFill").style.width = (prog * 100).toFixed(1) + "%";
+   $("spd").firstChild.nodeValue = String(Math.round(sp * 10));
+   $("flowFill").style.width = (S.flow * 100).toFixed(1) + "%";
+@@ -798,7 +898,7 @@
+ }
+ 
+ // ---------------------------------------------------------------- screens
+-function showScreen(id){ ["mapScreen", "arriveScreen", "dailyScreen"].forEach(function(s){ $(s).hidden = s !== id; }); if(id){ $("hudTop").hidden = true; $("hudBot").hidden = true; $("toMap").hidden = true; } }
++function showScreen(id){ ["mapScreen", "arriveScreen", "dailyScreen", "foreverScreen"].forEach(function(s){ $(s).hidden = s !== id; }); if(id){ $("hudTop").hidden = true; $("hudBot").hidden = true; $("toMap").hidden = true; } }
+ function hint(text, ms){ var h = $("hint"); h.textContent = text; h.hidden = false; h.style.opacity = "1"; clearTimeout(hint.t); hint.t = setTimeout(function(){ h.style.opacity = "0"; }, ms); }
+ function toast(text){ var t = $("toast"); t.textContent = text; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function(){ t.hidden = true; }, 1800); }
+ function renderMap(){
+@@ -843,6 +943,26 @@
+ $("toMap").addEventListener("click", toMap);
+ $("playNext").addEventListener("click", function(){ rideStop(Math.min(S.best, STOPS.length - 1)); });
+ $("playDaily").addEventListener("click", function(){ playDaily(false); });
++$("playForever").addEventListener("click", function(){ playForever(); });
++function playForever(){
++  ac(); S.daily = null;
++  var best = store.get("forever", {}).m || 0;
++  startStation({ name:"Forever", forever:true, seed:(Math.random() * 1e9) >>> 0 }, { color:"#2ee6ff", label:"FOREVER" + (best ? " · BEST " + best.toLocaleString("en-US") + " M" : "") });
++}
++function finishForever(){
++  S.mode = "forever"; checkProgress(false);
++  var m = Math.round(S.z), rec = store.get("forever", {}), newBest = m > (rec.m || 0);
++  if(newBest) store.set("forever", { m:m, style:Math.max(S.style, rec.style || 0) });
++  else if(S.style > (rec.style || 0)) store.set("forever", { m:rec.m, style:S.style });
++  $("foreverHead").textContent = newBest ? "forever · new best" : "forever";
++  $("foreverDist").textContent = m.toLocaleString("en-US") + " M";
++  $("foreverStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo], ["your best", Math.max(m, rec.m || 0).toLocaleString("en-US") + " m"]]
++    .map(function(x){ return '<div class="stat"><b>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join("");
++  showUnlocks("foreverUnlocks");
++  showScreen("foreverScreen"); $("foreverAgain").focus();
++}
++$("foreverAgain").addEventListener("click", function(){ playForever(); });
++$("foreverMap").addEventListener("click", toMap);
+ function playDaily(practice){
+   ac();
+   var d = dailyInfo(), rec = store.get("daily", {});
+@@ -884,10 +1004,11 @@
+ renderMap(); renderLocker(); showScreen("mapScreen");
+ requestAnimationFrame(frame);
+ 
+-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
++if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+ // An embedding page that inlines the game sets window.__OL_START first.
+-var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
++var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : /[?&]forever=1(&|$)/.test(location.search) ? "forever" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
+ if(startWith === "daily") playDaily(false);
++else if(startWith === "forever") playForever();
+ else if(startWith === "play") rideStop(Math.min(S.best, STOPS.length - 1));
+ })();
+ </script>

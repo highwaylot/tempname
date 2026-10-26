@@ -78,9 +78,10 @@ fs.writeFileSync(path.join(out, 'game.json'), JSON.stringify({
   description: 'You\'re Scramble, an egg on a skateboard, skating the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that keeps getting faster. One route a day, the same for everyone.',
   status: 'preview', platforms: { web: 'play.html' },
   controls: { keys: '← → carve, ↑ jump (or Space), ↓ tuck, Esc for the spots', touch: 'hold a side to carve, tap or swipe up to jump, hold both to tuck' },
-  orientation: 'any', aspect: '16:9', tags: ['skate', 'runner', 'tunnel', 'momentum', 'daily', 'egg'],
+  orientation: 'any', aspect: '16:9', tags: ['skate', 'runner', 'tunnel', 'momentum', 'daily', 'endless', 'egg'],
   ageNote: 'No chat, no accounts, no ads, no data leaves the device in this preview.',
   scheme: 'daily',
+  modes: { spots: 10, daily: '?daily=1', forever: '?forever=1' },
   daily: { resetsAt: '00:00 UTC', epoch: '2026-10-25', attempts: 'first ride counts, practice after' },
   character: { name: 'Scramble', unlockables: '9 beanies, earned in play' },
   assets: { card: 'card-16x9.jpg', og: 'og.jpg', icon: 'icon-512.png', hero: 'ride.jpg', map: 'map.jpg', beanies: 'beanies.jpg' }
