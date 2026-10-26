@@ -80,7 +80,7 @@
   .stat b{ display:block; font:900 italic 30px/1 var(--heavy); color:var(--lime); font-variant-numeric:tabular-nums; }
   .stat span{ font:700 11px var(--mono); letter-spacing:.14em; color:var(--dim); text-transform:uppercase; }
   .share{ font:700 14px/1.5 var(--mono); white-space:pre; background:#101016; border:2px dashed rgba(255,255,255,.25); padding:14px 16px; color:var(--ink); align-self:flex-start; max-width:100%; overflow-x:auto; }
-  .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%) rotate(-2deg); font:900 italic 14px var(--heavy); background:var(--lime); color:#111; padding:10px 14px; box-shadow:4px 4px 0 var(--mag); }
+  .toast{ pointer-events:none; position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%) rotate(-2deg); font:900 italic 14px var(--heavy); background:var(--lime); color:#111; padding:10px 14px; box-shadow:4px 4px 0 var(--mag); }
   .locker-head{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-top:6px; }
   .locker-head h2{ margin:0; font:900 italic 26px/1 var(--heavy); text-transform:uppercase; }
   .locker-head h2 em{ color:var(--lime); font-style:italic; }
@@ -220,7 +220,24 @@ var SPOT_COLORS = ["#c6ff00", "#c6ff00", "#c6ff00", "#2ee6ff", "#2ee6ff", "#2ee6
 // World units and feel. Lateral movement is a skater's: it accelerates,
 // carries momentum, and slides to a stop instead of snapping.
 var R = 3, D = 1.6, GRAV = 32, JUMP_V = 10.5;
-var ACC = 46, AIR_ACC = 26, FRICTION = 1.5, AIR_FRICTION = .25, VL_BASE = 6.5, VL_FLOW = 3;
+var ACC = 46, AIR_ACC = 26, FRICTION = 3, AIR_FRICTION = 1, VL_BASE = 6.5, VL_FLOW = 3;
+// Grip: let go of a side and the board brakes by LAT_STOP (a flat bite) plus
+// FRICTION × speed, so a release settles in about a third of a tile instead of
+// drifting on; turning against a slide bites TURN_BITE × harder.
+// FOOT: the board's half-width, as a share of a tile. Its edge on floor holds
+// you up; the centre over a hole for HOLE_GRACE is still a fall.
+var LAT_STOP = 30, AIR_STOP = 25, TURN_BITE = 1.7, FOOT = .12;
+// The jump arc: a floatier rise and a heavier fall (JUMP_K × the old launch,
+// RISE_G × gravity up, FALL_K × that down), tuned so apex height, air time and
+// landing row match the old symmetric arc. Tap ↓ in the air to drop faster.
+// A rolled-off edge falls at plain GRAV.
+var JUMP_K = .8535533905932737, RISE_G = .7285533905932737, FALL_K = 2, FASTFALL = 1.6, HARD_V = 15;
+// A glide off a jump ends GLIDE_ROWS rows past takeoff, so it can stretch an
+// air, never skip a section; the slow fall eases in rather than snapping.
+var GLIDE_ROWS = 12, GLIDE_EASE = 12;
+// After a respawn the board holds still for SPAWN_HOLD seconds (steering live)
+// so you see where you are before you move.
+var SPAWN_HOLD = .3;
 var FLOOR_L = 64, FLOOR_TINT = .2, FLOOR_WALL = .6, FLOOR_MIN_LUM = .15;
 // Hills. Downhills feed CARRY (extra speed on top of flow; a tuck feeds it
 // faster), flats bleed it off slowly, and an uphill spends it before it ever
@@ -611,7 +628,7 @@ var S = {
   flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, carry:0, pitch:0, tilt:0, row:0, fellOff:false, sunk:false, holeT:0, glideT:0, gliding:false, pushT:.06, pushPh:0, coins:0, coinChain:0, coinT:-9, coinsSeen:{}, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
   best: store.get("best", 0), bestStyle: store.get("bestStyle", {})
 };
-var input = { left:false, right:false, tuck:false, jumpQ:0, jumpHeld:false, glide:false };
+var input = { left:false, right:false, tuck:false, jumpQ:0, jumpHeld:false, glide:false, lastLat:0, jumpAge:0, fastFall:false, jumpLate:false };
 var pops = [];   // trick callouts drawn on the canvas
 
 // Speed follows flow and the tuck through a short ease, so a trick is a
@@ -625,14 +642,15 @@ function doJump(){
   if(S.landT < .16 && S.airT > .25) trick("hop");   // a jump right as you land is a hop: it keeps the line going
   // a jump covers at most JUMP_ROWS rows: fast, it's a lower, flatter ollie,
   // so speed never carries you over one gap and into the next
-  S.grounded = false; S.h = Math.max(S.h, 0); S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))); input.jumpQ = 0;
-  S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; SFX.jump();
+  S.grounded = false; S.h = Math.max(S.h, 0); S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))) * JUMP_K; input.jumpQ = 0; input.jumpLate = false; input.fastFall = false;
+  S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.jz = S.z; S.gapRow = false; SFX.jump();
 }
 function speedRaw(){ if(!S.st) return 0; var b = S.st.p.speed; return Math.min(b * ((1 + FLOW_MAX) * TUCK + HILL_TOP), b * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) + S.carry); }
 
 function startStation(params, opts){
   opts = opts || {};
   S.st = params.forever ? buildForever(params.seed) : buildStation(params, opts.seed);
+  for(var id in ptrs) delete ptrs[id];
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
@@ -655,6 +673,8 @@ function tileAt(p, z){
   var G = S.G, pp = ((p % G.P) + G.P) % G.P, col = Math.floor(pp / (G.S / st.C)) % st.cols;
   return st.rows[row][col];
 }
+// floor under the board: its centre, or either edge of its FOOT
+function floorAt(p, z){ var f = FOOT * S.G.S / S.st.C; return tileAt(p, z) || tileAt(p + f, z) || tileAt(p - f, z); }
 
 // ---------------------------------------------------------------- tricks
 // Momentum is the game. Every clean move adds flow; flow is speed; speed
@@ -920,12 +940,24 @@ var touchy = matchMedia("(pointer: coarse)").matches;
 // ↑ is the jump (Space and W too). An embedding page that has the focus
 // forwards these keys by postMessage, so they never scroll the page instead.
 function keyDown(code, repeat){
-  if(code === "ArrowLeft" || code === "KeyA"){ input.left = true; return true; }
-  if(code === "ArrowRight" || code === "KeyD"){ input.right = true; return true; }
-  if(code === "ArrowDown" || code === "KeyS"){ input.tuck = true; return true; }
-  if(code === "ArrowUp" || code === "Space" || code === "KeyW"){ if(!repeat && S.mode === "ride" && !(S.dead > 0)) input.jumpQ = .14; input.jumpHeld = true; return true; }
-  if(code === "Escape" && S.mode === "ride"){ toMap(); return true; }
+  if(code === "ArrowLeft" || code === "KeyA"){ input.left = true; if(!repeat) input.lastLat = -1; return true; }
+  if(code === "ArrowRight" || code === "KeyD"){ input.right = true; if(!repeat) input.lastLat = 1; return true; }
+  // ↓ in the air (a fresh press, not a held push) drops you faster
+  if(code === "ArrowDown" || code === "KeyS"){ input.tuck = true; if(!repeat && S.mode === "ride" && !S.grounded && !S.fellOff) input.fastFall = true; return true; }
+  if(code === "ArrowUp" || code === "Space" || code === "KeyW"){ if(!repeat && S.mode === "ride" && !(S.dead > 0)) pressJump(); input.jumpHeld = true; return true; }
+  // Esc twice to leave a ride, so a stray press never throws a run away
+  if(code === "Escape" && S.mode === "ride"){ if(performance.now() - escT < 1500) toMap(); else { escT = performance.now(); hint("Esc again to leave", 1500); } return true; }
+  // a result screen ignores the jump keys for a moment, so a jump held through
+  // a fall never presses a button you didn't mean to
+  if((code === "Space" || code === "Enter" || code === "ArrowUp" || code === "KeyW") && S.mode !== "ride" && performance.now() - screenT < 450) return true;
   return false;
+}
+var escT = -9e9, screenT = -9e9;
+// A jump press: on the ground or within coyote it jumps now; on the way down
+// from a jump it's held over and hops the moment you land, and it ends a glide.
+function pressJump(age){
+  input.jumpQ = .14; input.jumpAge = Math.min(age || 0, .1);   // age: how long before now the press began (a touch tap reports at release)
+  if(!S.grounded && !S.fellOff && S.vh < 0) input.jumpLate = true;
 }
 function keyUp(code){
   if(code === "ArrowLeft" || code === "KeyA") input.left = false;
@@ -939,7 +971,7 @@ addEventListener("keydown", function(e){
   if(keyDown(e.code, e.repeat)) e.preventDefault();
 });
 addEventListener("keyup", function(e){ keyUp(e.code); });
-function releaseAll(){ input.left = input.right = input.tuck = input.jumpHeld = input.glide = false; }
+function releaseAll(){ input.left = input.right = input.tuck = input.jumpHeld = input.glide = false; for(var id in ptrs) delete ptrs[id]; }
 addEventListener("blur", releaseAll);
 addEventListener("message", function(e){
   var m = e.data && e.data.olKey; if(!m || e.source !== window.parent) return;
@@ -947,29 +979,41 @@ addEventListener("message", function(e){
 });
 // Touch: hold a side to carve that way; both sides at once is a tuck; a
 // quick tap or an upward swipe jumps.
-var ptrs = {};
+// A tap steers for the instant it's down, so a jump tap gives back the sideways
+// speed it added (vl0). A second finger that lands and lifts quickly is a jump,
+// not a tuck: it only becomes a tuck once it's held past SECOND_MS.
+var ptrs = {}, TAP_MS = 170, SECOND_MS = 120;
 function steerFromPtrs(){
-  var l = false, r = false;
-  for(var id in ptrs){ if(ptrs[id].x < W / 2) l = true; else r = true; }
+  var l = false, r = false, now = performance.now(), n = 0;
+  for(var id in ptrs) n++;
+  for(id in ptrs){ var q = ptrs[id]; if(n > 1 && q.second && now - q.t < SECOND_MS && !q.moved) continue; if(q.x < W / 2) l = true; else r = true; }
   input.tuck = l && r; input.glide = l && r; input.left = l && !r; input.right = r && !l;
 }
+function tapJump(q){ q.jumped = true; if(!q.second) S.vl = q.vl0; pressJump((performance.now() - q.t) / 1000); }
 cv.addEventListener("pointerdown", function(e){
   if(S.mode !== "ride") return;
   ac();
-  ptrs[e.pointerId] = { x:e.clientX, y:e.clientY, t:performance.now(), jumped:false };
+  try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+  var n = 0; for(var id in ptrs) n++;
+  ptrs[e.pointerId] = { x:e.clientX, y:e.clientY, x0:e.clientX, t:performance.now(), jumped:false, moved:false, second:n > 0, vl0:S.vl };
   steerFromPtrs();
+  if(n > 0) setTimeout(steerFromPtrs, SECOND_MS + 5);
 });
 cv.addEventListener("pointermove", function(e){
   var q = ptrs[e.pointerId]; if(!q) return;
-  if(!q.jumped && q.y - e.clientY > 28 && performance.now() - q.t < 300){ q.jumped = true; input.jumpQ = .14; }
+  if(Math.abs(e.clientX - q.x0) > 40 || Math.abs(e.clientY - q.y) > 32) q.moved = true;
+  if(!q.jumped && q.y - e.clientY > 28 && performance.now() - q.t < 300) tapJump(q);
   q.x = e.clientX; steerFromPtrs();
 });
 function ptrUp(e){
   var q = ptrs[e.pointerId]; if(!q) return;
-  if(!q.jumped && performance.now() - q.t < 170 && Math.abs(e.clientY - q.y) < 20) input.jumpQ = .14;
+  if(!q.jumped && performance.now() - q.t < TAP_MS && e.clientY - q.y < 32 && q.y - e.clientY < 20 && Math.abs(e.clientX - q.x0) < 40) tapJump(q);
   delete ptrs[e.pointerId]; steerFromPtrs();
 }
-cv.addEventListener("pointerup", ptrUp); cv.addEventListener("pointercancel", ptrUp);
+// a cancelled touch (the OS took it: a gesture, a notification) never jumps
+function ptrCancel(e){ delete ptrs[e.pointerId]; steerFromPtrs(); }
+cv.addEventListener("pointerup", ptrUp); cv.addEventListener("pointercancel", ptrCancel); cv.addEventListener("lostpointercapture", ptrCancel);
+document.addEventListener("visibilitychange", function(){ if(document.hidden) releaseAll(); });
 
 // ---------------------------------------------------------------- physics
 function update(dt){
@@ -1004,7 +1048,7 @@ function update(dt){
   S.pitch = (vgradeAt(S.z) + vgradeAt(S.z - D * .5) + vgradeAt(S.z - D)) / 3;
   var steep = gr < -.07; if(steep && !S.wasSteep && S.grounded) woosh(.8); S.wasSteep = steep;
   S.tilt += ((gradeAt(S.z) + gradeAt(S.z - D * .5) + gradeAt(S.z - D)) / 3 - S.tilt) * Math.min(1, dt * 6);   // the real slope, for the whole-view shift
-  var sp = speedNow(); S.z += sp * dt; S.topSpeed = Math.max(S.topSpeed, sp);
+  var sp = speedNow(); if(S.t - S.spawnT >= SPAWN_HOLD) S.z += sp * dt; S.topSpeed = Math.max(S.topSpeed, sp);
   // crest: tip over the top of a hill fast and you fly (never into a gap)
   var row = Math.floor(S.z / D);
   if(row !== S.row){
@@ -1014,12 +1058,12 @@ function update(dt){
       // flying over a gap is fine; landing in one is not
       for(var gk = land - 4; gk <= land + 4; gk++) if(st.gap[gk]) clear = false;   // ±4: speed changes in the air move the real landing a few rows
       if(st.pieceRow) for(gk = rr - 4; gk <= land + 4; gk++) if(st.pieceRow[gk]) clear = false;   // never launch into or over a corridor
-      if(clear){ S.grounded = false; S.vh = vh; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; trick("crest"); SFX.jump(); woosh(1.3); break; }
+      if(clear){ S.grounded = false; S.jz = null; S.gapRow = false; S.vh = vh * JUMP_K; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; trick("crest"); SFX.jump(); woosh(1.3); break; }
     }
     for(var cr2 = S.row + 1; cr2 <= row; cr2++){
-      if(st.cp && st.cp[cr2]) S.check = { z:cr2 * D, p:(st.trail[cr2] + (st.wid ? st.wid[cr2] : st.width) / 2) * (G.S / st.C) };
+      if(st.cp && st.cp[cr2]) S.check = checkAt(cr2);
       if(st.pieceRow && st.pieceRow[cr2] && !st.pieceRow[cr2 - 1] && !S.pieceIn){ S.pieceIn = cr2; S.pieceFalls0 = S.falls; }
-      if(st.pieceEnd && st.pieceEnd[cr2] != null) S.check = { z:cr2 * D, p:(st.trail[cr2] + (st.wid ? st.wid[cr2] : st.width) / 2) * (G.S / st.C) };   // out of a corridor: never ride it twice for a fall after it
+      if(st.pieceEnd && st.pieceEnd[cr2] != null) S.check = checkAt(cr2);   // out of a corridor: never ride it twice for a fall after it
       if(st.pieceEnd && st.pieceEnd[cr2] != null && S.pieceIn){ if(S.falls === S.pieceFalls0){ trick("line"); S.lineCount = (S.lineCount || 0) + 1; } S.pieceIn = 0; }
     }
     S.row = row;
@@ -1030,34 +1074,37 @@ function update(dt){
 
   // carve: accelerate toward the held side, carry momentum, slide to a stop;
   // turning against your slide bites harder so it stays controllable
-  var lat = (input.right ? 1 : 0) - (input.left ? 1 : 0), acc = (S.grounded ? ACC : AIR_ACC) * (1 - .45 * S.tuckS);
+  // both sides held (keys): the newer press wins, so a fast flick never stalls
+  var lat = input.left && input.right ? input.lastLat : (input.right ? 1 : 0) - (input.left ? 1 : 0), acc = (S.grounded ? ACC : AIR_ACC) * (1 - .45 * S.tuckS);
   var vmax = VL_BASE + VL_FLOW * S.flow;
-  if(lat){ S.vl += lat * acc * dt * (S.vl * lat < 0 ? 1.7 : 1); }
-  else S.vl -= S.vl * Math.min(1, (S.grounded ? FRICTION : AIR_FRICTION) * dt);
+  if(lat){ S.vl += lat * acc * dt * (S.vl * lat < 0 ? TURN_BITE : 1); }
+  else { var dec = ((S.grounded ? LAT_STOP : AIR_STOP) + Math.abs(S.vl) * (S.grounded ? FRICTION : AIR_FRICTION)) * dt; S.vl = Math.abs(S.vl) <= dec ? 0 : S.vl - Math.sign(S.vl) * dec; }
   S.vl = clamp(S.vl, -vmax, vmax);
   S.p += S.vl * dt;
 
   if(input.jumpQ > 0) input.jumpQ -= dt;
   S.landT += dt;
   if(S.grounded){
-    if(input.jumpQ > 0) doJump();
-    else if(!tileAt(S.p, S.z)){
+    if(input.jumpQ > 0 || input.jumpLate) doJump();   // jumpLate: pressed on the way down, so it hops the moment you land
+    else if(!floorAt(S.p, S.z)){
       if(input.jumpHeld) doJump();   // holding jump at an edge jumps
       else { S.grounded = false; S.vh = 0; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = true; S.holeT = 0; S.sunk = false; }
     }
   }
-  if(!S.grounded && S.fellOff && S.airT < COYOTE && (input.jumpQ > 0 || input.jumpHeld)) doJump();
+  if(!S.grounded && S.fellOff && (input.jumpQ > 0 || input.jumpHeld) && S.airT < COYOTE + (input.jumpQ > 0 ? input.jumpAge : 0)) doJump();
   if(!S.grounded){
     S.airT += dt;
-    var under = tileAt(S.p, S.z);
+    var under = floorAt(S.p, S.z);
     if(!under) S.airGap = true;
+    if(st.gap[Math.floor(S.z / D)]) S.gapRow = true;
     // glide: hold jump on the way down
-    S.gliding = !S.fellOff && S.vh < 0 && S.glideT < GLIDE_MAX && (input.jumpHeld || input.glide);
+    var glideEnd = S.jz != null && (S.z - S.jz + Math.max(0, S.h) / GLIDE_FALL * sp) / D > GLIDE_ROWS;
+    S.gliding = !S.fellOff && S.vh < 0 && S.glideT < GLIDE_MAX && !input.jumpLate && !glideEnd && (input.jumpHeld || input.glide);
     if(S.gliding){
-      S.glideT += dt; S.vh -= GRAV * GLIDE_GRAV * dt; S.vh = Math.max(S.vh, -GLIDE_FALL);
+      S.glideT += dt; S.vh -= GRAV * GLIDE_GRAV * dt; if(S.vh < -GLIDE_FALL) S.vh += (-GLIDE_FALL - S.vh) * Math.min(1, dt * GLIDE_EASE);
       S.carry -= GLIDE_DRAG * base * dt;
     }
-    else S.vh -= GRAV * dt;
+    else S.vh -= GRAV * (S.fellOff ? 1 : S.vh > 0 ? RISE_G : RISE_G * FALL_K * (input.fastFall ? FASTFALL : 1)) * dt;
     S.h += S.vh * dt;
     // a hole you don't jump is a fall: roll off an edge and you get HOLE_GRACE
     // seconds (a carve that brushes a hole's side) to be back over floor, which
@@ -1070,9 +1117,9 @@ function update(dt){
     }
     if(S.h <= 0 && S.vh < 0){
       if(under && S.h > -.35 && !S.sunk){
-        var hard = S.vh < -12;
-        S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; S.fellOff = false; S.sunk = false; S.glideT = 0; S.gliding = false; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
-        if(S.airGap){ var rowsCleared = Math.round(S.airT * sp / D); trick(rowsCleared >= 5 ? "big" : "gap"); S.check = { z:Math.floor(S.z / D) * D, p:S.p }; }
+        var hard = S.vh < -HARD_V;
+        S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; S.fellOff = false; S.sunk = false; S.glideT = 0; S.gliding = false; input.fastFall = false; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
+        if(S.airGap && S.gapRow && S.airT > .12){ var rowsCleared = Math.round(S.airT * sp / D); trick(rowsCleared >= 5 ? "big" : "gap"); S.check = checkAt(Math.floor(S.z / D)); }
         if(S.airSide) trick("xfer");
       }
       else if(S.h < -1.2){ S.flowAtFall = S.flow; S.dead = DEATH_T; S.flow = 0; S.combo = 0; S.comboT = 0; SFX.fall(); }
@@ -1129,12 +1176,15 @@ function retry(){
   startStation(p, { seed:S.daily ? S.daily.p.seed : null, color:S.color, label:S.label });
 }
 // back at the last gap landing: style and coins kept, flow halved, a quick fade in
+// a checkpoint is always the middle of the path on its row, never a ledge, and a
+// hair into the row: row × D can round to the row before (43 × 1.6 / 1.6 = 42.999…), which can be a gap
+function checkAt(row){ var st = S.st; row = clamp(row, 0, st.len - 1); return { z:(row + .05) * D, p:(st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * (S.G.S / st.C) }; }
 function respawn(){
   var c = S.check, G = S.G;
   S.z = c.z; S.p = c.p; S.vl = 0; S.h = 0; S.vh = 0; S.grounded = true; S.dead = 0; S.carry = 0; S.flow = S.flowS = S.flowAtFall * .5;
   S.landT = 9; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false;
   S.roll = upAt(G, S.p); S.rollV = 0; S.side = surf(G, S.p).s; S.row = Math.floor(S.z / D); S.spawnT = S.t; S.falls++; S.pieceIn = 0;
-  input.jumpQ = 0; pops.length = 0;
+  input.jumpQ = 0; input.jumpLate = false; input.fastFall = false; pops.length = 0;
 }
 
 // ---------------------------------------------------------------- render
@@ -1401,7 +1451,7 @@ function drawSkater(proj, me, lean, f){
 }
 
 // ---------------------------------------------------------------- screens
-function showScreen(id){ ["mapScreen", "arriveScreen", "dailyScreen", "foreverScreen"].forEach(function(s){ $(s).hidden = s !== id; }); if(id){ $("hudTop").hidden = true; $("hudBot").hidden = true; $("toMap").hidden = true; } }
+function showScreen(id){ if(id){ screenT = performance.now(); releaseAll(); } ["mapScreen", "arriveScreen", "dailyScreen", "foreverScreen"].forEach(function(s){ $(s).hidden = s !== id; }); if(id){ $("hudTop").hidden = true; $("hudBot").hidden = true; $("toMap").hidden = true; } }
 function hint(text, ms){ var h = $("hint"); h.textContent = text; h.hidden = false; h.style.opacity = "1"; clearTimeout(hint.t); hint.t = setTimeout(function(){ h.style.opacity = "0"; }, ms); }
 function toast(text){ var t = $("toast"); t.textContent = text; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function(){ t.hidden = true; }, 1800); }
 function renderMap(){
@@ -1508,7 +1558,7 @@ checkProgress(true);
 renderMap(); renderLocker(); showScreen("mapScreen");
 requestAnimationFrame(frame);
 
-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { renderMusic:function(secs, st, _, wooshAt){ var oc = new OfflineAudioContext(1, Math.ceil(44100 * secs), 44100), m = createMusic(oc, oc.destination, function(){ return st; }); m.tick(secs); if(wooshAt != null) m.woosh(wooshAt, 1); return oc.startRendering().then(function(buf){ return Array.from(buf.getChannelData(0)); }); }, musicState:musicState, makeCoins:makeCoins, vgradeAt:vgradeAt, tune:function(o){ if(o.BEND_K != null) BEND_K = o.BEND_K; if(o.HILL_VIS != null) HILL_VIS = o.HILL_VIS; if(o.GAP_FLAT != null) GAP_FLAT = o.GAP_FLAT; }, gradeAt:gradeAt, heightAt:heightAt, floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { renderMusic:function(secs, st, _, wooshAt){ var oc = new OfflineAudioContext(1, Math.ceil(44100 * secs), 44100), m = createMusic(oc, oc.destination, function(){ return st; }); m.tick(secs); if(wooshAt != null) m.woosh(wooshAt, 1); return oc.startRendering().then(function(buf){ return Array.from(buf.getChannelData(0)); }); }, musicState:musicState, makeCoins:makeCoins, vgradeAt:vgradeAt, tune:function(o){ if(o.BEND_K != null) BEND_K = o.BEND_K; if(o.HILL_VIS != null) HILL_VIS = o.HILL_VIS; if(o.GAP_FLAT != null) GAP_FLAT = o.GAP_FLAT; }, gradeAt:gradeAt, heightAt:heightAt, floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, floorAt:floorAt, checkAt:checkAt, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
 // An embedding page that inlines the game sets window.__OL_START first.
 var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : /[?&]forever=1(&|$)/.test(location.search) ? "forever" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
 if(startWith === "daily") playDaily(false);

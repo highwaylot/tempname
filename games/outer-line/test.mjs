@@ -74,22 +74,22 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   const { ctx, page, errs } = await open({ width: 1280, height: 800 });
   const res = await page.evaluate(() => {
     const O = window.__ol, S = O.S, DEEP = 4000, out = { runs: 0, falls: [], gaps: 0, minRows: Infinity, topBase: 0 };
-    for(let seed = 1; seed <= 20; seed++){
+    // three riders who look ahead 0.12, 0.16 and 0.2 s (needed past row ~1,800 at 40 units/s);
+    // with grip, a rider holds a side for as long as they still want to go that way
+    for(const LA of [.12, .16, .2]) for(let seed = 1; seed <= 20; seed++){
       O.startStation({ name: 'Forever', forever: true, seed }, {});
       const G = S.G; let steps = 0;
       while(S.mode === 'ride' && S.z / O.D < DEEP && steps < 120 * 600){
-        // look ahead ~0.16 s, as a rider does at top speed (needed past row ~1,800 at 40 units/s)
-        const st = S.st, tw = G.S / st.C, row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * .6, O.speedNow() * .16)) / O.D));
+        const st = S.st, tw = G.S / st.C, row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * .6, O.speedNow() * LA)) / O.D));
         const target = (st.trail[row] + st.wid[row] / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
         const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
-        O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
+        O.input.left = want - S.vl < -.4 || (want < -.4 && want - S.vl < .4); O.input.right = want - S.vl > .4 || (want > .4 && want - S.vl > -.4);
         if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
         O.update(1 / 120); steps++;
       }
       O.input.left = O.input.right = false;
       out.runs++;
-      if(S.mode !== 'ride' || S.dead > 0) out.falls.push(seed);
-      out.minRows = Math.min(out.minRows, Math.floor(S.z / O.D));
+      if(S.mode !== 'ride' || S.dead > 0) out.falls.push(LA + 's/' + seed); else out.minRows = Math.min(out.minRows, Math.floor(S.z / O.D));
       out.gaps += S.st.gap.filter((g, i) => g && !S.st.gap[i - 1] && i < S.z / O.D).length;
       out.topBase = Math.max(out.topBase, S.st.p.speed);
     }
@@ -99,7 +99,10 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     out.markOk = markOk;
     return out;
   });
-  ok(res.falls.length === 0 && res.minRows >= 4000, 'forever: autopilot survives 20 random runs 4,000 rows deep, past the end of the ramp (' + res.gaps + ' jump-gaps, base speed up to ' + res.topBase.toFixed(1) + ', falls on seeds: ' + (res.falls.join(', ') || 'none') + ')');
+  // every seed is survivable (some rider makes it), and at most 2 of 60 runs fall. With the old loose
+  // physics these riders fell 1, 0–2 and 20 times (the 0.2 s rider slid past every early turn).
+  const seedsLost = [...new Set(res.falls.map(f => f.split('/')[1]))].filter(sd => res.falls.filter(f => f.endsWith('/' + sd)).length === 3);
+  ok(res.falls.length <= 2 && seedsLost.length === 0 && res.minRows >= 4000, 'forever: three autopilots, 60 random runs 4,000 rows deep, past the end of the ramp (' + res.gaps + ' jump-gaps, base speed up to ' + res.topBase.toFixed(1) + ', falls: ' + (res.falls.join(', ') || 'none') + ')');
   ok(res.markOk, 'every fully empty row is marked as a jump-gap (and nothing else is)');
   // one fall ends the run on its card and saves the best; the bar races it next time
   await page.evaluate(() => { localStorage.removeItem('outerline.forever'); window.__ol.S.mode = 'ride'; document.getElementById('foreverMap').click(); });
@@ -187,7 +190,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
         const st = S.st, tw = G.S / st.C, w = st.wid ? st.wid : null, row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
         const target = (st.trail[row] + (w ? w[row] : st.width) / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
         const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
-        O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4; O.input.tuck = true;
+        O.input.left = want - S.vl < -.4 || (want < -.4 && want - S.vl < .4); O.input.right = want - S.vl > .4 || (want > .4 && want - S.vl > -.4); O.input.tuck = true;
         if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
         O.update(1 / 120); steps++;
         if(steps % 4 || S.dead > 0) continue;
@@ -543,6 +546,8 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   const send = await page.evaluate(() => { const O = window.__ol, S = O.S; S.flow = .62; S.tier = 1; O.input.left = O.input.right = false; S.p += S.G.S; S.grounded = true; S.h = 0; S.wallT = -9; for(let i = 0; i < 40; i++) O.update(1 / 120); return { owned: O.owned(), pop: O.pops.some(p => p.text === "NEW BEANIE!" && p.sub === "FULL SEND") }; });
   ok(send.owned.includes('send') && send.pop, 'hitting FULL SEND unlocks the Full Send beanie mid-ride, with a callout');
   // wear it, survive a reload; locked beanies can't be worn
+  await page.keyboard.press('Escape'); await page.waitForTimeout(50);
+  ok(await page.evaluate(() => window.__ol.S.mode === 'ride'), 'one stray Esc doesn\'t throw a ride away (it takes two)');
   await page.keyboard.press('Escape'); await page.waitForTimeout(100);
   await page.click('#locker .beanie:nth-child(2)');
   await page.evaluate(() => window.__ol.wear('gold'));
@@ -557,6 +562,53 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await page.evaluate(() => document.getElementById('locker').scrollIntoView());
   await shot(page, 'locker');
   ok(errs.length === 0, 'no errors (beanies)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
+// feel: grip, the jump arc, respawns, and the hole rule that keeps it honest
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S, out = {}, dt = 1 / 120;
+    const flat = () => { O.rideStop(0); const st = S.st; for(let k = 0; k < st.len; k++){ st.rows[k].fill(1); st.gap[k] = 0; st.grade[k] = 0; st.crest[k] = 0; } S.z = 20 * O.D; S.grounded = true; S.h = 0; S.vh = 0; S.flow = S.flowS = 0; S.carry = 0; S.spawnT = -9; O.input.left = O.input.right = O.input.tuck = O.input.jumpHeld = false; O.input.jumpQ = 0; return S.G.S / st.C; };
+    // key to motion: the first frame with a side held already moves you
+    let tw = flat(); S.vl = 0; let p0 = S.p; O.input.right = true; O.update(dt); out.firstFrame = S.p > p0;
+    // release at top carving speed: how far you slide and how long it takes
+    for(let i = 0; i < 120; i++) O.update(dt); O.input.right = false; p0 = S.p; let t = 0; while(S.vl !== 0 && t < 2){ O.update(dt); t += dt; }
+    out.slide = (S.p - p0) / tw; out.stopT = t;
+    // a 50 ms tap of a side moves you a little, not a lane
+    flat(); S.vl = 0; p0 = S.p; O.input.right = true; for(let i = 0; i < 6; i++) O.update(dt); O.input.right = false; for(let i = 0; i < 120; i++) O.update(dt); out.tap = (S.p - p0) / tw;
+    // the jump: same apex, air time and landing row as the old even arc
+    flat(); const sp = O.speedNow(), v0 = Math.min(10.5, 32 * 8 * O.D / (2 * Math.max(1, sp))), z0 = S.z; let apex = 0; t = 0; O.input.jumpQ = .14;
+    do { O.update(dt); t += dt; apex = Math.max(apex, S.h); } while(!S.grounded && t < 3);
+    out.arc = { apex, apex0: v0 * v0 / 64, air: t, air0: 2 * v0 / 32, rows: (S.z - z0) / O.D, rows0: 2 * v0 / 32 * sp / O.D };
+    // a hole under your centre is still a fall: FOOT only covers a board's edge
+    tw = flat(); const r = 40, c = S.st.trail[r] + 1; S.st.rows[r][c] = 0; S.st.rows[r + 1][c] = 0; S.p = (c + .5) * tw; S.z = (r - 1) * O.D; S.vl = 0; let died = false;
+    for(let i = 0; i < 120 && !died; i++){ S.vl = 0; O.update(dt); died = S.dead > 0; } out.centreFalls = died;
+    // ...but a board whose edge is still on the floor rides the hole's lip
+    tw = flat(); S.st.rows[r][c] = 0; S.p = (c + 1 + .08) * tw; S.z = (r - 1) * O.D; died = false;
+    for(let i = 0; i < 60 && !died; i++){ S.vl = 0; O.update(dt); died = S.dead > 0 || !S.grounded; } out.lipHolds = !died;
+    // every place a checkpoint can be set on every spot is floor, with floor on the next 3 rows
+    let bad = 0, n = 0;
+    for(let i = 0; i < 10; i++){ O.rideStop(i); const st = S.st;
+      for(let k = 1; k < st.len - 4; k++){ const land = st.gap[k - 1] && !st.gap[k]; if(!(land || (st.cp && st.cp[k]) || (st.pieceEnd && st.pieceEnd[k] != null))) continue; n++;
+        const ck = O.checkAt(k); for(let j = 0; j < 4; j++) if(!O.tileAt(ck.p, ck.z + j * O.D)) { bad++; break; } } }
+    out.checks = { n, bad };
+    // after a respawn you hold still briefly, steering live
+    O.rideStop(2); S.check = O.checkAt(60); S.dead = .001; S.flowAtFall = 0; O.update(dt); const zc = S.z, pc = S.p; O.input.right = true; for(let i = 0; i < 24; i++) O.update(dt); O.input.right = false;
+    out.hold = { still: S.z === zc, steer: S.p !== pc }; for(let i = 0; i < 24; i++) O.update(dt); out.hold.moves = S.z > zc;
+    return out;
+  });
+  ok(res.firstFrame, 'a held side moves you on the very first frame');
+  ok(res.slide >= .3 && res.slide <= .7 && res.stopT <= .2, 'let go at top carving speed and you slide ' + res.slide.toFixed(2) + ' of a tile and stop in ' + res.stopT.toFixed(2) + ' s (was 4.2 tiles and still sliding after 2 s)');
+  ok(res.tap > 0 && res.tap <= .3, 'a 50 ms tap of a side moves you ' + res.tap.toFixed(2) + ' of a tile (was 1.5 tiles)');
+  const a = res.arc;
+  ok(Math.abs(a.apex - a.apex0) < .05 && Math.abs(a.air - a.air0) < .02 && Math.abs(a.rows - a.rows0) < .3, 'the jump rises slower and falls faster, with the same apex (' + a.apex.toFixed(2) + ' vs ' + a.apex0.toFixed(2) + '), air time (' + a.air.toFixed(2) + ' vs ' + a.air0.toFixed(2) + ' s) and distance (' + a.rows.toFixed(1) + ' vs ' + a.rows0.toFixed(1) + ' rows)');
+  ok(res.centreFalls, 'a hole under the middle of the board is still a fall');
+  ok(res.lipHolds, 'a board with its edge still on the floor rides along a hole\'s lip');
+  ok(res.checks.bad === 0, 'every checkpoint on every spot respawns you on the path with floor ahead (' + res.checks.n + ' checked)');
+  ok(res.hold.still && res.hold.steer && res.hold.moves, 'after a respawn you hold still for a moment, steering live, then roll');
+  ok(errs.length === 0, 'no errors (feel)' + (errs.length ? ': ' + errs[0] : ''));
   await ctx.close();
 }
 
@@ -576,6 +628,15 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForTimeout(60);
   ok(await page.evaluate(() => !window.__ol.S.grounded), 'a quick tap jumps');
+  // a jump tap on the left gives back the sideways shove it made while down
+  await page.waitForTimeout(900);
+  await page.evaluate(() => { const S = window.__ol.S; S.dead = 0; S.h = 0; S.vh = 0; S.grounded = true; S.vl = 0; S.z = 2; });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 60, y: 500, id: 3 }] });
+  await page.waitForTimeout(90);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForTimeout(40);
+  const tap = await page.evaluate(() => ({ air: !window.__ol.S.grounded, vl: window.__ol.S.vl }));
+  ok(tap.air && Math.abs(tap.vl) < .5, 'a jump tap on one side jumps straight, not sideways (sideways speed after it: ' + tap.vl.toFixed(2) + ')');
   await page.waitForTimeout(600);
   await shot(page, 'ride-phone');
   ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll on a phone');

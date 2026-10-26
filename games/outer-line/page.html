@@ -213,6 +213,8 @@ style 48,210</pre>
     return f;
   }
   function play(start){
+    // the Play button keeps the focus after a click, and Space on a button presses it: let go of it so Space jumps instead of restarting
+    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if(window.matchMedia('(min-width: 861px)').matches){
       var f = gameFrame(start); win.replaceChildren(f); stop.hidden = false; liveTape.hidden = true;   // the game has its own labels
       win.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(function(){ f.focus(); }, 300);
