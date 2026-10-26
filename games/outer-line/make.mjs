@@ -77,7 +77,7 @@ fs.writeFileSync(path.join(out, 'game.json'), JSON.stringify({
   short: 'Scramble, an egg on a skateboard, in the space metro. Tricks are speed.',
   description: 'You\'re Scramble, an egg on a skateboard, skating the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that keeps getting faster. One route a day, the same for everyone.',
   status: 'preview', platforms: { web: 'play.html' },
-  controls: { keys: '← → carve, ↑ jump (or Space), ↓ tuck, Esc for the spots', touch: 'hold a side to carve, tap or swipe up to jump, hold both to tuck' },
+  controls: { keys: '← → carve, ↑ jump (hold to glide), ↓ push (tuck downhill), Esc for the spots', touch: 'hold a side to carve, tap or swipe up to jump, hold both to push (in the air: glide)' },
   orientation: 'any', aspect: '16:9', tags: ['skate', 'runner', 'tunnel', 'momentum', 'daily', 'endless', 'egg'],
   ageNote: 'No chat, no accounts, no ads, no data leaves the device in this preview.',
   scheme: 'daily',

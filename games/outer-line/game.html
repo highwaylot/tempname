@@ -237,6 +237,10 @@ var glideTold = false, PACE = .85;
 // after rolling off an edge still jumps; holding jump as you reach an edge
 // jumps; and on spots and practice a fall respawns you at the last gap landing.
 var COYOTE = .12;
+// Hold ↓ (both sides on touch): on a downhill you tuck; anywhere else you push,
+// a skater's kick every PUSH_EVERY seconds adding PUSH_KICK × base of carry,
+// up to PUSH_CAP × base, so it's slightly faster, never a rocket.
+var PUSH_EVERY = .45, PUSH_KICK = .08, PUSH_CAP = .22;
 var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 55, CARRY_MAX = 1.3, HILL_TOP = 1, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 2, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = 1.2, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
 var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
@@ -451,7 +455,7 @@ addEventListener("resize", resize); resize();
 var S = {
   mode:"map", st:null, G:null, stopIdx:0, daily:null, dailyFirst:false,
   p:0, vl:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, rollV:0, side:0, t:0, arrived:false,
-  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, carry:0, pitch:0, tilt:0, row:0, fellOff:false, sunk:false, holeT:0, glideT:0, gliding:false, coins:0, coinChain:0, coinT:-9, coinsSeen:{}, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
+  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, carry:0, pitch:0, tilt:0, row:0, fellOff:false, sunk:false, holeT:0, glideT:0, gliding:false, pushT:.06, pushPh:0, coins:0, coinChain:0, coinT:-9, coinsSeen:{}, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
   best: store.get("best", 0), bestStyle: store.get("bestStyle", {})
 };
 var input = { left:false, right:false, tuck:false, jumpQ:0, jumpHeld:false, glide:false };
@@ -479,7 +483,7 @@ function startStation(params, opts){
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
-  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.coins = 0; S.coinChain = 0; S.coinT = -9; S.coinsSeen = {}; S.check = null; S.spawnT = 0; S.falls = 0; S.flowAtFall = 0; input.jumpQ = 0;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.coins = 0; S.coinChain = 0; S.coinT = -9; S.coinsSeen = {}; S.check = null; S.spawnT = 0; S.pushT = .06; S.pushPh = 0; S.falls = 0; S.flowAtFall = 0; input.jumpQ = 0;
   if(S.st.coins) S.st.coins.forEach(function(c){ c.got = false; });
   S.roll = upAt(S.G, S.p); S.side = surf(S.G, S.p).s;
   S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
@@ -489,7 +493,7 @@ function startStation(params, opts){
   showScreen(null);
   $("hudTop").hidden = false; $("hudBot").hidden = false; $("toMap").hidden = false;
   $("stnName").textContent = S.label;
-  hint(touchy ? "hold a side to carve · tap to jump · hold both to tuck" : "← → carve · ↑ jump · ↓ tuck", 2600);
+  hint(touchy ? "hold a side to carve · tap to jump · hold both to push" : "← → carve · ↑ jump · hold ↓ to push", 2600);
   try{ window.focus(); }catch(e){}
 }
 function tileAt(p, z){
@@ -667,6 +671,7 @@ var SFX = {
   },
   glint: function(){ blip(1320, .05, "sine", .03); },
   jump: function(){ tone(380, 620, .1, "triangle", .08); },
+  push: function(){ tone(150, 95, .09, "triangle", .06); tone(2400, 1800, .05, "sine", .012, .01); },
   land: function(hard){ tone(hard ? 160 : 220, 90, hard ? .14 : .08, "sine", hard ? .2 : .12); },
   side: function(){ tone(1500, 1700, .03, "sine", .03); },
   fall: function(){ tone(500, 70, .55, "sawtooth", .07); },
@@ -748,7 +753,7 @@ function update(dt){
   // stars and speed lines advance by accumulated phase, so a speed change
   // changes how fast they stream, never where they are
   var spn = speedNow(); S.starPh += dt * (.05 + spn * .012); S.linePh = (S.linePh + dt * (1.5 + spn * .05)) % 1;
-  S.tuckS += ((input.tuck && S.grounded ? 1 : 0) - S.tuckS) * Math.min(1, dt * 6);
+  S.tuckS += ((input.tuck && S.grounded && gradeAt(S.z) < -.03 ? 1 : 0) - S.tuckS) * Math.min(1, dt * 6);
   S.leanS += (clamp(S.vl / (VL_BASE + VL_FLOW), -1, 1) - S.leanS) * Math.min(1, dt * 10);
   if(S.dead > 0){ S.dead -= dt; S.h -= 16 * dt; S.z += speedNow() * (.2 + .8 * Math.pow(S.dead / DEATH_T, 2)) * dt; S.shake = Math.max(S.shake, .3); if(S.dead <= 0) retry(); return; }
   // hills: downhill feeds carry, uphill spends it first, flats bleed it slowly
@@ -756,6 +761,13 @@ function update(dt){
   S.carry += gain * dt;
   if(Math.abs(gr) < .01) S.carry -= Math.max(0, S.carry) * CARRY_DECAY * dt;   // bleeds on the flat only
   if(gr <= .01 && S.carry < 0) S.carry -= S.carry * 1.5 * dt;   // a dip below base recovers once the uphill ends
+  // push: hold ↓ on the flat or an uphill
+  if(S.grounded && input.tuck && gr >= -.03){
+    S.pushT -= dt;
+    if(S.pushT <= 0){ S.pushT = PUSH_EVERY; if(S.carry < PUSH_CAP * base) S.carry = Math.min(PUSH_CAP * base, S.carry + PUSH_KICK * base); S.pushPh = 1; SFX.push(); }
+  }
+  else S.pushT = Math.min(S.pushT, .06);   // the first kick comes almost as soon as you press
+  S.pushPh = Math.max(0, S.pushPh - dt / .35);
   S.carry = clamp(S.carry, CARRY_MIN * base, CARRY_MAX * base);
   // the camera tilts with the visual slope (already eased row by row), averaged over the last row so it can't jitter; no time lag to grow with speed
   S.pitch = (vgradeAt(S.z) + vgradeAt(S.z - D * .5) + vgradeAt(S.z - D)) / 3;
@@ -779,7 +791,7 @@ function update(dt){
 
   // carve: accelerate toward the held side, carry momentum, slide to a stop;
   // turning against your slide bites harder so it stays controllable
-  var lat = (input.right ? 1 : 0) - (input.left ? 1 : 0), acc = (S.grounded ? ACC : AIR_ACC) * (input.tuck && S.grounded ? .55 : 1);
+  var lat = (input.right ? 1 : 0) - (input.left ? 1 : 0), acc = (S.grounded ? ACC : AIR_ACC) * (1 - .45 * S.tuckS);
   var vmax = VL_BASE + VL_FLOW * S.flow;
   if(lat){ S.vl += lat * acc * dt * (S.vl * lat < 0 ? 1.7 : 1); }
   else S.vl -= S.vl * Math.min(1, (S.grounded ? FRICTION : AIR_FRICTION) * dt);
@@ -1105,7 +1117,9 @@ function drawSkater(proj, me, lean, f){
   // feet side by side on the deck, the left a touch behind the right
   var crouch = .28 * S.tuckS + (S.landT < .15 ? (1 - S.landT / .15) * .3 : 0) + clamp(-S.pitch * .8, 0, .12);
   var air = S.grounded ? 0 : 1;
-  var fb = bp(-.08, -.075, .1), ff = bp(.08, .075, .1); if(!fb || !ff) return;
+  var fb = bp(-.08, -.075, .1), ff = bp(.08, .075, .1);
+  if(S.pushPh > 0 && S.grounded){ var pt = 1 - S.pushPh, kick = Math.sin(Math.PI * Math.min(1, pt / .85)); fb = bp(.04 - .42 * pt, -.075 - .17 * kick, .1 - .1 * kick); }
+  if(!fb || !ff) return;
   var rot = lean * .35;
   ctx.save();
   ctx.translate(P[0], P[1]);
@@ -1161,8 +1175,8 @@ function renderMap(){
   $("spots").querySelectorAll(".spot").forEach(function(b){ b.addEventListener("click", function(){ rideStop(+b.dataset.i); }); });
   var nx = Math.min(S.best, STOPS.length - 1);
   $("playNext").firstChild.textContent = S.best >= STOPS.length ? "Run it back" : "Drop in: " + STOPS[nx].name;
-  $("keys").innerHTML = touchy ? "<b>hold</b> a side to carve · <b>tap</b> or <b>swipe up</b> to jump · <b>hold both</b> to tuck · walls become floors · chain tricks for speed"
-    : "<b>← →</b> carve · <b>↑</b> jump · <b>↓</b> tuck · walls become floors · chain wall rides, gaps and hops to build speed";
+  $("keys").innerHTML = touchy ? "<b>hold</b> a side to carve · <b>tap</b> or <b>swipe up</b> to jump · <b>hold both</b> to push · walls become floors · chain tricks for speed"
+    : "<b>← →</b> carve · <b>↑</b> jump · <b>↓</b> push · walls become floors · chain wall rides, gaps and hops to build speed";
 }
 function toMap(){
   // quitting the first ride of the day still uses it up, as a fall would

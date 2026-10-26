@@ -105,7 +105,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await page.click('#playForever'); await page.waitForTimeout(300);
   const ride = await page.evaluate(() => ({ forever: !!window.__ol.S.st.forever, label: document.getElementById('stnName').textContent, bar: document.getElementById('progFill').style.width }));
   await page.evaluate(() => { const S = window.__ol.S; S.z = 512; S.grounded = false; S.h = -1.3; S.vh = -5; });
-  await page.waitForTimeout(1400);
+  await page.waitForFunction(() => !document.getElementById('foreverScreen').hidden, null, { timeout: 5000 }).catch(() => {});
   const end = await page.evaluate(() => ({ shown: !document.getElementById('foreverScreen').hidden, dist: document.getElementById('foreverDist').textContent, head: document.getElementById('foreverHead').textContent, rec: JSON.parse(localStorage.getItem('outerline.forever') || '{}') }));
   ok(ride.forever && /^FOREVER/.test(ride.label) && parseFloat(ride.bar) === 0, 'Forever starts an endless ride; with no best yet the bar is empty (' + ride.label + ', bar ' + ride.bar + ')');
   ok(end.shown && /new best/.test(end.head) && end.rec.m >= 512 && /M$/.test(end.dist), 'one fall ends the run on its card and saves the best (' + end.dist + ')');
@@ -306,6 +306,20 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   ok(res.held, 'holding jump as you reach an edge jumps');
   ok(res.check.had && res.check.back && res.check.mode === 'ride' && res.check.styleKept && res.check.falls === 1, 'a fall on a spot respawns you at the last gap landing, style kept (' + JSON.stringify(res.check) + ')');
   ok(errs.length === 0, 'no errors (forgiveness)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
+// push: holding ↓ on the flat kicks you a little faster, capped; nothing when not held
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const res = await page.evaluate(() => {
+    const O = window.__ol, S = O.S;
+    const ride = hold => { O.rideStop(0); const st = S.st; for(let k = 10; k < 120; k++){ st.rows[k].fill(1); st.grade[k] = 0; } S.z = 12 * O.D; S.flow = S.flowS = 0; S.carry = 0; O.input.tuck = hold; let kicks = 0, ph0 = 0, top = 0; for(let i = 0; i < 4 * 120; i++){ O.update(1 / 120); if(S.pushPh > ph0) kicks++; ph0 = S.pushPh; top = Math.max(top, O.speedNow()); } O.input.tuck = false; return { gain: top / O.speedNow.call ? top : top, kicks, end: O.speedNow() }; };
+    const a = ride(true), b = ride(false);
+    return { gain: a.end / b.end, kicks: a.kicks, kicksNot: b.kicks };
+  });
+  ok(res.gain > 1.12 && res.gain < 1.3 && res.kicks >= 6 && res.kicksNot === 0, 'holding ↓ on the flat pushes: ' + res.kicks + ' kicks in 4 s, ' + Math.round((res.gain - 1) * 100) + ' % faster (slightly, capped)');
+  ok(errs.length === 0, 'no errors (push)' + (errs.length ? ': ' + errs[0] : ''));
   await ctx.close();
 }
 
