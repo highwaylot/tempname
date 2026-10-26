@@ -50,7 +50,7 @@ await b.close();
 
 ff('-i', path.join(out, 'ride.png'), '-q:v', '3', path.join(out, 'ride.jpg'));
 ff('-i', path.join(out, 'map.png'), '-q:v', '3', path.join(out, 'map.jpg'));
-ff('-i', path.join(out, 'ride.png'), '-vf', 'crop=600:600:340:120,scale=512:512', path.join(out, 'icon-512.png'));
+ff('-i', path.join(out, 'ride.png'), '-vf', 'crop=420:420:430:300,scale=512:512', path.join(out, 'icon-512.png'));
 const card = (w, h, dst) => ff('-i', path.join(out, 'ride.png'), '-filter_complex',
   `[0]scale=${w}:-1,crop=${w}:${h},eq=brightness=-0.06,drawbox=x=0:y=ih-10:w=iw*0.4:h=10:color=0xc6ff00:t=fill,drawbox=x=iw*0.4:y=ih-10:w=iw*0.3:h=10:color=0x2ee6ff:t=fill,drawbox=x=iw*0.7:y=ih-10:w=iw*0.3:h=10:color=0xff2e88:t=fill`,
   '-q:v', '3', path.join(out, dst));
@@ -61,11 +61,11 @@ fs.rmSync(path.join(out, 'ride.png')); fs.rmSync(path.join(out, 'map.png'));
 fs.writeFileSync(path.join(out, 'game.json'), JSON.stringify({
   slug: 'outer-line', title: 'Outer Line', studio: 'Trip and Route',
   tagline: 'Walls are floors. Tricks are speed.',
-  short: 'Skate the space metro: walls are floors, tricks are speed.',
-  description: 'Skate the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that keeps getting faster. One route a day, the same for everyone.',
+  short: 'An egg on a skateboard in the space metro. Walls are floors, tricks are speed.',
+  description: 'You\'re an egg on a skateboard, skating the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that keeps getting faster. One route a day, the same for everyone.',
   status: 'preview', platforms: { web: 'play.html' },
   controls: { keys: '← → carve, ↑ jump (or Space), ↓ tuck, Esc for the spots', touch: 'hold a side to carve, tap or swipe up to jump, hold both to tuck' },
-  orientation: 'any', aspect: '16:9', tags: ['skate', 'runner', 'tunnel', 'momentum', 'daily'],
+  orientation: 'any', aspect: '16:9', tags: ['skate', 'runner', 'tunnel', 'momentum', 'daily', 'egg'],
   ageNote: 'No chat, no accounts, no ads, no data leaves the device in this preview.',
   scheme: 'daily',
   daily: { resetsAt: '00:00 UTC', epoch: '2026-10-25', attempts: 'first ride counts, practice after' },

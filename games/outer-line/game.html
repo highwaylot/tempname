@@ -178,7 +178,7 @@ var SPOT_COLORS = ["#c6ff00", "#c6ff00", "#c6ff00", "#2ee6ff", "#2ee6ff", "#2ee6
 // carries momentum, and slides to a stop instead of snapping.
 var R = 3, D = 1.6, GRAV = 32, JUMP_V = 10.5;
 var ACC = 46, AIR_ACC = 26, FRICTION = 1.5, AIR_FRICTION = .25, VL_BASE = 6.5, VL_FLOW = 3;
-var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11;
+var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
 // A station: rows of tiles, 1 = floor. One guaranteed path of `width`
 // tiles wanders around the tunnel (so you have to take the walls), every
@@ -241,7 +241,7 @@ function surf(G, p){
 // The view's "up", continuous around the tunnel: a side's own normal across
 // its middle, easing (smoothstep) into the next side's over the stretch
 // before each corner, so the camera never steps when you change walls.
-var UP_BAND = .5;
+var UP_BAND = 1;
 function upAt(G, p){
   p = ((p % G.P) + G.P) % G.P;
   var s = Math.min(G.N - 1, Math.floor(p / G.S)), u = (p - s * G.S) / G.S * 2 - 1, a = Math.abs(u);
@@ -258,7 +258,7 @@ addEventListener("resize", resize); resize();
 var S = {
   mode:"map", st:null, G:null, stopIdx:0, daily:null, dailyFirst:false,
   p:0, vl:0, h:0, vh:0, z:0, grounded:true, dead:0, roll:Math.PI / 2, rollV:0, side:0, t:0, arrived:false,
-  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, flowS:0, tuckS:0, leanS:0, cam:null,
+  flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
   best: store.get("best", 0), bestStyle: store.get("bestStyle", {})
 };
 var input = { left:false, right:false, tuck:false, jumpQ:0 };
@@ -274,7 +274,7 @@ function startStation(params, opts){
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
-  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; input.jumpQ = 0;
   S.roll = upAt(S.G, S.p); S.side = surf(S.G, S.p).s;
   S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
   S.label = opts.label || ("STOP " + String(S.stopIdx + 1).padStart(2, "0") + " · " + params.name);
@@ -354,7 +354,7 @@ function keyDown(code, repeat){
   if(code === "ArrowLeft" || code === "KeyA"){ input.left = true; return true; }
   if(code === "ArrowRight" || code === "KeyD"){ input.right = true; return true; }
   if(code === "ArrowDown" || code === "KeyS"){ input.tuck = true; return true; }
-  if(code === "ArrowUp" || code === "Space" || code === "KeyW"){ if(!repeat) input.jumpQ = .14; return true; }
+  if(code === "ArrowUp" || code === "Space" || code === "KeyW"){ if(!repeat && S.mode === "ride" && !(S.dead > 0)) input.jumpQ = .14; return true; }
   if(code === "Escape" && S.mode === "ride"){ toMap(); return true; }
   return false;
 }
@@ -363,12 +363,17 @@ function keyUp(code){
   if(code === "ArrowRight" || code === "KeyD") input.right = false;
   if(code === "ArrowDown" || code === "KeyS") input.tuck = false;
 }
-addEventListener("keydown", function(e){ if(keyDown(e.code, e.repeat)) e.preventDefault(); });
+addEventListener("keydown", function(e){
+  // outside a ride, keys aimed at a menu button work the button
+  if(S.mode !== "ride" && e.target && e.target.closest && e.target.closest("button,a,input,select,textarea")) return;
+  if(keyDown(e.code, e.repeat)) e.preventDefault();
+});
 addEventListener("keyup", function(e){ keyUp(e.code); });
-addEventListener("blur", function(){ input.left = input.right = input.tuck = false; });
+function releaseAll(){ input.left = input.right = input.tuck = false; }
+addEventListener("blur", releaseAll);
 addEventListener("message", function(e){
   var m = e.data && e.data.olKey; if(!m || e.source !== window.parent) return;
-  if(m.type === "down") keyDown(m.code, m.repeat); else keyUp(m.code);
+  if(m.type === "release") releaseAll(); else if(m.type === "down") keyDown(m.code, m.repeat); else keyUp(m.code);
 });
 // Touch: hold a side to carve that way; both sides at once is a tuck; a
 // quick tap or an upward swipe jumps.
@@ -402,9 +407,12 @@ function update(dt){
   S.t += dt;
   var st = S.st, G = S.G, tw = G.S / st.C;
   S.flowS += (S.flow - S.flowS) * Math.min(1, dt * 4);
+  // stars and speed lines advance by accumulated phase, so a speed change
+  // changes how fast they stream, never where they are
+  var spn = speedNow(); S.starPh += dt * (.05 + spn * .012); S.linePh = (S.linePh + dt * (1.5 + spn * .05)) % 1;
   S.tuckS += ((input.tuck && S.grounded ? 1 : 0) - S.tuckS) * Math.min(1, dt * 6);
   S.leanS += (clamp(S.vl / (VL_BASE + VL_FLOW), -1, 1) - S.leanS) * Math.min(1, dt * 10);
-  if(S.dead > 0){ S.dead -= dt; S.h -= 16 * dt; S.z += speedNow() * .2 * dt; S.shake = Math.max(S.shake, .3); if(S.dead <= 0) retry(); return; }
+  if(S.dead > 0){ S.dead -= dt; S.h -= 16 * dt; S.z += speedNow() * (.2 + .8 * Math.pow(S.dead / DEATH_T, 2)) * dt; S.shake = Math.max(S.shake, .3); if(S.dead <= 0) retry(); return; }
   var sp = speedNow(); S.z += sp * dt; S.topSpeed = Math.max(S.topSpeed, sp);
   if(S.comboT > 0){ S.comboT -= dt; if(S.comboT <= 0) S.combo = 0; }
   S.flow = Math.max(0, S.flow - FLOW_DECAY * dt * (S.comboT > 0 ? .3 : 1));
@@ -440,7 +448,7 @@ function update(dt){
         if(S.airGap){ var rowsCleared = Math.round(S.airT * sp / D); trick(rowsCleared >= 5 ? "big" : "gap"); }
         if(S.airSide) trick("xfer");
       }
-      else if(S.h < -1.2){ S.dead = .75; S.flow = 0; S.combo = 0; S.comboT = 0; SFX.fall(); }
+      else if(S.h < -1.2){ S.dead = DEATH_T; S.flow = 0; S.combo = 0; S.comboT = 0; SFX.fall(); }
     }
     if(S.h > R * .9){ S.h = R * .9; S.vh = Math.min(S.vh, 0); }
   }
@@ -460,7 +468,10 @@ function update(dt){
   // camera rolls so the side under you is the floor: a critically damped
   // spring toward the continuous up, so the roll eases in and out
   var d = wrapA(upAt(G, S.p) - S.roll), w = ROLL_W;
-  S.rollV += (w * w * d - 2 * w * S.rollV) * dt; S.roll += S.rollV * dt;
+  // plus feed-forward: the rate the target is turning at, so a hard carve
+  // round the tunnel doesn't leave the floor tilted under you
+  var tv = wrapA(upAt(G, S.p + .01) - upAt(G, S.p - .01)) / .02 * S.vl * .5;
+  S.rollV += (w * w * d + 2 * w * (tv - S.rollV)) * dt; S.roll += S.rollV * dt;
   for(var i = pops.length - 1; i >= 0; i--){ pops[i].t += dt; if(pops[i].t > 1.1) pops.splice(i, 1); }
   if(!S.arrived && S.z / D >= st.len - 2){ S.arrived = true; arrive(); }
 }
@@ -485,7 +496,7 @@ function draw(){
   var roll = S.st ? S.roll - Math.PI / 2 : 0;
   // stars stream past at speed
   for(var i = 0; i < stars.length; i++){
-    var s = stars[i], a = s[0] - roll, rr = (.15 + ((s[1] + S.t * (.05 + sp * .012) * (.4 + s[3])) % 1) * .95) * Math.max(W, H);
+    var s = stars[i], a = s[0] - roll, rr = (.15 + ((s[1] + S.starPh * (.4 + s[3])) % 1) * .95) * Math.max(W, H);
     var len = 1 + sp * .25 * s[3] * (.3 + flow);
     ctx.strokeStyle = "rgba(240,240,255," + (.18 + s[1] * .45).toFixed(2) + ")"; ctx.lineWidth = s[2];
     ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); ctx.lineTo(cx + Math.cos(a) * (rr + len), cy + Math.sin(a) * (rr + len)); ctx.stroke();
@@ -539,11 +550,11 @@ function draw(){
     }
   }
   // speed lines
-  var nLines = Math.round(10 + 70 * flow + (input.tuck ? 20 : 0));
+  var nLines = Math.round(10 + 70 * flow + 20 * S.tuckS);
   ctx.strokeStyle = "rgba(255,255,255," + (.06 + .18 * flow).toFixed(3) + ")"; ctx.lineWidth = 2;
   ctx.beginPath();
   for(var k = 0; k < nLines; k++){
-    var ang = (k * 2.399 + S.t * 3) % TAU, r1s = Math.max(W, H) * (.35 + ((k * .618 + S.t * (1.5 + sp * .05)) % 1) * .5), r2s = r1s + 30 + sp * 3 * (.5 + flow);
+    var ang = (k * 2.399 + S.t * 3) % TAU, r1s = Math.max(W, H) * (.35 + ((k * .618 + S.linePh) % 1) * .5), r2s = r1s + 30 + sp * 3 * (.5 + flow);
     ctx.moveTo(cx + Math.cos(ang) * r1s, cy + Math.sin(ang) * r1s); ctx.lineTo(cx + Math.cos(ang) * r2s, cy + Math.sin(ang) * r2s);
   }
   ctx.stroke();
@@ -562,6 +573,11 @@ function draw(){
     ctx.restore();
   }
   ctx.restore();
+  // a short dip to black hides the cut from a fall back to the start
+  if(S.mode === "ride"){
+    var fade = S.dead > 0 ? clamp((FADE_T - S.dead) / FADE_T, 0, 1) : clamp(1 - S.t / FADE_T, 0, 1);
+    if(fade > 0){ fade = fade * fade * (3 - 2 * fade); ctx.fillStyle = "rgba(8,8,12," + fade.toFixed(3) + ")"; ctx.fillRect(0, 0, W, H); }
+  }
   // HUD numbers
   var prog = Math.min(1, S.z / D / st.len);
   $("progFill").style.width = (prog * 100).toFixed(1) + "%";
@@ -588,7 +604,9 @@ function drawSkater(proj, me, lean, f){
   }
   // heading: forward speed against sideways speed, from the eased lean
   var a = surf(S.G, S.p - .02), b = surf(S.G, S.p + .02), Lx = b.x - a.x, Ly = b.y - a.y, Ll = Math.hypot(Lx, Ly) || 1; Lx /= Ll; Ly /= Ll;
-  var yaw = Math.atan2(lean * (VL_BASE + VL_FLOW), Math.max(1, speedNow())) * .55 + (S.dead > 0 ? S.t * 9 : 0);
+  // a fall spins up from rest (no snap), about one turn by the restart
+  var spin = S.dead > 0 ? Math.pow(DEATH_T - S.dead, 2) * 12 : 0;
+  var yaw = Math.atan2(lean * (VL_BASE + VL_FLOW), Math.max(1, speedNow())) * .55 + spin;
   var sy = Math.sin(yaw), cy = Math.cos(yaw);
   // a point on the board: fo along the board, si across it, up above the floor
   function bp(fo, si, up){ return proj(bx + Lx * (sy * fo + cy * si) + ux * up, by + Ly * (sy * fo + cy * si) + uy * up, bz + cy * fo - sy * si); }
@@ -603,15 +621,15 @@ function drawSkater(proj, me, lean, f){
   if(poly(deck(.07))){ ctx.fillStyle = "#3a4d00"; ctx.fill(); }
   if(poly(deck(.1))){ ctx.fillStyle = "#c6ff00"; ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1; ctx.stroke(); }
   // feet side by side on the deck, the left a touch behind the right
-  var crouch = (input.tuck && S.grounded ? .28 : 0) + (S.landT < .15 ? (1 - S.landT / .15) * .3 : 0);
+  var crouch = .28 * S.tuckS + (S.landT < .15 ? (1 - S.landT / .15) * .3 : 0);
   var air = S.grounded ? 0 : 1;
   var fb = bp(-.08, -.075, .1), ff = bp(.08, .075, .1); if(!fb || !ff) return;
   var rot = lean * .35;
   ctx.save();
   ctx.translate(P[0], P[1]);
-  ctx.rotate(rot + (S.dead > 0 ? S.t * 9 : 0));
+  ctx.rotate(rot + spin);
   // the feet, in this rotated frame
-  var cr = Math.cos(-rot), sr = Math.sin(-rot);
+  var cr = Math.cos(-(rot + spin)), sr = Math.sin(-(rot + spin));
   function loc(q){ var dx = q[0] - P[0], dy = q[1] - P[1]; return [dx * cr - dy * sr, dx * sr + dy * cr]; }
   var FB = loc(fb), FF = loc(ff), turn = sy * k * .12;
   // legs: short and springy, left foot to left hip, right to right

@@ -101,7 +101,7 @@
       <span class="tape">A Trip and Route game · Preview</span>
       <h1>OUTER<br><em>LINE</em></h1>
       <p class="tag">Walls are floors. <span>Tricks are speed.</span></p>
-      <p class="lede">Skate the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that just keeps getting faster.</p>
+      <p class="lede">You're an egg on a skateboard, skating the space metro after hours. Carve the tunnel, step onto a wall when the floor runs out, and chain wall rides, gaps and hops into a line that just keeps getting faster.</p>
       <div class="actions">
         <button type="button" class="btn go" id="play"><span>Drop in</span></button>
         <button type="button" class="btn mag" id="playDaily"><span>Today's route</span></button>
@@ -111,7 +111,7 @@
       <div class="screen">
         <span class="tape lime">live in your browser</span>
         <div class="window" id="window">
-          <img id="poster" src="ride.jpg" alt="The skater mid-run in the tunnel, at speed" width="1280" height="800">
+          <img id="poster" src="ride.jpg" alt="The green egg on its skateboard, airborne in the tunnel at full speed" width="1280" height="800">
           <button type="button" class="btn go play-over" id="play2"><span>▶ Ride</span></button>
         </div>
       </div>
@@ -214,13 +214,25 @@ style 48,210</pre>
   // While the game is open, keys pressed with the focus still on this page
   // go to the game instead of scrolling the page.
   var GAME_KEYS = { ArrowLeft:1, ArrowRight:1, ArrowUp:1, ArrowDown:1, Space:1, KeyA:1, KeyD:1, KeyW:1, KeyS:1, Escape:1 };
+  // Only while the game is on screen: scrolled away, the keys scroll the page.
   function liveFrame(){ return win.querySelector('iframe') || overlay.querySelector('iframe'); }
-  function forward(type){ return function(e){
+  function onScreen(f){ if(!overlay.hidden) return true; var r = f.getBoundingClientRect(); return r.bottom > 80 && r.top < innerHeight - 80; }
+  var held = {};
+  function send(f, m){ try{ f.contentWindow.postMessage({ olKey:m }, '*'); }catch(e){} }
+  addEventListener('keydown', function(e){
     var f = liveFrame(); if(!f || !GAME_KEYS[e.code] || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     if(e.code === 'Space' && e.target.tagName === 'BUTTON') return;
-    e.preventDefault(); f.contentWindow.postMessage({ olKey:{ type:type, code:e.code, repeat:e.repeat } }, '*');
-  }; }
-  addEventListener('keydown', forward('down')); addEventListener('keyup', forward('up'));
+    if(!onScreen(f)) return;
+    e.preventDefault(); held[e.code] = 1; send(f, { type:'down', code:e.code, repeat:e.repeat });
+  });
+  addEventListener('keyup', function(e){
+    // a keyup always follows its forwarded keydown, even if the game has scrolled away
+    if(!held[e.code]) return; delete held[e.code];
+    var f = liveFrame(); if(f){ e.preventDefault(); send(f, { type:'up', code:e.code }); }
+  });
+  function release(){ held = {}; var f = liveFrame(); if(f) send(f, { type:'release' }); }
+  addEventListener('blur', release); addEventListener('pagehide', release);
+  document.addEventListener('visibilitychange', function(){ if(document.hidden) release(); });
   document.getElementById('play').addEventListener('click', function(){ play('play'); });
   playOver.addEventListener('click', function(){ play('play'); });
   document.getElementById('playDaily').addEventListener('click', function(){ play('daily'); });
