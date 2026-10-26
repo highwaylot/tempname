@@ -200,7 +200,7 @@ style 48,210</pre>
   route(); setInterval(route, 30000);
 
   var win = document.getElementById('window'), poster = document.getElementById('poster'), playOver = document.getElementById('play2');
-  var overlay = document.getElementById('overlay'), stop = document.getElementById('stop');
+  var overlay = document.getElementById('overlay'), stop = document.getElementById('stop'), liveTape = win.parentElement.querySelector('.tape');
   // The game is one file, inlined (srcdoc) where the host allows, so the
   // start screen goes in as window.__OL_START instead of a query string.
   function gameFrame(start){
@@ -214,7 +214,7 @@ style 48,210</pre>
   }
   function play(start){
     if(window.matchMedia('(min-width: 861px)').matches){
-      var f = gameFrame(start); win.replaceChildren(f); stop.hidden = false;
+      var f = gameFrame(start); win.replaceChildren(f); stop.hidden = false; liveTape.hidden = true;   // the game has its own labels
       win.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(function(){ f.focus(); }, 300);
     } else {
       var g = gameFrame(start); overlay.appendChild(g); overlay.hidden = false; document.body.classList.add('playing'); g.focus();
@@ -247,7 +247,7 @@ style 48,210</pre>
   document.getElementById('playDaily').addEventListener('click', function(){ play('daily'); });
   document.getElementById('playDaily2').addEventListener('click', function(){ play('daily'); });
   document.getElementById('playForever').addEventListener('click', function(){ play('forever'); });
-  stop.addEventListener('click', function(){ win.replaceChildren(poster, playOver); stop.hidden = true; });
+  stop.addEventListener('click', function(){ win.replaceChildren(poster, playOver); stop.hidden = true; liveTape.hidden = false; });
   document.getElementById('close').addEventListener('click', function(){
     var f = overlay.querySelector('iframe'); if(f) f.remove();
     overlay.hidden = true; document.body.classList.remove('playing');

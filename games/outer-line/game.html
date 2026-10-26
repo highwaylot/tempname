@@ -1221,7 +1221,7 @@ function finishForever(){
   else if(S.style > (rec.style || 0)) store.set("forever", { m:rec.m, style:S.style });
   $("foreverHead").textContent = newBest ? "forever · new best" : "forever";
   $("foreverDist").textContent = m.toLocaleString("en-US") + " M";
-  $("foreverStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo], ["coins", S.coins], ["your best", Math.max(m, rec.m || 0).toLocaleString("en-US") + " m"]]
+  $("foreverStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo], ["coins", S.coins], ["your best", Math.max(m, rec.m || 0).toLocaleString("en-US") + " M"]]
     .map(function(x){ return '<div class="stat"><b>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join("");
   showUnlocks("foreverUnlocks");
   showScreen("foreverScreen"); $("foreverAgain").focus();
