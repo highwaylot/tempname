@@ -631,8 +631,7 @@ function trick(kind, extra){
   if(pops.length > 4) pops.shift();
   SFX.trick(S.combo);
   var tier = S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0;
-  if(tier > S.tier){ S.tier = tier; pops.push({ text:TIERS[tier] + "!", t:0, x:0, rot:-.04, big:true, color:"#ff2e88" }); SFX.tier(); if(tier === 2){ woosh(1.2); stuntSolo(); } }
-  if((S.combo >= 10 && S.combo % 10 === 0) || ((kind === "big" || kind === "xfer") && S.combo >= 8)) stuntSolo();
+  if(tier > S.tier){ S.tier = tier; pops.push({ text:TIERS[tier] + "!", t:0, x:0, rot:-.04, big:true, color:"#ff2e88" }); SFX.tier(); if(tier === 2) woosh(1.2); }
   if(kind === "big") woosh(1);
   if(tier === 2) unlock("send");
   if(S.combo >= 20) unlock("combo");
@@ -685,8 +684,8 @@ var SFX = {
 
 // ---------------------------------------------------------------- music
 // Founder (2026-10-26): "space opera EDM, vibey French EDM … subtle in the
-// background, wooshes for speed, subtle too, and high-score stunts get a
-// cool guitar solo". This overrides the earlier effects-only rule for Outer
+// background, wooshes for speed, subtle too" (a stunt guitar solo was tried
+// and cut). This overrides the earlier effects-only rule for Outer
 // Line only. Everything is synthesized here (no samples to license). French
 // house in A minor at 122 BPM, four bars Am9 Fmaj7 Cmaj7 G6: a four-on-the-
 // floor kick that pumps the rest (sidechain), filtered disco chord stabs on
@@ -698,12 +697,11 @@ var M_BPM = 122, M_BEAT = 60 / M_BPM, M_STEP = M_BEAT / 4;
 var M_ROOTS = [45, 41, 48, 43];
 var M_CHORDS = [[57, 60, 64, 67, 71], [53, 57, 60, 64, 69], [52, 55, 59, 60, 64], [55, 59, 62, 64, 67]];
 var M_ARP = [0, 2, 4, 3, 1, 3, 4, 2];
-var M_LICK = [[69, 1], [72, 1], [74, 1], [76, 1], [79, 1], [81, 1], [83, 2, 84], [81, 1], [79, 1], [76, 1], [79, 1], [81, 2], [76, 1], [74, 2, 76], [72, 1], [69, 3]];
 function mhz(m){ return 440 * Math.pow(2, (m - 69) / 12); }
 function createMusic(ctx, dest, getState){
   var out = ctx.createGain(); out.gain.value = .0001; out.connect(dest);       // everything; fades with scene and mute
   var sweep = ctx.createBiquadFilter(); sweep.type = "lowpass"; sweep.Q.value = 1.1; sweep.frequency.value = 900; sweep.connect(out);   // the French-house filter: speed opens it
-  var duck = ctx.createGain(); duck.connect(sweep);                            // dips under the guitar
+  var duck = ctx.createGain(); duck.connect(sweep);
   var pump = ctx.createGain(); pump.connect(duck);                             // the sidechain: all but the kick
   var chordLP = ctx.createBiquadFilter(); chordLP.type = "lowpass"; chordLP.Q.value = 3; chordLP.frequency.value = 700; chordLP.connect(pump);
   var echo = ctx.createDelay(1); echo.delayTime.value = M_STEP * 3; var fb = ctx.createGain(); fb.gain.value = .38; var echoLP = ctx.createBiquadFilter(); echoLP.type = "lowpass"; echoLP.frequency.value = 3000;
@@ -743,29 +741,6 @@ function createMusic(ctx, dest, getState){
       if(!started){ started = true; nextT = Math.max(ctx.currentTime + .05, nextT); }
       while(nextT < until){ play(step, nextT); step++; nextT += M_STEP; }
     },
-    // the guitar: a driven saw/square lead through a tanh drive, with bends and
-    // vibrato, playing an A-minor pentatonic run; the band dips under it
-    solo: function(t){
-      t = Math.max(t, ctx.currentTime + .02);
-      var o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), pre = ctx.createGain(), sh = ctx.createWaveShaper(), lp = ctx.createBiquadFilter(), pk = ctx.createBiquadFilter(), g = ctx.createGain(), vib = ctx.createOscillator(), vibG = ctx.createGain();
-      var curve = new Float32Array(1024); for(var c = 0; c < 1024; c++){ var xx = c / 512 - 1; curve[c] = Math.tanh(xx * 6); } sh.curve = curve;
-      o1.type = "sawtooth"; o2.type = "square"; o2.detune.value = 9; pre.gain.value = .7; lp.type = "lowpass"; lp.frequency.value = 3400; lp.Q.value = 1.2; pk.type = "peaking"; pk.frequency.value = 1200; pk.gain.value = 5; pk.Q.value = 1;
-      vib.frequency.value = 6.2; vibG.gain.value = 0; vib.connect(vibG); vibG.connect(o1.detune); vibG.connect(o2.detune);
-      o1.connect(pre); o2.connect(pre); pre.connect(sh); sh.connect(lp); lp.connect(pk); pk.connect(g); g.connect(out); g.connect(echo);
-      var tt = t, sixteenth = M_STEP * .9, sol = SOLO_VOL;
-      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(sol, t + .02);
-      M_LICK.forEach(function(nt){
-        var f = mhz(nt[0]), d = nt[1] * sixteenth;
-        [o1, o2].forEach(function(o){ o.frequency.setTargetAtTime(f, tt, .008); if(nt[2]) o.frequency.setTargetAtTime(mhz(nt[2]), tt + d * .35, d * .18); });
-        g.gain.setValueAtTime(sol * .75, tt); g.gain.linearRampToValueAtTime(sol, tt + .015);
-        tt += d;
-      });
-      vibG.gain.setValueAtTime(0, tt - 3 * sixteenth); vibG.gain.linearRampToValueAtTime(28, tt);
-      g.gain.setValueAtTime(sol, tt); g.gain.exponentialRampToValueAtTime(.0001, tt + .45);
-      [o1, o2, vib].forEach(function(o){ o.start(t); o.stop(tt + .5); });
-      duck.gain.setTargetAtTime(.45, t, .05); duck.gain.setTargetAtTime(1, tt, .25);
-      return tt + .5 - t;
-    },
     // speed: a filtered-noise sweep, subtle
     woosh: function(t, v){
       t = Math.max(t, ctx.currentTime + .01);
@@ -776,14 +751,12 @@ function createMusic(ctx, dest, getState){
     }
   };
 }
-var MUSIC_VOL = .55, SOLO_VOL = .07, WOOSH_VOL = .07, SOLO_GAP = 7;
-var music = null, soloAt = -99;
+var MUSIC_VOL = .55, WOOSH_VOL = .07;
+var music = null;
 function musicState(){ var sp = speedNow(), top = S.st ? S.st.p.speed * ((1 + FLOW_MAX) * TUCK + HILL_TOP) * PACE : 1; return { on:!muted, ride:S.mode === "ride" && S.dead <= 0, energy:S.st ? clamp(.6 * (sp / top) / .55 + .4 * S.flow, 0, 1) : 0 }; }
 function musicTick(){ if(!AC || muted) { if(music) music.tick(0); return; } if(!music) music = createMusic(AC, AC.destination, musicState); music.tick(AC.currentTime + .15); }
 setInterval(musicTick, 25);
 function woosh(v){ if(music && AC && !muted) music.woosh(AC.currentTime, v || 1); }
-// a stunt worth a solo: combo milestones, FULL SEND, a big gap or transfer at the top multiplier; not back to back
-function stuntSolo(){ if(!music || !AC || muted || S.t - soloAt < SOLO_GAP) return false; soloAt = S.t; music.solo(AC.currentTime); S.solos = (S.solos || 0) + 1; return true; }
 function syncMute(){ $("mute").textContent = muted ? "×" : "♪"; $("mute").setAttribute("aria-label", muted ? "Sound on" : "Sound off"); }
 $("mute").addEventListener("click", function(){ muted = !muted; store.set("muted", muted); syncMute(); if(!muted) tone(660, 880, .1, "triangle", .08); });
 syncMute();
@@ -1374,7 +1347,7 @@ checkProgress(true);
 renderMap(); renderLocker(); showScreen("mapScreen");
 requestAnimationFrame(frame);
 
-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { renderMusic:function(secs, st, soloAt, wooshAt){ var oc = new OfflineAudioContext(1, Math.ceil(44100 * secs), 44100), m = createMusic(oc, oc.destination, function(){ return st; }); m.tick(secs); if(soloAt != null) m.solo(soloAt); if(wooshAt != null) m.woosh(wooshAt, 1); return oc.startRendering().then(function(buf){ return Array.from(buf.getChannelData(0)); }); }, musicState:musicState, makeCoins:makeCoins, vgradeAt:vgradeAt, tune:function(o){ if(o.BEND_K != null) BEND_K = o.BEND_K; if(o.HILL_VIS != null) HILL_VIS = o.HILL_VIS; if(o.GAP_FLAT != null) GAP_FLAT = o.GAP_FLAT; }, gradeAt:gradeAt, heightAt:heightAt, floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { renderMusic:function(secs, st, _, wooshAt){ var oc = new OfflineAudioContext(1, Math.ceil(44100 * secs), 44100), m = createMusic(oc, oc.destination, function(){ return st; }); m.tick(secs); if(wooshAt != null) m.woosh(wooshAt, 1); return oc.startRendering().then(function(buf){ return Array.from(buf.getChannelData(0)); }); }, musicState:musicState, makeCoins:makeCoins, vgradeAt:vgradeAt, tune:function(o){ if(o.BEND_K != null) BEND_K = o.BEND_K; if(o.HILL_VIS != null) HILL_VIS = o.HILL_VIS; if(o.GAP_FLAT != null) GAP_FLAT = o.GAP_FLAT; }, gradeAt:gradeAt, heightAt:heightAt, floorColor:floorColor, relLum:relLum, S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, playForever:playForever, buildForever:buildForever, foreverAt:foreverAt, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
 // An embedding page that inlines the game sets window.__OL_START first.
 var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : /[?&]forever=1(&|$)/.test(location.search) ? "forever" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
 if(startWith === "daily") playDaily(false);
