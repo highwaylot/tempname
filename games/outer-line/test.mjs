@@ -132,6 +132,39 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await ctx.close();
 }
 
+// Scramble's beanies: start with one, earn the rest, wear what you've earned
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const start = await page.evaluate(() => ({ owned: window.__ol.owned(), worn: window.__ol.worn(), cards: document.querySelectorAll('#locker .beanie').length, locked: document.querySelectorAll('#locker .beanie.locked').length, name: document.getElementById('eggName').textContent }));
+  ok(start.owned.join() === 'og' && start.worn === 'og' && start.cards === 9 && start.locked === 8 && start.name === 'Scramble', 'a new rider is Scramble with the OG beanie and 8 to earn');
+  // landing Dockyard earns Lime Rib, shown on the arrival card
+  await page.click('#playNext'); await page.waitForTimeout(200);
+  await page.evaluate(() => { const S = window.__ol.S; S.dead = 0; S.h = 0; S.grounded = true; S.z = (S.st.len - 3) * window.__ol.D; });
+  await page.waitForTimeout(900);
+  const arr = await page.evaluate(() => ({ owned: window.__ol.owned(), strip: !document.getElementById('arriveUnlocks').hidden && document.getElementById('arriveUnlocks').textContent }));
+  ok(arr.owned.includes('lime') && /Lime Rib/.test(arr.strip || ''), 'landing Dockyard unlocks Lime Rib and the arrival card says so');
+  // FULL SEND mid-ride earns Full Send with a callout
+  await page.click('#arriveAgain'); await page.waitForTimeout(200);
+  const send = await page.evaluate(() => { const O = window.__ol, S = O.S; S.flow = .62; S.tier = 1; O.input.left = O.input.right = false; S.p += S.G.S; S.grounded = true; S.h = 0; S.wallT = -9; for(let i = 0; i < 40; i++) O.update(1 / 120); return { owned: O.owned(), pop: O.pops.some(p => /NEW BEANIE: FULL SEND/.test(p.text)) }; });
+  ok(send.owned.includes('send') && send.pop, 'hitting FULL SEND unlocks the Full Send beanie mid-ride, with a callout');
+  // wear it, survive a reload; locked beanies can't be worn
+  await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+  await page.click('#locker .beanie:nth-child(2)');
+  await page.evaluate(() => window.__ol.wear('gold'));
+  await page.reload(); await page.waitForFunction(() => window.__ol);
+  const after = await page.evaluate(() => ({ worn: window.__ol.worn(), on: document.querySelector('#locker .beanie.on .nm').textContent, owned: window.__ol.owned().length }));
+  ok(after.worn === 'lime' && after.on === 'Lime Rib' && after.owned === 3, 'the worn beanie is saved; a locked one can\'t be worn (' + after.on + ', ' + after.owned + ' owned)');
+  // returning riders get progress beanies quietly
+  await page.evaluate(() => { localStorage.setItem('outerline.best', '10'); });
+  await page.reload(); await page.waitForFunction(() => window.__ol);
+  const ret = await page.evaluate(() => window.__ol.owned());
+  ok(['lime', 'cyan', 'nightbus', 'flag'].every(id => ret.includes(id)), 'a rider who already landed every spot gets the progress beanies on load');
+  await page.evaluate(() => document.getElementById('locker').scrollIntoView());
+  await shot(page, 'locker');
+  ok(errs.length === 0, 'no errors (beanies)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
 // touch
 {
   const { ctx, page, errs } = await open({ width: 390, height: 844 }, true);

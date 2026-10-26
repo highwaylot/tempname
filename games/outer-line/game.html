@@ -20,7 +20,8 @@
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body{ margin:0; height:100%; background:var(--void); color:var(--ink); font-family:var(--heavy); overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; }
   [hidden]{ display:none !important; }
-  canvas{ position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #c{ position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .beanie canvas, .unlocks canvas{ position:static; display:block; }
 
   /* tape label */
   .tape{ display:inline-block; background:var(--tape); color:#111; font:900 italic 13px var(--heavy); letter-spacing:.04em; text-transform:uppercase; padding:5px 10px 4px; transform:rotate(-2deg); box-shadow:2px 3px 0 rgba(0,0,0,.45); }
@@ -77,7 +78,21 @@
   .stat span{ font:700 11px var(--mono); letter-spacing:.14em; color:var(--dim); text-transform:uppercase; }
   .share{ font:700 14px/1.5 var(--mono); white-space:pre; background:#101016; border:2px dashed rgba(255,255,255,.25); padding:14px 16px; color:var(--ink); align-self:flex-start; max-width:100%; overflow-x:auto; }
   .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%) rotate(-2deg); font:900 italic 14px var(--heavy); background:var(--lime); color:#111; padding:10px 14px; box-shadow:4px 4px 0 var(--mag); }
-  @media (max-width: 560px){ .hud-top{ right:108px; } .spots{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+  .locker-head{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-top:6px; }
+  .locker-head h2{ margin:0; font:900 italic 26px/1 var(--heavy); text-transform:uppercase; }
+  .locker-head h2 em{ color:var(--lime); font-style:italic; }
+  .locker{ display:grid; grid-template-columns:repeat(auto-fill, minmax(112px, 1fr)); gap:12px; }
+  .beanie{ appearance:none; border:0; padding:8px 8px 10px; background:#14141c; color:var(--ink); cursor:pointer; box-shadow:4px 4px 0 rgba(0,0,0,.55); display:flex; flex-direction:column; align-items:center; gap:4px; font-family:var(--heavy); position:relative; }
+  .beanie canvas{ width:72px; height:72px; }
+  .beanie .nm{ font:900 italic 13px/1.1 var(--heavy); text-transform:uppercase; text-align:center; }
+  .beanie .how{ font:700 10px/1.3 var(--mono); letter-spacing:.04em; color:var(--dim); text-align:center; }
+  .beanie.locked{ cursor:default; }
+  .beanie.locked canvas{ opacity:.25; filter:grayscale(1); }
+  .beanie.on{ outline:3px solid var(--lime); outline-offset:-3px; }
+  .beanie.on::after{ content:"ON"; position:absolute; right:-6px; top:-8px; background:var(--lime); color:#111; font:900 italic 10px var(--heavy); padding:3px 6px; transform:rotate(6deg); }
+  .unlocks{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .unlocks canvas{ width:56px; height:56px; background:#14141c; box-shadow:3px 3px 0 rgba(0,0,0,.5); }
+  @media (max-width: 560px){ .hud-top{ right:108px; } .spots{ grid-template-columns:repeat(2, minmax(0, 1fr)); } .locker{ grid-template-columns:repeat(3, minmax(0, 1fr)); } }
   @media (prefers-reduced-motion: reduce){ .hint{ transition:none; } }
 </style>
 </head>
@@ -103,7 +118,7 @@
 
 <section class="screen" id="mapScreen">
   <div class="page">
-    <p class="kicker">A Trip and Route game · after hours on the metro</p>
+    <p class="kicker">A Trip and Route game · after hours on the metro · starring Scramble, an egg</p>
     <h1 class="logo">OUTER<br><em>LINE</em></h1>
     <div class="row">
       <button type="button" class="btn go" id="playNext"><span>Drop in</span></button>
@@ -111,6 +126,8 @@
     </div>
     <p class="keys" id="keys"></p>
     <div class="spots" id="spots"></div>
+    <div class="locker-head"><h2><em id="eggName">Scramble</em>'s beanies</h2><span class="keys" id="lockerCount"></span></div>
+    <div class="locker" id="locker"></div>
   </div>
 </section>
 
@@ -119,6 +136,7 @@
     <span class="tape lime">landed</span>
     <p class="big" id="arriveName">—</p>
     <div class="stats" id="arriveStats"></div>
+    <div class="unlocks" id="arriveUnlocks" hidden></div>
     <div class="row">
       <button type="button" class="btn go" id="arriveNext"><span>Next stop</span></button>
       <button type="button" class="btn" id="arriveAgain"><span>Again</span></button>
@@ -132,6 +150,7 @@
     <span class="tape mag" id="dailyHead">today's route</span>
     <p class="big" id="dailyPct">—</p>
     <div class="share" id="shareText"></div>
+    <div class="unlocks" id="dailyUnlocks" hidden></div>
     <div class="row">
       <button type="button" class="btn go" id="copyShare"><span>Copy card</span></button>
       <button type="button" class="btn" id="dailyAgain"><span>Practice</span></button>
@@ -306,6 +325,96 @@ var TRICKS = {
   edge:  { label:"EDGE",      flow:.05, pts:150 }
 };
 var TIERS = ["ROLLING", "FLOWING", "FULL SEND"];
+
+// ---------------------------------------------------------------- Scramble's beanies
+// The rider is Scramble, an egg on a skateboard. Beanies unlock from things
+// you do (progress, a tier, a combo, a style score, the daily), never from
+// grinding time, and each one says how to get it.
+var EGG_NAME = "Scramble";
+var BEANIES = [
+  { id:"og",      name:"OG",          how:"yours from day one",              look:{ base:"#ff2e88", band:"#d81f6e", pom:"#ff2e88" } },
+  { id:"lime",    name:"Lime Rib",    how:"land Dockyard",                   look:{ base:"#c6ff00", band:"#94c200", pom:"#c6ff00", rib:"#94c200" } },
+  { id:"cyan",    name:"Big Pom",     how:"land 3 spots",                    look:{ base:"#2ee6ff", band:"#18a9c0", pom:"#f4f4f0", pomR:1.7 } },
+  { id:"nightbus",name:"Night Bus",   how:"land 5 spots",                    look:{ base:"#22223a", band:"#ffd23f", pom:"#ffd23f", stripes:["#ffd23f"] } },
+  { id:"flag",    name:"Finish Flag", how:"land Terminus",                   look:{ base:"#f4f4f0", band:"#111", pom:"#111", checker:"#111" } },
+  { id:"send",    name:"Full Send",   how:"hit FULL SEND",                   look:{ base:"#ff6a1a", band:"#d93a00", pom:"#ffd23f", flame:"#ffd23f" } },
+  { id:"combo",   name:"Combo Cap",   how:"a ×20 combo",                     look:{ base:"#ff2e88", band:"#111", pom:"#f4f4f0", stripes:["#ff9f1a", "#ffe23f", "#c6ff00", "#2ee6ff", "#8a5cff"] } },
+  { id:"daily",   name:"Daily Moon",  how:"land today's route, first ride",  look:{ base:"#3a3f8f", band:"#2ee6ff", pom:"#2ee6ff", moon:"#f4f4f0" } },
+  { id:"gold",    name:"Gold",        how:"100,000 style in one ride",       look:{ base:"#f0b90b", band:"#b8860b", pom:"#ffe680", shine:true } }
+];
+var BEANIE_BY = {}; BEANIES.forEach(function(b){ BEANIE_BY[b.id] = b; });
+var owned = store.get("beanies", ["og"]); if(owned.indexOf("og") < 0) owned.unshift("og");
+var worn = BEANIE_BY[store.get("beanie", "og")] ? store.get("beanie", "og") : "og";
+var fresh = [];   // unlocked since the last results screen
+function unlock(id, quiet){
+  if(owned.indexOf(id) >= 0 || !BEANIE_BY[id]) return;
+  owned.push(id); store.set("beanies", owned);
+  if(quiet) return;
+  fresh.push(id);
+  if(S.mode === "ride"){ pops.push({ text:"NEW BEANIE: " + BEANIE_BY[id].name.toUpperCase(), t:0, x:0, rot:-.05, big:true, color:"#ff2e88" }); if(pops.length > 4) pops.shift(); SFX.tier(); }
+}
+// progress unlocks; quiet on load so returning riders get theirs without a parade
+function checkProgress(quiet){
+  if(S.best >= 1) unlock("lime", quiet);
+  if(S.best >= 3) unlock("cyan", quiet);
+  if(S.best >= 5) unlock("nightbus", quiet);
+  if(S.best >= 10) unlock("flag", quiet);
+}
+function wear(id){ if(owned.indexOf(id) < 0) return; worn = id; store.set("beanie", id); renderLocker(); }
+// A beanie on an egg top: band at y (its top edge), w half-width, h dome height.
+function drawBeanie(c, L, x, y, w, h, pomR){
+  var dome = function(){ c.beginPath(); c.ellipse(x, y + h * .08, w * .94, h, 0, Math.PI, 0); c.closePath(); };
+  if(L.shine){ var gg = c.createLinearGradient(x - w, y - h, x + w, y); gg.addColorStop(0, "#ffe680"); gg.addColorStop(.5, L.base); gg.addColorStop(1, "#a87700"); c.fillStyle = gg; }
+  else c.fillStyle = L.base;
+  dome(); c.fill();
+  c.save(); dome(); c.clip();
+  var i;
+  if(L.rib){ c.strokeStyle = L.rib; c.lineWidth = Math.max(1, w * .07); c.beginPath(); for(i = -3; i <= 3; i++){ c.moveTo(x + i * w * .27, y + h * .1); c.lineTo(x + i * w * .2, y - h); } c.stroke(); }
+  if(L.stripes){ var n = L.stripes.length, sh = h / (n === 1 ? 4 : n + 1); for(i = 0; i < n; i++){ c.fillStyle = L.stripes[i]; c.fillRect(x - w, y - sh * (i + 1) - (n === 1 ? sh * .5 : 0), w * 2, sh * (n === 1 ? 1 : .9)); } }
+  if(L.checker){ var q = w * .3; for(var cx = -4; cx < 4; cx++) for(var cy = 0; cy < 4; cy++) if((cx + cy) % 2 === 0){ c.fillStyle = L.checker; c.fillRect(x + cx * q, y - (cy + 1) * q, q, q); } }
+  if(L.flame){ c.fillStyle = L.flame; c.beginPath(); c.moveTo(x - w, y + h * .1); for(i = 0; i <= 6; i++){ var fx = x - w + i * w / 3; c.lineTo(fx - w * .08, y - h * (.45 + (i % 2) * .25)); c.lineTo(fx + w * .08, y + h * .1); } c.closePath(); c.fill(); }
+  if(L.moon){ c.fillStyle = L.moon; c.beginPath(); c.arc(x + w * .25, y - h * .5, h * .28, 0, TAU); c.fill(); c.fillStyle = L.base; c.beginPath(); c.arc(x + w * .35, y - h * .58, h * .24, 0, TAU); c.fill(); }
+  if(L.shine){ c.fillStyle = "rgba(255,255,255,.45)"; c.beginPath(); c.ellipse(x - w * .4, y - h * .55, w * .14, h * .25, -.5, 0, TAU); c.fill(); }
+  c.restore();
+  c.fillStyle = L.band; c.fillRect(x - w, y, w * 2, h * .38);
+  c.fillStyle = L.pom; c.beginPath(); c.arc(x, y - h * .92, pomR * (L.pomR || 1), 0, TAU); c.fill();
+}
+// Scramble's head with a beanie, for the locker and the results screens
+function beanieCanvas(id){
+  var cv2 = document.createElement("canvas"), r = 2; cv2.width = cv2.height = 72 * r;
+  var c = cv2.getContext("2d"); c.scale(r, r);
+  var rx = 26, ry = 34, cyE = 52;
+  var eg = c.createRadialGradient(36 - rx * .35, cyE - ry * .35, 1, 36, cyE, ry * 1.15);
+  eg.addColorStop(0, "#9df27a"); eg.addColorStop(.55, "#3fbf4a"); eg.addColorStop(1, "#1b6e2a");
+  c.fillStyle = eg; c.beginPath(); c.ellipse(36, cyE, rx, ry, 0, 0, TAU); c.fill();
+  c.fillStyle = "rgba(255,255,255,.22)"; c.beginPath(); c.ellipse(36 - rx * .38, cyE - ry * .42, rx * .16, ry * .24, -.35, 0, TAU); c.fill();
+  drawBeanie(c, BEANIE_BY[id].look, 36, cyE - ry * .88, rx * .66, ry * .3, 4.5);
+  return cv2;
+}
+function renderLocker(){
+  var box = $("locker"); if(!box) return;
+  box.innerHTML = "";
+  BEANIES.forEach(function(b){
+    var have = owned.indexOf(b.id) >= 0, btn = document.createElement("button");
+    btn.type = "button"; btn.className = "beanie" + (have ? "" : " locked") + (worn === b.id ? " on" : "");
+    if(!have) btn.disabled = true;
+    btn.setAttribute("aria-label", b.name + (have ? (worn === b.id ? ", wearing" : ", tap to wear") : ", locked: " + b.how));
+    btn.appendChild(beanieCanvas(b.id));
+    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = have ? b.name : "???"; btn.appendChild(nm);
+    var how = document.createElement("span"); how.className = "how"; how.textContent = have ? (worn === b.id ? "wearing" : "tap to wear") : b.how; btn.appendChild(how);
+    if(have) btn.addEventListener("click", function(){ wear(b.id); });
+    box.appendChild(btn);
+  });
+  $("lockerCount").textContent = owned.length + " / " + BEANIES.length;
+}
+// "new beanie" strip on a results screen; empties the fresh list
+function showUnlocks(el){
+  el = $(el); el.innerHTML = "";
+  if(!fresh.length){ el.hidden = true; return; }
+  var tape = document.createElement("span"); tape.className = "tape mag"; tape.textContent = fresh.length > 1 ? "new beanies" : "new beanie"; el.appendChild(tape);
+  fresh.forEach(function(id){ el.appendChild(beanieCanvas(id)); var t = document.createElement("span"); t.className = "keys"; t.innerHTML = "<b>" + BEANIE_BY[id].name + "</b>"; el.appendChild(t); });
+  el.hidden = false; fresh = [];
+}
 function trick(kind, extra){
   var k = TRICKS[kind];
   S.combo = S.comboT > 0 ? S.combo + 1 : 1; S.comboT = 2.4;
@@ -318,6 +427,9 @@ function trick(kind, extra){
   SFX.trick(S.combo);
   var tier = S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0;
   if(tier > S.tier){ S.tier = tier; pops.push({ text:TIERS[tier] + "!", t:0, x:0, rot:-.04, big:true, color:"#ff2e88" }); SFX.tier(); }
+  if(tier === 2) unlock("send");
+  if(S.combo >= 20) unlock("combo");
+  if(S.style >= 100000) unlock("gold");
 }
 
 // ---------------------------------------------------------------- audio
@@ -586,7 +698,7 @@ function draw(){
   $("flowTier").textContent = TIERS[S.flow >= .66 ? 2 : S.flow >= .33 ? 1 : 0] + (S.combo > 1 ? "  ×" + Math.min(8, S.combo) : "");
   $("score").textContent = "STYLE " + S.style.toLocaleString("en-US");
 }
-// The rider: a smooth green egg on a skateboard, seen from behind, riding the
+// The rider: Scramble, a smooth green egg on a skateboard, seen from behind, riding the
 // board nose-first down the tunnel. The board is a real 3D quad (nose ahead, tail behind) that yaws
 // toward where you're carving; the feet stand on it side by side, facing
 // forward, and the egg turns a little into the carve. Squashes on a tuck and a
@@ -658,10 +770,8 @@ function drawSkater(proj, me, lean, f){
   egg(); ctx.fillStyle = eg; ctx.fill();
   // a soft shine up top, so the shell reads as smooth and round
   ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.beginPath(); ctx.ellipse(-rx * .38 + turn * .3, cyE - ry * .42, rx * .16, ry * .24, -.35, 0, TAU); ctx.fill();
-  // a magenta beanie on top, leaning into the turn
-  ctx.fillStyle = "#ff2e88"; ctx.beginPath(); ctx.ellipse(turn * .5, cyE - ry * .86, rx * .62, ry * .26, 0, Math.PI, 0); ctx.fill();
-  ctx.fillRect(turn * .5 - rx * .66, cyE - ry * .88, rx * 1.32, ry * .1);
-  ctx.beginPath(); ctx.arc(turn * .5, cyE - ry * 1.12, k * .04, 0, TAU); ctx.fill();
+  // the beanie Scramble is wearing, leaning into the turn
+  drawBeanie(ctx, BEANIE_BY[worn].look, turn * .5, cyE - ry * .88, rx * .66, ry * .26, k * .04);
   ctx.restore();
 }
 
@@ -682,18 +792,20 @@ function renderMap(){
   $("keys").innerHTML = touchy ? "<b>hold</b> a side to carve · <b>tap</b> or <b>swipe up</b> to jump · <b>hold both</b> to tuck · walls become floors · chain tricks for speed"
     : "<b>← →</b> carve · <b>↑</b> jump · <b>↓</b> tuck · walls become floors · chain wall rides, gaps and hops to build speed";
 }
-function toMap(){ S.mode = "map"; S.st = null; S.daily = null; input.left = input.right = input.tuck = false; renderMap(); showScreen("mapScreen"); }
+function toMap(){ S.mode = "map"; S.st = null; S.daily = null; input.left = input.right = input.tuck = false; fresh = []; renderMap(); renderLocker(); showScreen("mapScreen"); }
 function rideStop(i){ ac(); S.stopIdx = i; S.daily = null; startStation(STOPS[i]); }
 function arrive(){
   S.mode = "arrive"; SFX.arrive();
   if(S.daily){ finishDaily(100); return; }
   if(S.stopIdx + 1 > S.best){ S.best = S.stopIdx + 1; store.set("best", S.best); }
+  checkProgress(false);
   if(!S.bestStyle[S.stopIdx] || S.style > S.bestStyle[S.stopIdx]){ S.bestStyle[S.stopIdx] = S.style; store.set("bestStyle", S.bestStyle); }
   $("arriveName").textContent = STOPS[S.stopIdx].name;
   $("arriveStats").innerHTML = [["style", S.style.toLocaleString("en-US")], ["top speed", Math.round(S.topSpeed * 10)], ["best combo", "×" + S.bestCombo]]
     .map(function(x){ return '<div class="stat"><b>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join("");
   var last = S.stopIdx === STOPS.length - 1;
   $("arriveNext").firstChild.textContent = last ? "Back to Dockyard" : "Next: " + STOPS[S.stopIdx + 1].name;
+  showUnlocks("arriveUnlocks");
   setTimeout(function(){ showScreen("arriveScreen"); $("arriveNext").focus(); }, 380);
 }
 $("arriveNext").addEventListener("click", function(){ rideStop(S.stopIdx === STOPS.length - 1 ? 0 : S.stopIdx + 1); });
@@ -710,7 +822,7 @@ function playDaily(practice){
 }
 function finishDaily(pct){
   var d = S.daily, rec = store.get("daily", {});
-  if(S.dailyFirst){ rec = { key:d.key, pct:pct, style:S.style }; store.set("daily", rec); S.dailyFirst = false; }
+  if(S.dailyFirst){ rec = { key:d.key, pct:pct, style:S.style }; store.set("daily", rec); S.dailyFirst = false; if(pct >= 100) unlock("daily"); }
   S.mode = "daily";
   var mine = rec.key === d.key ? rec.pct : pct, style = rec.key === d.key ? rec.style : S.style;
   var bar = ""; for(var i = 0; i < 10; i++) bar += i < Math.round(mine / 10) ? "🟩" : "⬛";
@@ -718,6 +830,7 @@ function finishDaily(pct){
   $("dailyHead").textContent = "today's route #" + d.n;
   $("dailyPct").textContent = mine >= 100 ? "LANDED" : mine + "%";
   $("shareText").textContent = text;
+  showUnlocks("dailyUnlocks");
   showScreen("dailyScreen");
 }
 $("copyShare").addEventListener("click", function(){
@@ -737,10 +850,11 @@ function frame(ts){
   draw();
   requestAnimationFrame(frame);
 }
-renderMap(); showScreen("mapScreen");
+checkProgress(true);
+renderMap(); renderLocker(); showScreen("mapScreen");
 requestAnimationFrame(frame);
 
-if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
+if(/[?&]test=1(&|$)/.test(location.search)) window.__ol = { S:S, STOPS:STOPS, input:input, buildStation:buildStation, dailyInfo:dailyInfo, dailyParams:dailyParams, tileAt:tileAt, rideStop:rideStop, playDaily:playDaily, startStation:startStation, update:update, surf:surf, speedNow:speedNow, pops:pops, draw:draw, upAt:upAt, BEANIES:BEANIES, owned:function(){ return owned.slice(); }, worn:function(){ return worn; }, wear:wear, unlock:unlock, checkProgress:checkProgress, renderLocker:renderLocker, D:D, VL_BASE:VL_BASE, VL_FLOW:VL_FLOW };
 // An embedding page that inlines the game sets window.__OL_START first.
 var startWith = window.__OL_START || (/[?&]daily=1(&|$)/.test(location.search) ? "daily" : (/[?&]play=1(&|$)/.test(location.search) ? "play" : ""));
 if(startWith === "daily") playDaily(false);
