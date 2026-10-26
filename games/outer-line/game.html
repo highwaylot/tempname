@@ -374,7 +374,10 @@ function applyPiece(st, start, kind, o){
   st.cp[start - pad] = 1;
   for(var j = 0; j < spec.length; j++){
     var rr = start + j, row = st.rows[rr]; row.fill(0); st.pieceRow[rr] = 1;
-    if(!spec[j].gap) for(var e = Math.max(0, j - K.E); e <= j; e++){ if(spec[e].gap) continue; spec[e].lines.forEach(function(l){ for(var w = 0; w < l[1]; w++) row[wrap(l[0] + w)] = 1; }); }
+    // each line is also laid on the rows just before it starts (the elbow: a
+    // quarter second to finish a turn) and, since v15, the 2 rows after it ends, so
+    // a turn has floor on both sides of the step, wherever in it you commit
+    if(!spec[j].gap) for(var e = Math.max(0, j - K.E); e <= Math.min(spec.length - 1, j + 2); e++){ if(spec[e].gap) continue; spec[e].lines.forEach(function(l){ for(var w = 0; w < l[1]; w++) row[wrap(l[0] + w)] = 1; }); }
     var tl = spec[j].lines[spec[j].tr] || spec[Math.max(0, j - 1)].lines[0] || [c0, 1];
     if(spec[j].gap){ for(var f = j + 1; f < spec.length; f++) if(!spec[f].gap){ tl = spec[f].lines[0]; break; } }
     st.trail[rr] = wrap(tl[0]); st.wid[rr] = tl[1];
@@ -654,7 +657,7 @@ function startStation(params, opts){
   S.G = geom(S.st.N);
   S.p = (S.st.start + S.st.width / 2) * (S.G.S / S.st.C) % S.G.P;
   S.vl = 0; S.h = 0; S.vh = 0; S.z = 0; S.grounded = true; S.dead = 0; S.arrived = false; S.t = 0;
-  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.coins = 0; S.coinChain = 0; S.coinT = -9; S.coinsSeen = {}; S.lineCount = 0; S.pieceIn = 0; S.pieceFalls0 = 0; S.check = null; S.spawnT = 0; S.pushT = .06; S.pushPh = 0; S.falls = 0; S.flowAtFall = 0; input.jumpQ = 0;
+  S.flow = 0; S.style = 0; S.combo = 0; S.comboT = 0; S.topSpeed = 0; S.bestCombo = 0; S.landT = 9; S.airGap = false; S.airSide = false; S.edgeT = 0; S.onEdge = false; S.tier = 0; S.wallT = -9; S.flowS = 0; S.tuckS = 0; S.leanS = 0; S.rollV = 0; S.starPh = 0; S.linePh = 0; S.carry = 0; S.pitch = 0; S.tilt = 0; S.row = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.coins = 0; S.coinChain = 0; S.coinT = -9; S.coinsSeen = {}; S.lineCount = 0; S.pieceIn = 0; S.pieceFalls0 = 0; S.check = null; S.tapFix = 0; S.spawnT = 0; S.pushT = .06; S.pushPh = 0; S.falls = 0; S.flowAtFall = 0; input.jumpQ = 0;
   if(S.st.coins) S.st.coins.forEach(function(c){ c.got = false; });
   S.roll = upAt(S.G, S.p); S.side = surf(S.G, S.p).s;
   S.color = opts.color || SPOT_COLORS[Math.min(S.stopIdx, 9)];
@@ -982,20 +985,21 @@ addEventListener("message", function(e){
 // A tap steers for the instant it's down, so a jump tap gives back the sideways
 // speed it added (vl0). A second finger that lands and lifts quickly is a jump,
 // not a tuck: it only becomes a tuck once it's held past SECOND_MS.
-var ptrs = {}, TAP_MS = 170, SECOND_MS = 120;
+var ptrs = {}, TAP_MS = 170, SECOND_MS = 170;
 function steerFromPtrs(){
   var l = false, r = false, now = performance.now(), n = 0;
   for(var id in ptrs) n++;
   for(id in ptrs){ var q = ptrs[id]; if(n > 1 && q.second && now - q.t < SECOND_MS && !q.moved) continue; if(q.x < W / 2) l = true; else r = true; }
   input.tuck = l && r; input.glide = l && r; input.left = l && !r; input.right = r && !l;
 }
-function tapJump(q){ q.jumped = true; if(!q.second) S.vl = q.vl0; pressJump((performance.now() - q.t) / 1000); }
+// and the sideways distance it moved you eases back out (tapFix) over about 0.1 s
+function tapJump(q){ var age = (performance.now() - q.t) / 1000; q.jumped = true; if(!q.second){ S.vl = q.vl0; S.tapFix = clamp(q.p0 + q.vl0 * age - S.p, -1, 1); } pressJump(age); }
 cv.addEventListener("pointerdown", function(e){
   if(S.mode !== "ride") return;
   ac();
   try{ cv.setPointerCapture(e.pointerId); }catch(err){}
   var n = 0; for(var id in ptrs) n++;
-  ptrs[e.pointerId] = { x:e.clientX, y:e.clientY, x0:e.clientX, t:performance.now(), jumped:false, moved:false, second:n > 0, vl0:S.vl };
+  ptrs[e.pointerId] = { x:e.clientX, y:e.clientY, x0:e.clientX, t:performance.now(), jumped:false, moved:false, second:n > 0, vl0:S.vl, p0:S.p };
   steerFromPtrs();
   if(n > 0) setTimeout(steerFromPtrs, SECOND_MS + 5);
 });
@@ -1081,6 +1085,7 @@ function update(dt){
   else { var dec = ((S.grounded ? LAT_STOP : AIR_STOP) + Math.abs(S.vl) * (S.grounded ? FRICTION : AIR_FRICTION)) * dt; S.vl = Math.abs(S.vl) <= dec ? 0 : S.vl - Math.sign(S.vl) * dec; }
   S.vl = clamp(S.vl, -vmax, vmax);
   S.p += S.vl * dt;
+  if(S.tapFix){ var fix = S.tapFix * Math.min(1, dt * 12); S.p += fix; S.tapFix = Math.abs(S.tapFix - fix) < 1e-3 ? 0 : S.tapFix - fix; }
 
   if(input.jumpQ > 0) input.jumpQ -= dt;
   S.landT += dt;
@@ -1182,7 +1187,7 @@ function checkAt(row){ var st = S.st; row = clamp(row, 0, st.len - 1); return { 
 function respawn(){
   var c = S.check, G = S.G;
   S.z = c.z; S.p = c.p; S.vl = 0; S.h = 0; S.vh = 0; S.grounded = true; S.dead = 0; S.carry = 0; S.flow = S.flowS = S.flowAtFall * .5;
-  S.landT = 9; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false;
+  S.landT = 9; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.tapFix = 0;
   S.roll = upAt(G, S.p); S.rollV = 0; S.side = surf(G, S.p).s; S.row = Math.floor(S.z / D); S.spawnT = S.t; S.falls++; S.pieceIn = 0;
   input.jumpQ = 0; input.jumpLate = false; input.fastFall = false; pops.length = 0;
 }
