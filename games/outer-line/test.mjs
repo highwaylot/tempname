@@ -37,14 +37,14 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
       start();
       const st = S.st, G = S.G, tw = G.S / st.C;
       let deaths = 0, steps = 0, lastDead = 0;
-      while(S.mode === 'ride' && steps < 60 * 120){
-        const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+      while(S.mode === 'ride' && steps < 150 * 120){
+        const row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * .6, O.speedNow() * .12)) / O.D));
         const target = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw;
         let d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
         // steer like a skater: aim a sideways speed at the target and hold
         // whichever key closes the difference (momentum, not teleporting)
         const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
-        O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
+        O.input.left = want - S.vl < -.4 || (want < -.4 && want - S.vl < .4); O.input.right = want - S.vl > .4 || (want > .4 && want - S.vl > -.4);
         if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
         O.update(1 / 120); steps++;
         if(S.dead > 0 && !lastDead) deaths++;
@@ -58,7 +58,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     // the next 60 days of routes too, not just today's
     let bad = [];
     for(let n = 1; n <= 60; n++){ const r = ride(() => O.startStation(O.dailyParams(n), {})); if(!r.arrived || r.deaths) bad.push(n); }
-    out.push({ name: 'routes #1–60', arrived: bad.length === 0, deaths: bad.length, secs: 0, rows: 200, bad });
+    out.push({ name: 'routes #1–60', arrived: bad.length === 0, deaths: bad.length, secs: 0, rows: O.dailyParams(1).len, bad });
     return out;
   });
   for(const r of results) ok(r.arrived && r.deaths === 0, `autopilot finishes ${r.name} (${r.rows} rows, ${r.secs}s, ${r.deaths} deaths${r.style != null ? `, style ${r.style}, best combo ×${r.combo}, top speed ${r.top}× base` : ''})`);
@@ -129,11 +129,11 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
       for(const noFlow of [false, true]){
         O.rideStop(i); const st = S.st, G = S.G, tw = G.S / st.C;
         let n = 0, down = 0, up = 0, slow = 0, launched = 0, steps = 0, top = 0;
-        while(S.mode === 'ride' && steps < 120 * 60){
-          const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+        while(S.mode === 'ride' && steps < 120 * 150){
+          const row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * .6, O.speedNow() * .12)) / O.D));
           const target = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
           const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
-          O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
+          O.input.left = want - S.vl < -.4 || (want < -.4 && want - S.vl < .4); O.input.right = want - S.vl > .4 || (want > .4 && want - S.vl > -.4);
           if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
           if(noFlow){ S.flow = 0; S.flowS = 0; }
           O.update(1 / 120); steps++; n++;
@@ -187,13 +187,13 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     for(const [name, start] of rides){
       start(); const G = S.G; let steps = 0;
       while(S.mode === 'ride' && steps < 120 * 150 && S.z / O.D < 3000){
-        const st = S.st, tw = G.S / st.C, w = st.wid ? st.wid : null, row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+        const st = S.st, tw = G.S / st.C, w = st.wid ? st.wid : null, row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * .6, O.speedNow() * .12)) / O.D));
         const target = (st.trail[row] + (w ? w[row] : st.width) / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
         const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
         O.input.left = want - S.vl < -.4 || (want < -.4 && want - S.vl < .4); O.input.right = want - S.vl > .4 || (want > .4 && want - S.vl > -.4); O.input.tuck = true;
         if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
         O.update(1 / 120); steps++;
-        if(steps % 4 || S.dead > 0) continue;
+        if(steps % 2 || S.dead > 0) continue;
         const r0 = Math.floor(S.z / O.D); let g = -1;
         for(let k = r0 + 4; k <= r0 + 10; k++) if(st.gap[k] && !st.gap[k - 1]){ g = k; break; }
         if(g < 0) continue;
@@ -245,14 +245,14 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     for(const mult of [1, 1.4, 1.8, 2.07]){
       let fell = 0;
       for(let t = 0; t < 8; t++){
-        const r = 40 + t * 5, { st } = setup(r, 0, mult); const c = st.trail[r] + 1; st.rows[r].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * (S.G.S / st.C);
+        const r = 40 + t * 5, { st } = setup(r, 0, mult); const c = (st.trail[r] + 1) % st.cols; st.rows[r].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * (S.G.S / st.C);
         let died = false;
         for(let i = 0; i < 120; i++){ S.vl = 0; S.flow = S.flowS = Math.min(1, (mult - 1) / .8); O.update(1 / 120); if(S.dead > 0){ died = true; break; } if(S.z > (r + 3) * O.D && S.grounded) break; }
         if(died) fell++;
       }
       out.glide.push(mult + '×: ' + fell + '/8');
       // the same hole, jumped
-      const r = 60, { st } = setup(r, 0, mult); const c = st.trail[r] + 1; st.rows[r].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * (S.G.S / st.C);
+      const r = 60, { st } = setup(r, 0, mult); const c = (st.trail[r] + 1) % st.cols; st.rows[r].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * (S.G.S / st.C);
       let died = false;
       for(let i = 0; i < 180; i++){ S.vl = 0; S.flow = S.flowS = Math.min(1, (mult - 1) / .8); if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15; O.update(1 / 120); if(S.dead > 0){ died = true; break; } if(S.z > (r + 4) * O.D && S.grounded) break; }
       if(!died) out.jump++;
@@ -260,8 +260,8 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     }
     // brushing a hole's side: carve across the edge of a hole beside you and straight back
     for(let t = 0; t < 8; t++){
-      const r = 40 + t * 5; O.rideStop(0); const st = S.st, G = S.G, tw = G.S / st.C, c = st.trail[r] + 1;
-      for(let k = r - 4; k <= r + 4; k++){ st.rows[k].fill(1); st.rows[k][c + 1] = 0; }
+      const r = 40 + t * 5; O.rideStop(0); const st = S.st, G = S.G, tw = G.S / st.C, c = (st.trail[r] + 1) % st.cols;
+      for(let k = r - 4; k <= r + 4; k++){ st.rows[k].fill(1); st.rows[k][(c + 1) % st.cols] = 0; }
       S.p = (c + .5) * tw + tw * .4; S.z = (r - 3) * O.D; S.grounded = true; S.h = 0; S.dead = 0; O.input.jumpQ = 0;
       let died = false;
       for(let i = 0; i < 60; i++){ S.vl = i < 4 ? 6 : -6; O.update(1 / 120); if(S.dead > 0){ died = true; break; } }
@@ -324,9 +324,9 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   const shares = res.stops.map(x => Math.round(x.share * 100));
   ok(res.bad.length === 0, 'corridors are passable by construction: at most 40 % floor, every row shares floor with the next, the line moves one column at a time and never faster than the stop allows' + (res.bad.length ? ' (' + res.bad.length + ': ' + res.bad.slice(0, 3).join('; ') + ')' : ''));
   ok(shares[0] === 0 && shares.every(x => x <= 42), 'Dockyard stays clean; at most ~40 % of any stop is stripped (' + shares.join('/') + ' %)');
-  const seen = new Set(); let order = true; res.stops.forEach((x, i) => { const fresh = x.kinds.filter(k => !seen.has(k)); if(fresh.length > 1) order = false; x.kinds.forEach(k => seen.add(k)); });
+  const seen = new Set(); let order = true; res.stops.forEach((x, i) => { const fresh = new Set(x.kinds.filter(k => !seen.has(k))); if(fresh.size > 1) order = false; x.kinds.forEach(k => seen.add(k)); });
   ok(order && seen.size === 6, 'one new corridor shape per stop, all six by Terminus (' + res.stops.map(x => x.kinds.join('+') || '–').join(', ') + ')');
-  ok(res.daily >= 30 && res.daily <= 60 && res.forever.length >= 8, 'every mode has them: ' + res.daily + ' corridors over 30 daily routes, ' + res.forever.length + ' in 3,400 rows of Forever');
+  ok(res.daily >= 60 && res.daily <= 90 && res.forever.length >= 8, 'every mode has them (2–3 per daily route): ' + res.daily + ' corridors over 30 daily routes, ' + res.forever.length + ' in 3,400 rows of Forever');
   ok(res.lines >= res.piecesRidden * .8, 'clearing a corridor without a fall scores LINE (' + res.lines + ' of ' + res.piecesRidden + ' corridors for the middle-skill rider)');
   ok(res.mid.slice(2, 7).every(x => x <= 1.5) && res.mid.every(x => x <= 2.5), 'not punishing: a middle-skill rider falls ' + res.mid.map(x => x.toFixed(1)).join('/') + ' times a minute inside corridors (caps: 1.5 on stops 3–7, 2.5 on 8–10)');
   ok(errs.length === 0, 'no errors (corridors)' + (errs.length ? ': ' + errs[0] : ''));
@@ -339,7 +339,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   const { ctx, page, errs } = await open({ width: 1280, height: 800 });
   const res = await page.evaluate(() => {
     const O = window.__ol, S = O.S, out = {};
-    const setup = () => { O.rideStop(0); const st = S.st, G = S.G, tw = G.S / st.C, r = 40, c = st.trail[r] + 1; for(let k = r - 3; k <= r + 6; k++) st.rows[k].fill(1); st.rows[r].fill(0); st.rows[r + 1].fill(0); S.p = (c + .5) * tw; S.z = (r - 2) * O.D; S.vl = 0; S.grounded = true; S.h = 0; S.dead = 0; O.input.jumpQ = 0; O.input.jumpHeld = false; return r; };
+    const setup = () => { O.rideStop(0); const st = S.st, G = S.G, tw = G.S / st.C, r = 40, c = (st.trail[r] + 1) % st.cols; for(let k = r - 3; k <= r + 6; k++) st.rows[k].fill(1); st.rows[r].fill(0); st.rows[r + 1].fill(0); S.p = (c + .5) * tw; S.z = (r - 2) * O.D; S.vl = 0; S.grounded = true; S.h = 0; S.dead = 0; O.input.jumpQ = 0; O.input.jumpHeld = false; return r; };
     // late by 80 ms
     let r = setup(), off = -1, died = false;
     for(let i = 0; i < 240; i++){ if(!S.grounded && off < 0) off = i; if(off >= 0 && i - off === 10) O.input.jumpQ = .14; O.update(1 / 120); if(S.dead > 0){ died = true; break; } if(S.z > (r + 4) * O.D && S.grounded) break; }
@@ -354,7 +354,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     O.input.jumpHeld = false; out.held = !died;
     // checkpoint: clear a gap, collect, then fall later and respawn at the landing
     O.rideStop(2); { const st = S.st, G = S.G, tw = G.S / st.C; let steps = 0;
-      while(S.mode === 'ride' && !S.check && steps < 120 * 30){ const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D)); const t = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw, d = ((t - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2; const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7)); O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4; if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15; O.update(1 / 120); steps++; }
+      while(S.mode === 'ride' && !S.check && steps < 120 * 30){ const row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * .6, O.speedNow() * .12)) / O.D)); const t = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw, d = ((t - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2; const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7)); O.input.left = want - S.vl < -.4 || (want < -.4 && want - S.vl < .4); O.input.right = want - S.vl > .4 || (want > .4 && want - S.vl > -.4); if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15; O.update(1 / 120); steps++; }
       O.input.left = O.input.right = false;
       const cz = S.check && S.check.z, style = S.style; S.z = cz + 20 * O.D; S.grounded = false; S.h = -1.3; S.vh = -5; S.fellOff = true; S.sunk = true;
       for(let i = 0; i < 200 && !(S.dead === 0 && S.falls > 0); i++) O.update(1 / 120);
@@ -414,11 +414,11 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
       O.rideStop(i); const st = S.st, G = S.G, tw = G.S / st.C; let steps = 0;
       const gapStarts = st.gap.filter((g, r) => g && !st.gap[r - 1]).length, arcs = new Set(st.coins.filter(c => c.grp[0] === 'g').map(c => c.grp)).size;
       const crests = st.crest.filter((c, r) => c && r < st.len - 8 && !(st.pieceRow && st.pieceRow.slice(r, r + 16).some(Boolean))).length, crestLines = new Set(st.coins.filter(c => c.grp[0] === 'c').map(c => c.grp)).size;
-      while(S.mode === 'ride' && steps < 120 * 60){
-        const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+      while(S.mode === 'ride' && steps < 120 * 150){
+        const row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * .6, O.speedNow() * .12)) / O.D));
         const target = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
         const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
-        O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
+        O.input.left = want - S.vl < -.4 || (want < -.4 && want - S.vl < .4); O.input.right = want - S.vl > .4 || (want > .4 && want - S.vl > -.4);
         if(S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
         O.update(1 / 120); steps++; out.chainMax = Math.max(out.chainMax, S.coinChain);
       }
@@ -426,7 +426,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     }
     const air = held => { O.rideStop(0); const st = S.st; for(let k = 20; k < 60; k++) st.rows[k].fill(1); S.z = 22 * O.D; S.flow = S.flowS = 0; S.carry = 0; S.grounded = true; S.h = 0; O.input.jumpQ = .15; O.input.jumpHeld = held; const z0 = S.z; let t = 0; do { O.update(1 / 120); t++; } while((!S.grounded && t < 600) || t < 3); O.input.jumpHeld = false; return { rows: (S.z - z0) / O.D, carry: S.carry }; };
     out.plain = air(false); out.glide = air(true);
-    O.rideStop(0); { const st = S.st, G = S.G, tw = G.S / st.C, r = 40, c = st.trail[r] + 1; for(let k = r - 3; k <= r + 3; k++) st.rows[k].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * tw; S.z = (r - 2) * O.D; S.grounded = true; S.h = 0; O.input.jumpHeld = false; let died = false, off = -1; for(let i = 0; i < 120; i++){ S.vl = 0; O.update(1 / 120); if(!S.grounded && off < 0) off = i; if(off >= 0 && i - off > 18) O.input.jumpHeld = true; if(S.dead > 0){ died = true; break; } } O.input.jumpHeld = false; out.edge = died; }
+    O.rideStop(0); { const st = S.st, G = S.G, tw = G.S / st.C, r = 40, c = (st.trail[r] + 1) % st.cols; for(let k = r - 3; k <= r + 3; k++) st.rows[k].fill(1); st.rows[r][c] = 0; S.p = (c + .5) * tw; S.z = (r - 2) * O.D; S.grounded = true; S.h = 0; O.input.jumpHeld = false; let died = false, off = -1; for(let i = 0; i < 120; i++){ S.vl = 0; O.update(1 / 120); if(!S.grounded && off < 0) off = i; if(off >= 0 && i - off > 18) O.input.jumpHeld = true; if(S.dead > 0){ died = true; break; } } O.input.jumpHeld = false; out.edge = died; }
     return out;
   });
   ok(res.stops.every(s => s.arcs === s.gapStarts && s.crestLines === s.crests), 'every jump-gap has a coin arc and every crest a glide line (' + res.stops.map(s => s.arcs + '/' + s.gapStarts + ' ' + s.crestLines + '/' + s.crests).join(', ') + ')');
@@ -494,11 +494,11 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   const mot = await page.evaluate(() => {
     const O = window.__ol, S = O.S; O.rideStop(4); const st = S.st, G = S.G, tw = G.S / st.C;
     let prev = null, prevUp = null, prevDu = 0, maxStep = 0, maxJerk = 0, sides = 0, side = S.side;
-    for (let i = 0; i < 60 * 12 && S.mode === 'ride'; i++) {
-      const row = Math.min(st.len - 1, Math.floor((S.z + O.D * .6) / O.D));
+    for (let i = 0; i < 60 * 24 && S.mode === 'ride'; i++) {
+      const row = Math.min(st.len - 1, Math.floor((S.z + Math.max(O.D * .6, O.speedNow() * .12)) / O.D));
       const target = (st.trail[row] + (st.wid ? st.wid[row] : st.width) / 2) * tw, d = ((target - S.p) % G.P + G.P * 1.5) % G.P - G.P / 2;
       const vmax = O.VL_BASE + O.VL_FLOW * S.flow, want = Math.max(-vmax, Math.min(vmax, d * 7));
-      O.input.left = want - S.vl < -.4; O.input.right = want - S.vl > .4;
+      O.input.left = want - S.vl < -.4 || (want < -.4 && want - S.vl < .4); O.input.right = want - S.vl > .4 || (want > .4 && want - S.vl > -.4);
       if (S.grounded && !O.tileAt(S.p, S.z + O.D * .55)) O.input.jumpQ = .15;
       O.update(1 / 120); O.update(1 / 120); O.draw();
       if (S.side !== side) { sides++; side = S.side; }
@@ -565,6 +565,20 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
   await ctx.close();
 }
 
+// gaps keep their length: a corridor's run-up or exit never cuts a jump-gap down to a stub
+{
+  const { ctx, page, errs } = await open({ width: 1280, height: 800 });
+  const bad = await page.evaluate(() => { const O = window.__ol, bad = [];
+    const chk = (name, t, want) => { for(let r = 1; r < t.len; r++) if(t.gap[r] && !t.gap[r - 1] && !(t.pieceRow && t.pieceRow[r])){ let e = r; while(t.gap[e + 1]) e++; const w = want(r); if(e - r + 1 < w) bad.push(name + ' row ' + r + ': ' + (e - r + 1) + ' of ' + w); } };
+    O.STOPS.forEach(p => chk(p.name, O.buildStation(p), () => p.gapLen));
+    for(let n = 1; n <= 60; n++){ const p = O.dailyParams(n); chk('route ' + n, O.buildStation(p), () => p.gapLen); }
+    for(const sd of [1, 7, 99]){ const t = O.buildForever(sd); t.extend(4000); chk('forever ' + sd, t, r => O.foreverAt(r).gapLen); }
+    return bad; });
+  ok(bad.length === 0, 'every jump-gap on the spots, 60 routes and 3 Forever runs is its full length (corridor stepping stones aside)' + (bad.length ? ': ' + bad.slice(0, 4).join('; ') : ''));
+  ok(errs.length === 0, 'no errors (gap length)' + (errs.length ? ': ' + errs[0] : ''));
+  await ctx.close();
+}
+
 // feel: grip, the jump arc, respawns, and the hole rule that keeps it honest
 {
   const { ctx, page, errs } = await open({ width: 1280, height: 800 });
@@ -583,7 +597,7 @@ const shot = async (page, n) => { if(shots) await page.screenshot({ path: path.j
     do { O.update(dt); t += dt; apex = Math.max(apex, S.h); } while(!S.grounded && t < 3);
     out.arc = { apex, apex0: v0 * v0 / 64, air: t, air0: 2 * v0 / 32, rows: (S.z - z0) / O.D, rows0: 2 * v0 / 32 * sp / O.D };
     // a hole under your centre is still a fall: FOOT only covers a board's edge
-    tw = flat(); const r = 40, c = S.st.trail[r] + 1; S.st.rows[r][c] = 0; S.st.rows[r + 1][c] = 0; S.p = (c + .5) * tw; S.z = (r - 1) * O.D; S.vl = 0; let died = false;
+    tw = flat(); const r = 40, c = (S.st.trail[r] + 1) % S.st.cols; S.st.rows[r][c] = 0; S.st.rows[r + 1][c] = 0; S.p = (c + .5) * tw; S.z = (r - 1) * O.D; S.vl = 0; let died = false;
     for(let i = 0; i < 120 && !died; i++){ S.vl = 0; O.update(dt); died = S.dead > 0; } out.centreFalls = died;
     // ...but a board whose edge is still on the floor rides the hole's lip
     tw = flat(); S.st.rows[r][c] = 0; S.p = (c + 1 + .08) * tw; S.z = (r - 1) * O.D; died = false;

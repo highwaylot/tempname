@@ -204,16 +204,16 @@ function clamp(v, a, b){ return v < a ? a : v > b ? b : v; }
 // same ride. N = tunnel sides, C = tile columns per side, speed = base speed
 // before momentum (flow multiplies it up to 1 + FLOW_MAX).
 var STOPS = [
-  { name:"Dockyard",       N:6, C:3, len:130, speed:10.0, holes:.12, gapEvery:30, gapLen:1, width:3, seed:11 },
-  { name:"Lumen Avenue",   N:6, C:3, len:150, speed:10.5, holes:.24, gapEvery:24, gapLen:2, width:3, seed:23 },
-  { name:"Halo Junction",  N:6, C:3, len:170, speed:11.0, holes:.36, gapEvery:22, gapLen:2, width:2, seed:37 },
-  { name:"Quarry Steps",   N:6, C:3, len:180, speed:11.5, holes:.46, gapEvery:20, gapLen:2, width:2, seed:41 },
-  { name:"Lantern Market", N:8, C:2, len:190, speed:12.0, holes:.42, gapEvery:18, gapLen:2, width:2, seed:53 },
-  { name:"Orbit Park",     N:8, C:2, len:200, speed:12.5, holes:.54, gapEvery:16, gapLen:3, width:2, seed:67 },
-  { name:"Glass Bridge",   N:8, C:2, len:210, speed:13.0, holes:.62, gapEvery:15, gapLen:3, width:1, seed:71 },
-  { name:"Deep Siding",    N:6, C:3, len:250, speed:13.5, holes:.62, gapEvery:14, gapLen:3, width:1, seed:83 },
-  { name:"Comet Yard",     N:8, C:2, len:270, speed:14.0, holes:.70, gapEvery:13, gapLen:3, width:1, seed:97 },
-  { name:"Terminus",       N:6, C:3, len:300, speed:14.5, holes:.72, gapEvery:12, gapLen:3, width:1, seed:101 }
+  { name:"Dockyard",       N:6, C:3, len:305, speed:10.0, holes:.12, gapEvery:40, gapLen:1, width:3, seed:11 },
+  { name:"Lumen Avenue",   N:6, C:3, len:420, speed:10.5, holes:.24, gapEvery:41, gapLen:2, width:3, seed:23 },
+  { name:"Halo Junction",  N:6, C:3, len:490, speed:11.0, holes:.36, gapEvery:38, gapLen:2, width:2, seed:37 },
+  { name:"Quarry Steps",   N:6, C:3, len:575, speed:11.5, holes:.46, gapEvery:40, gapLen:2, width:2, seed:41 },
+  { name:"Lantern Market", N:8, C:2, len:615, speed:12.0, holes:.42, gapEvery:37, gapLen:2, width:2, seed:53 },
+  { name:"Orbit Park",     N:8, C:2, len:700, speed:12.5, holes:.54, gapEvery:38, gapLen:3, width:2, seed:67 },
+  { name:"Glass Bridge",   N:8, C:2, len:775, speed:13.0, holes:.62, gapEvery:36, gapLen:3, width:1, seed:71 },
+  { name:"Deep Siding",    N:6, C:3, len:835, speed:13.5, holes:.62, gapEvery:33, gapLen:3, width:1, seed:83 },
+  { name:"Comet Yard",     N:8, C:2, len:990, speed:14.0, holes:.70, gapEvery:34, gapLen:3, width:1, seed:97 },
+  { name:"Terminus",       N:6, C:3, len:1050, speed:14.5, holes:.72, gapEvery:32, gapLen:3, width:1, seed:101 }
 ];
 var SPOT_COLORS = ["#c6ff00", "#c6ff00", "#c6ff00", "#2ee6ff", "#2ee6ff", "#2ee6ff", "#ff2e88", "#ff2e88", "#ff2e88", "#ff2e88"];
 
@@ -234,7 +234,7 @@ var LAT_STOP = 30, AIR_STOP = 25, TURN_BITE = 1.7, FOOT = .12;
 var JUMP_K = .8535533905932737, RISE_G = .7285533905932737, FALL_K = 2, FASTFALL = 1.6, HARD_V = 15;
 // A glide off a jump ends GLIDE_ROWS rows past takeoff, so it can stretch an
 // air, never skip a section; the slow fall eases in rather than snapping.
-var GLIDE_ROWS = 12, GLIDE_EASE = 12;
+var GLIDE_ROWS = 12, GLIDE_EASE = 12, JUMP_BUF = .2;
 // After a respawn the board holds still for SPAWN_HOLD seconds (steering live)
 // so you see where you are before you move.
 var SPAWN_HOLD = .3;
@@ -258,7 +258,7 @@ var COYOTE = .12;
 // a skater's kick every PUSH_EVERY seconds adding PUSH_KICK × base of carry,
 // up to PUSH_CAP × base, so it's slightly faster, never a rocket.
 var PUSH_EVERY = .45, PUSH_KICK = .08, PUSH_CAP = .22;
-var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 55, CARRY_MAX = 1.3, HILL_TOP = 1, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 2, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = 1.2, BEND_K = .9, HILL_VIS = 3, GAP_FLAT = 10, GAP_AFTER = 4, GAP_PRE = 8;
+var HOLE_GRACE = .03, JUMP_ROWS = 8, OWED_CAP = 2.4, SLOPE_G = 55, CARRY_MAX = 1.3, HILL_TOP = 1, CARRY_MIN = -.1, CARRY_DECAY = .35, DOWN_TUCK = 2, UP_SHARE = .6, CREST_SPEED = 1.25, VIEW_TILT = 1.2, BEND_K = .9, HILL_VIS = 3, HOLD_LEVEL = .8, GAP_FLAT = 12, GAP_AFTER = 4, GAP_PRE = 8;
 var FLOW_MAX = .8, TUCK = 1.15, FLOW_DECAY = .045, ROLL_W = 11, DEATH_T = .75, FADE_T = .3;
 
 // A station: rows of tiles, 1 = floor. One guaranteed path of `width`
@@ -272,6 +272,10 @@ function buildStation(p, seedOverride){
   var cols = p.N * p.C, rows = [], path = Math.floor(rng() * cols), drift = 0, start = path, trail = [];
   var tileW = 2 * R * Math.sin(Math.PI / p.N) / p.C, vTop = p.speed * ((1 + FLOW_MAX) * TUCK + HILL_TOP);
   var keep = Math.ceil((2 * Math.sqrt(tileW / ACC) + .08) * vTop / D) + 1, hist = [];
+  // the path shifts a column at most every dEvery rows: the corridors' line rule
+  // (sideways speed asked ≤ 60 % of steering top speed, at this stop's top speed),
+  // since longer stops (v16) hold top speed long enough that a faster drift outran riders
+  var dEvery = Math.max(2, lineK(p.speed, p.N, p.C).Kd), sinceDrift = 0;
   var START = 12, END = 8;
   for(var r = 0; r < p.len; r++){
     var row = new Uint8Array(cols);
@@ -279,7 +283,7 @@ function buildStation(p, seedOverride){
     if(r % 2 === 0){
       if(rng() < .35) drift = rng() < .5 ? -1 : 1;
       if(rng() < .3) drift = 0;
-      path = (path + drift + cols) % cols;
+      if(++sinceDrift * 2 >= dEvery && drift){ path = (path + drift + cols) % cols; sinceDrift = 0; }
     }
     for(var c = 0; c < cols; c++) row[c] = rng() < p.holes ? 0 : 1;
     hist.push(path); if(hist.length > keep) hist.shift();
@@ -334,6 +338,8 @@ function pieceSpec(kind, o, c0, cols, C, K){
     c = c0; for(var cy = 0; cy < o.cycles; cy++){ c = walk(c, o.A, 1, 4, 1); c = walk(c, o.A, -1, 4, 1); }
   }
   else if(kind === "fork"){   // split ±d, run, rejoin; the trail takes one branch, coins ride the other
+    // a funnel in first (v16): at full speed a needle straight off the run-up was where riders fell
+    for(i = 0; i < K.keep; i++) push([[c0 - 1, 3]]);
     for(i = 0; i < 2; i++) push([[c0, 1]]);
     var a = c0, b = c0;
     for(var st2 = 0; st2 < 3; st2++){ var dirA = st2 === 0 ? 1 : st2 === 2 ? -1 : 0, n = st2 === 1 ? 1 : o.d;
@@ -346,6 +352,7 @@ function pieceSpec(kind, o, c0, cols, C, K){
   }
   else if(kind === "twin"){   // two rails a side apart; crossovers swap the trail between them
     var A = c0, B = c0 + C, onA = true;
+    for(i = 0; i < K.keep; i++) push([[c0 - 1, 3]]);   // funnel onto rail A (v16)
     for(i = 0; i < 6; i++) push([[A, 1], [B, 1]], 0);
     for(var ph = 0; ph < o.phases; ph++){
       var x = onA ? A : B, dir = onA ? 1 : -1;
@@ -371,6 +378,10 @@ function applyPiece(st, start, kind, o){
   var c0 = st.trail[start], spec = pieceSpec(kind, o, c0, cols, st.C, K), end = start + spec.length;
   st.wid = st.wid || []; st.pieceRow = st.pieceRow || []; st.cp = st.cp || []; st.pieceEnd = st.pieceEnd || []; st.pieceCoins = st.pieceCoins || [];
   for(var r = start - pad; r < end + br; r++){ if(r < 0 || r >= st.rows.length) continue; if(r < start || r >= end){ st.rows[r].fill(1); if(st.wid[r] == null) st.wid[r] = st.width; } }
+  // a gap the run-up pad cut into is filled whole too, never left as a stub before it
+  for(r = start - pad - 1; r >= 0 && st.rows[r].every(function(v){ return !v; }); r--) st.rows[r].fill(1);
+  // the run-up's line (trail, coins, checkpoint) points straight at the entry, so you arrive lined up (v16)
+  for(r = Math.max(0, start - pad); r < start && r < st.rows.length; r++) st.trail[r] = c0;
   st.cp[start - pad] = 1;
   for(var j = 0; j < spec.length; j++){
     var rr = start + j, row = st.rows[rr]; row.fill(0); st.pieceRow[rr] = 1;
@@ -386,21 +397,28 @@ function applyPiece(st, start, kind, o){
     if(spec[j].alt != null && j % 2 === 0){ var al = spec[j].lines[spec[j].alt]; st.pieceCoins.push({ r:rr + .5, col:wrap(al[0]), w:al[1], grp:"a" + start }); }
   }
   for(var b = end; b < end + br && b < st.rows.length; b++) st.trail[b] = st.trail[Math.min(st.rows.length - 1, end + br)];
+  // out of the breather you still have a run-up's worth of rows before any
+  // jump-gap: you may be crossing back to the path, so a gap laid there before
+  // the corridor becomes floor, all of it (a gap across the boundary is never
+  // cut down to a 1-row stub)
+  var clear = end + br + RUNUP + 4, empty = function(r){ return st.rows[r].every(function(v){ return !v; }); }, filled = -1;
+  for(b = end + br; b < clear && b < st.rows.length; b++) if(empty(b)){ st.rows[b].fill(1); filled = b; }
+  if(filled === clear - 1) for(; clear < st.rows.length && empty(clear); clear++) st.rows[clear].fill(1);
   st.pieceEnd[end] = start; (st.pieces = st.pieces || []).push({ kind:kind, start:start, end:end, o:o, K:K });
   return end + br;
 }
 // per stop: which pieces, where (fraction of the stop), with what settings
 var STOP_PIECES = [
   [],
-  [["rail", .5, { teaser:1, ln:10 }]],
-  [["rail", .55, { ln:8 }]],
-  [["rail", .35, { ln:8 }], ["slalom", .7, { A:1, cycles:2 }]],
-  [["slalom", .33, { A:2, cycles:1 }], ["fork", .7, { d:1 }]],
-  [["cork", .45, { sides:3, dir:1 }]],
-  [["twin", .45, { phases:2 }]],
-  [["stones", .33, { G:2, n:3, s:1 }], ["fork", .72, { d:2 }]],
-  [["fork", .3, { d:1 }], ["slalom", .66, { A:2, cycles:2 }]],
-  [["stones", .33, { G:3, n:4, s:-1 }], ["cork", .68, { sides:2, dir:-1 }]]
+  [["rail", .25, { teaser:1, ln:10 }], ["rail", .55, { teaser:1, ln:14 }], ["rail", .82, { ln:6 }]],
+  [["rail", .25, { ln:8 }], ["rail", .55, { ln:10 }], ["rail", .82, { ln:12 }]],
+  [["rail", .2, { ln:8 }], ["slalom", .4, { A:1, cycles:1 }], ["rail", .6, { ln:10 }], ["slalom", .8, { A:1, cycles:2 }]],
+  [["slalom", .2, { A:1, cycles:2 }], ["fork", .4, { d:1 }], ["slalom", .6, { A:2, cycles:1 }], ["fork", .82, { d:1 }]],
+  [["slalom", .18, { A:2, cycles:1 }], ["cork", .38, { sides:2, dir:1 }], ["fork", .6, { d:1 }], ["cork", .8, { sides:3, dir:-1 }]],
+  [["cork", .18, { sides:2, dir:-1 }], ["twin", .38, { phases:1 }], ["slalom", .6, { A:2, cycles:2 }], ["twin", .8, { phases:2 }]],
+  [["twin", .15, { phases:1 }], ["stones", .33, { G:2, n:3, s:1 }], ["fork", .5, { d:2 }], ["stones", .68, { G:2, n:4, s:-1 }], ["cork", .86, { sides:2, dir:1 }]],
+  [["fork", .15, { d:1 }], ["stones", .3, { G:3, n:3, s:1 }], ["slalom", .45, { A:2, cycles:2 }], ["twin", .6, { phases:2 }], ["fork", .75, { d:2 }], ["slalom", .89, { A:3, cycles:1 }]],
+  [["stones", .14, { G:3, n:3, s:-1 }], ["cork", .28, { sides:2, dir:-1 }], ["twin", .42, { phases:2 }], ["fork", .56, { d:2 }], ["slalom", .7, { A:3, cycles:1 }], ["stones", .84, { G:3, n:4, s:1 }]]
 ];
 STOPS.forEach(function(s2, i){ s2.pieces = STOP_PIECES[i]; });
 function layPieces(st, list){
@@ -447,12 +465,15 @@ function addHills(st, gen, flatFrom, upto){
     // the visual slope never bends over (no crest, no new drop) and may only
     // level toward flat, never climb into a fake uphill, so on gap-dense spots
     // it reads flat rather than backwards
-    // and in the run-up to a hold (beyond the 10 rows you get to see a gap from)
+    // and in the run-up to a hold (beyond the GAP_FLAT rows you get to see a gap from;
+    // 12 since v16, as longer stops hold more speed on downhills into gaps)
     // any visual uphill eases off, so a hold always starts level or downhill
     var vprev = r ? st.vgrade[r - 1] : 0, vt = st.grade[r], hold = false, pre = false;
     for(var ga = r - GAP_AFTER; ga <= r + GAP_FLAT; ga++) if(st.gap[ga] || (st.pieceRow && st.pieceRow[ga])){ hold = true; break; }
     if(!hold) for(ga = r + GAP_FLAT + 1; ga <= r + GAP_FLAT + GAP_PRE; ga++) if(st.gap[ga] || (st.pieceRow && st.pieceRow[ga])){ pre = true; break; }
-    if(hold) vt = Math.min(Math.max(vt, vprev), Math.max(vprev, 0));
+    // (and, since v16, eases toward flat by HOLD_LEVEL a row: a gap on a downhill is drawn
+    // at least as tall as on the flat, where it used to read as thin as 0.57 of that)
+    if(hold) vt = Math.min(Math.max(vt, vprev), Math.max(vprev, 0)) * HOLD_LEVEL;
     else if(pre) vt = Math.min(vt, 0);
     st.vgrade[r] = vprev + (vt - vprev) * .3;
     st.vhgt[r + 1] = st.vhgt[r] + st.vgrade[r] * D;
@@ -514,7 +535,7 @@ function markGaps(rows, from, gap){
 var RAMP = 2400;
 function foreverAt(r){
   var t = Math.min(1, r / RAMP);
-  return { t:t, holes:.10 + .62 * t, width: t < .3 ? 3 : t < .65 ? 2 : 1, gapEvery: Math.round(30 - 17 * t), gapLen: t < .25 ? 1 : t < .6 ? 2 : 3, speed:10 + 5.5 * t };
+  return { t:t, holes:.10 + .62 * t, width: t < .3 ? 3 : t < .65 ? 2 : 1, gapEvery: Math.round(36 - 5 * t), gapLen: t < .25 ? 1 : t < .6 ? 2 : 3, speed:10 + 5.5 * t };
 }
 function buildForever(seed){
   var p = { name:"Forever", N:6, C:3, speed:10, width:3, seed:seed, forever:true };
@@ -523,7 +544,7 @@ function buildForever(seed){
   var tileW = 2 * R * Math.sin(Math.PI / p.N) / p.C, START = 14;
   // wid[r]: the safe path's width at row r (it narrows as the ramp goes on)
   var wid = [];
-  var st = { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:0, start:start, trail:trail, width:3, wid:wid, gap:[], forever:true };
+  var st = { p:p, N:p.N, C:p.C, cols:cols, rows:rows, len:0, start:start, trail:trail, width:3, wid:wid, gap:[], forever:true, sinceDrift:0 };
   st.extend = function(n){
     var from = rows.length;
     for(var k = 0; k < n; k++){
@@ -534,7 +555,8 @@ function buildForever(seed){
       if(r % 2 === 0){
         if(rng() < .35) drift = rng() < .5 ? -1 : 1;
         if(rng() < .3) drift = 0;
-        path = (path + drift + cols) % cols;
+        // at most a column every lineK(…).Kd rows, as on the stops
+        if(++st.sinceDrift * 2 >= Math.max(2, lineK(f.speed, p.N, p.C).Kd) && drift){ path = (path + drift + cols) % cols; st.sinceDrift = 0; }
       }
       for(var c = 0; c < cols; c++) row[c] = rng() < f.holes ? 0 : 1;
       hist.push(path); while(hist.length > keep) hist.shift();
@@ -587,12 +609,12 @@ function dailyInfo(){
 }
 function dailyParams(n){
   var r = mulberry32(n * 7919 >>> 0);
-  var p = { name:"Route " + n, N: r() < .5 ? 6 : 8, C:0, len:220, speed:12 + r() * 1.5, holes:.5 + r() * .15, gapEvery:15, gapLen:2 + (r() < .5 ? 1 : 0), width:1, seed:n * 104729 };
+  var p = { name:"Route " + n, N: r() < .5 ? 6 : 8, C:0, len:630, speed:12 + r() * 1.5, holes:.5 + r() * .15, gapEvery:33, gapLen:2 + (r() < .5 ? 1 : 0), width:1, seed:n * 104729 };
   p.C = p.N === 8 ? 2 : 3;
   // gentle corridors only (a fall on the first daily ride ends it): 1 or 2 per route
   var q = mulberry32(n * 31337 + 7 >>> 0), pool = [["rail", { ln:10 + Math.floor(q() * 7) }], ["slalom", { A:1 + (q() < .5 ? 1 : 0), cycles:1 }], ["fork", { d:1 }], ["stones", { G:p.gapLen, n:3, s:q() < .5 ? 1 : -1 }], ["twin", { phases:1 }]];
   var pick = function(){ return pool[Math.floor(q() * pool.length)]; }, two = q() < .5, a1 = pick();
-  p.pieces = two ? [[a1[0], .35, a1[1]], (function(b){ return [b[0], .7, b[1]]; })(pick())] : [[a1[0], .5, a1[1]]];
+  p.pieces = two ? [[a1[0], .22, a1[1]], (function(b){ return [b[0], .5, b[1]]; })(pick()), (function(b){ return [b[0], .78, b[1]]; })(pick())] : [[a1[0], .3, a1[1]], (function(b){ return [b[0], .68, b[1]]; })(pick())];
   return p;
 }
 
@@ -631,7 +653,7 @@ var S = {
   flow:0, style:0, combo:0, comboT:0, topSpeed:0, bestCombo:0, landT:9, airGap:false, airSide:false, airT:0, edgeT:0, onEdge:false, shake:0, tier:0, wallT:-9, carry:0, pitch:0, tilt:0, row:0, fellOff:false, sunk:false, holeT:0, glideT:0, gliding:false, pushT:.06, pushPh:0, coins:0, coinChain:0, coinT:-9, coinsSeen:{}, starPh:0, linePh:0, flowS:0, tuckS:0, leanS:0, cam:null,
   best: store.get("best", 0), bestStyle: store.get("bestStyle", {})
 };
-var input = { left:false, right:false, tuck:false, jumpQ:0, jumpHeld:false, glide:false, lastLat:0, jumpAge:0, fastFall:false, jumpLate:false };
+var input = { left:false, right:false, tuck:false, jumpQ:0, jumpHeld:false, glide:false, lastLat:0, jumpAge:0, fastFall:false, jumpLate:0 };
 var pops = [];   // trick callouts drawn on the canvas
 
 // Speed follows flow and the tuck through a short ease, so a trick is a
@@ -645,7 +667,7 @@ function doJump(){
   if(S.landT < .16 && S.airT > .25) trick("hop");   // a jump right as you land is a hop: it keeps the line going
   // a jump covers at most JUMP_ROWS rows: fast, it's a lower, flatter ollie,
   // so speed never carries you over one gap and into the next
-  S.grounded = false; S.h = Math.max(S.h, 0); S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))) * JUMP_K; input.jumpQ = 0; input.jumpLate = false; input.fastFall = false;
+  S.grounded = false; S.h = Math.max(S.h, 0); S.vh = Math.min(JUMP_V, GRAV * JUMP_ROWS * D / (2 * Math.max(1, speedNow()))) * JUMP_K; input.jumpQ = 0; input.jumpLate = 0; S.glideCut = false; input.fastFall = false;
   S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.jz = S.z; S.gapRow = false; SFX.jump();
 }
 function speedRaw(){ if(!S.st) return 0; var b = S.st.p.speed; return Math.min(b * ((1 + FLOW_MAX) * TUCK + HILL_TOP), b * (1 + S.flowS * FLOW_MAX) * (1 + (TUCK - 1) * S.tuckS) + S.carry); }
@@ -960,7 +982,10 @@ var escT = -9e9, screenT = -9e9;
 // from a jump it's held over and hops the moment you land, and it ends a glide.
 function pressJump(age){
   input.jumpQ = .14; input.jumpAge = Math.min(age || 0, .1);   // age: how long before now the press began (a touch tap reports at release)
-  if(!S.grounded && !S.fellOff && S.vh < 0) input.jumpLate = true;
+  // pressed on the way down: it ends a glide, and a press up to JUMP_BUF before you
+  // land hops as you touch down (v16: no longer held all the way down, which could
+  // spend an early press on a hop into the gap ahead)
+  if(!S.grounded && !S.fellOff && S.vh < 0){ input.jumpLate = JUMP_BUF; S.glideCut = true; }
 }
 function keyUp(code){
   if(code === "ArrowLeft" || code === "KeyA") input.left = false;
@@ -1060,7 +1085,9 @@ function update(dt){
       var vh = Math.min(clamp(4 + (sp / PACE - base * CREST_SPEED) * .8, 4, 11), GRAV * CREST_ROWS * D / (2 * sp));
       var land = rr + Math.round(2 * vh / GRAV * sp / D), clear = true;
       // flying over a gap is fine; landing in one is not
-      for(var gk = land - 4; gk <= land + 4; gk++) if(st.gap[gk]) clear = false;   // ±4: speed changes in the air move the real landing a few rows
+      // -4: speed changes in the air move the real landing a few rows; +RUNUP (v16): you land
+      // with a full run-up before the next gap, never 6–8 rows short of one
+      for(var gk = land - 4; gk <= land + RUNUP; gk++) if(st.gap[gk]) clear = false;
       if(st.pieceRow) for(gk = rr - 4; gk <= land + 4; gk++) if(st.pieceRow[gk]) clear = false;   // never launch into or over a corridor
       if(clear){ S.grounded = false; S.jz = null; S.gapRow = false; S.vh = vh * JUMP_K; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; trick("crest"); SFX.jump(); woosh(1.3); break; }
     }
@@ -1088,9 +1115,10 @@ function update(dt){
   if(S.tapFix){ var fix = S.tapFix * Math.min(1, dt * 12); S.p += fix; S.tapFix = Math.abs(S.tapFix - fix) < 1e-3 ? 0 : S.tapFix - fix; }
 
   if(input.jumpQ > 0) input.jumpQ -= dt;
+  if(input.jumpLate > 0) input.jumpLate -= dt;
   S.landT += dt;
   if(S.grounded){
-    if(input.jumpQ > 0 || input.jumpLate) doJump();   // jumpLate: pressed on the way down, so it hops the moment you land
+    if(input.jumpQ > 0 || input.jumpLate > 0) doJump();   // jumpLate: pressed just before landing, so it hops the moment you land
     else if(!floorAt(S.p, S.z)){
       if(input.jumpHeld) doJump();   // holding jump at an edge jumps
       else { S.grounded = false; S.vh = 0; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = true; S.holeT = 0; S.sunk = false; }
@@ -1104,7 +1132,7 @@ function update(dt){
     if(st.gap[Math.floor(S.z / D)]) S.gapRow = true;
     // glide: hold jump on the way down
     var glideEnd = S.jz != null && (S.z - S.jz + Math.max(0, S.h) / GLIDE_FALL * sp) / D > GLIDE_ROWS;
-    S.gliding = !S.fellOff && S.vh < 0 && S.glideT < GLIDE_MAX && !input.jumpLate && !glideEnd && (input.jumpHeld || input.glide);
+    S.gliding = !S.fellOff && S.vh < 0 && S.glideT < GLIDE_MAX && !S.glideCut && !glideEnd && (input.jumpHeld || input.glide);
     if(S.gliding){
       S.glideT += dt; S.vh -= GRAV * GLIDE_GRAV * dt; if(S.vh < -GLIDE_FALL) S.vh += (-GLIDE_FALL - S.vh) * Math.min(1, dt * GLIDE_EASE);
       S.carry -= GLIDE_DRAG * base * dt;
@@ -1123,7 +1151,7 @@ function update(dt){
     if(S.h <= 0 && S.vh < 0){
       if(under && S.h > -.35 && !S.sunk){
         var hard = S.vh < -HARD_V;
-        S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; S.fellOff = false; S.sunk = false; S.glideT = 0; S.gliding = false; input.fastFall = false; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
+        S.h = 0; S.vh = 0; S.grounded = true; S.landT = 0; S.fellOff = false; S.sunk = false; S.glideT = 0; S.gliding = false; S.glideCut = false; input.fastFall = false; SFX.land(hard); S.shake = Math.max(S.shake, hard ? .45 : .2);
         if(S.airGap && S.gapRow && S.airT > .12){ var rowsCleared = Math.round(S.airT * sp / D); trick(rowsCleared >= 5 ? "big" : "gap"); S.check = checkAt(Math.floor(S.z / D)); }
         if(S.airSide) trick("xfer");
       }
@@ -1189,7 +1217,7 @@ function respawn(){
   S.z = c.z; S.p = c.p; S.vl = 0; S.h = 0; S.vh = 0; S.grounded = true; S.dead = 0; S.carry = 0; S.flow = S.flowS = S.flowAtFall * .5;
   S.landT = 9; S.airGap = false; S.airSide = false; S.airT = 0; S.fellOff = false; S.sunk = false; S.holeT = 0; S.glideT = 0; S.gliding = false; S.tapFix = 0;
   S.roll = upAt(G, S.p); S.rollV = 0; S.side = surf(G, S.p).s; S.row = Math.floor(S.z / D); S.spawnT = S.t; S.falls++; S.pieceIn = 0;
-  input.jumpQ = 0; input.jumpLate = false; input.fastFall = false; pops.length = 0;
+  input.jumpQ = 0; input.jumpLate = 0; S.glideCut = false; input.fastFall = false; pops.length = 0;
 }
 
 // ---------------------------------------------------------------- render
